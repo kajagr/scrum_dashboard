@@ -66,8 +66,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
 
 You can find these values inside:
 
-Supabase → Project Settings → Data API (API URL)
-Supabase → Project Settings → API Keys (Publishable key)
+- Supabase → Project Settings → Data API (API URL)
+- Supabase → Project Settings → API Keys (Publishable key)
 
 ---
 
