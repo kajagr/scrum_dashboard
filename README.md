@@ -7,19 +7,19 @@ The application enables backlog organization, sprint planning, and task tracking
 
 ## 🚀 Features
 
-* Product Backlog management
-* Sprint planning & tracking
-* Scrum board (To Do / In Progress / Done)
-* Task status updates
-* User authentication
-* Real-time data synchronization
+- Product Backlog management
+- Sprint planning & tracking
+- Scrum board (To Do / In Progress / Done)
+- Task status updates
+- User authentication
+- Real-time data synchronization
 
 ---
 
 ## 🛠 Tech Stack
 
 **Frontend:**
-React / Next.js 
+React / Next.js
 
 **Backend / Services:**
 Supabase (Authentication, Database, Realtime, Storage)
@@ -41,7 +41,7 @@ It demonstrates practical implementation of agile project management concepts co
 ### 1️⃣ Clone repository
 
 ```bash
-git clone https://github.com/yourusername/scrum_dashboard.git
+git clone https://github.com/kajagr/scrum_dashboard.git
 cd scrum_dashboard
 ```
 
@@ -60,8 +60,8 @@ npm install
 Create a `.env.local` file:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+NEXT_PUBLIC_SUPABASE_URL=https://kdrilgqqtairyrzlryrk.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_u0VwDid8nWd_AE7f4Rur4w_ycu4v4WW
 ```
 
 You can find these values inside:
@@ -80,15 +80,14 @@ npm run dev
 
 ## 📖 Scrum Concepts Implemented
 
-* Product Backlog
-* Sprint Backlog
-* Scrum Board
-* Task Lifecycle Management
-* Incremental Progress Tracking
+- Product Backlog
+- Sprint Backlog
+- Scrum Board
+- Task Lifecycle Management
+- Incremental Progress Tracking
 
 ---
 
 ## 📄 License
 
 This project is created for educational purposes.
-
