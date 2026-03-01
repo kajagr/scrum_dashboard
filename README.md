@@ -60,13 +60,14 @@ npm install
 Create a `.env.local` file:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://kdrilgqqtairyrzlryrk.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_u0VwDid8nWd_AE7f4Rur4w_ycu4v4WW
+NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
 ```
 
 You can find these values inside:
 
-Supabase → Project Settings → API
+Supabase → Project Settings → Data API (API URL)
+Supabase → Project Settings → API Keys (Publishable key)
 
 ---
 
