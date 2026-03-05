@@ -4,17 +4,20 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-interface CreateProjectModalProps {
+interface CreateSprintModalProps {
   isOpen: boolean;
   onClose: () => void;
+  projectId: string;
 }
 
-export default function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps) {
+export default function CreateSprintModal({ isOpen, onClose, projectId }: CreateSprintModalProps) {
   const router = useRouter();
   const supabase = createClient();
 
   const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [goal, setGoal] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -23,47 +26,36 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
     setLoading(true);
     setError(null);
 
-    // Get current user
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      setError("Nisi prijavljen");
+    if (new Date(endDate) <= new Date(startDate)) {
+      setError("Končni datum mora biti po začetnem datumu");
       setLoading(false);
       return;
     }
 
-    // Create project
-    const { data: project, error: projectError } = await supabase
-      .from("projects")
+    const { error: insertError } = await supabase
+      .from("sprints")
       .insert({
+        project_id: projectId,
         name,
-        description,
-        owner_id: user.id,
-      })
-      .select()
-      .single();
+        goal,
+        start_date: startDate,
+        end_date: endDate,
+        status: "planned",
+      });
 
-    if (projectError) {
-      setError(projectError.message);
+    if (insertError) {
+      setError(insertError.message);
       setLoading(false);
       return;
     }
-
-    // Add owner as project member (product_owner role)
-    await supabase.from("project_members").insert({
-      project_id: project.id,
-      user_id: user.id,
-      role: "product_owner",
-    });
 
     // Reset form
     setName("");
-    setDescription("");
+    setGoal("");
+    setStartDate("");
+    setEndDate("");
     setLoading(false);
     onClose();
-
-    // Redirect to new project
-    router.push(`/projects/${project.id}`);
     router.refresh();
   };
 
@@ -71,22 +63,17 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/50" 
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
-      {/* Modal */}
       <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md p-6 m-4">
         <h2 className="text-xl font-bold text-gray-900 mb-4">
-          Ustvari nov projekt
+          Nov Sprint
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-              Ime projekta *
+              Ime sprinta *
             </label>
             <input
               id="name"
@@ -95,23 +82,53 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
               onChange={(e) => setName(e.target.value)}
               required
               autoFocus
+              placeholder="npr. Sprint 1"
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="npr. E-commerce Platform"
             />
           </div>
 
           <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-              Opis
+            <label htmlFor="goal" className="block text-sm font-medium text-gray-700">
+              Cilj sprinta
             </label>
             <textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
+              id="goal"
+              value={goal}
+              onChange={(e) => setGoal(e.target.value)}
+              rows={2}
+              placeholder="Kaj želimo doseči v tem sprintu?"
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Kratek opis projekta..."
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">
+                Začetek *
+              </label>
+              <input
+                id="startDate"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                required
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">
+                Konec *
+              </label>
+              <input
+                id="endDate"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                required
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
           </div>
 
           {error && (
