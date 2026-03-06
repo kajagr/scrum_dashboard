@@ -93,3 +93,16 @@ export async function POST(req: Request) {
     );
   }
 }
+
+export async function GET() {
+  const { data, error } = await supabaseAdmin
+    .from("users")
+    .select("id, username, first_name, last_name")
+    .order("first_name");
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json(data, { status: 200 });
+}
