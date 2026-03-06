@@ -13,7 +13,7 @@ const helpItems = [
       </svg>
     ),
     title: "Creating a sprint",
-    body: 'Click "+ New Sprint" to create a new sprint. Each sprint needs a name, a start date, an end date, and an optional velocity.',
+    body: 'Click "+ New Sprint" to create a new sprint. Each sprint needs a name, a start date, an end date, and a velocity (story points).',
   },
   {
     icon: (

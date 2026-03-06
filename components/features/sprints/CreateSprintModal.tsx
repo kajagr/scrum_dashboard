@@ -38,12 +38,11 @@ export default function CreateSprintModal({
   const validate = (): string | null => {
     if (startDate < today) return "Start date cannot be in the past.";
     if (endDate <= startDate) return "End date must be after the start date.";
-    if (velocity !== "") {
-      const v = Number(velocity);
-      if (!Number.isFinite(v) || v <= 0) return "Velocity must be a positive number (greater than 0).";
-      if (!Number.isInteger(v)) return "Velocity must be an integer (story points).";
-      if (v > 100) return "Velocity is too high (maximum 100).";
-    }
+    if (velocity === "") return "Velocity is required.";
+    const v = Number(velocity);
+    if (!Number.isFinite(v) || v <= 0) return "Velocity must be a positive number (greater than 0).";
+    if (!Number.isInteger(v)) return "Velocity must be an integer (story points).";
+    if (v > 100) return "Velocity is too high (maximum 100).";
     const overlap = existingSprints.find(
       (s) => startDate < s.end_date && endDate > s.start_date
     );
@@ -69,7 +68,7 @@ export default function CreateSprintModal({
           name, goal,
           start_date: startDate,
           end_date: endDate,
-          velocity: velocity !== "" ? Number(velocity) : null,
+          velocity: Number(velocity),
         }),
       });
       const data = await res.json();
@@ -173,10 +172,10 @@ export default function CreateSprintModal({
             {/* Velocity */}
             <div>
               <label htmlFor="velocity" className={labelClass}>
-                Sprint Velocity
+                Sprint Velocity <span className="text-accent">*</span>
               </label>
               <input
-                id="velocity" type="number" value={velocity} min={1} max={100} step={1}
+                id="velocity" type="number" value={velocity} min={1} max={100} step={1} required
                 onChange={(e) => setVelocity(e.target.value)}
                 placeholder="example: 40"
                 className={inputClass}
