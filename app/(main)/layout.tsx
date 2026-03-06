@@ -1,6 +1,7 @@
 import Navbar from "@/components/layout/Navbar";
+import Sidebar from "@/components/layout/Sidebar";
 
-export default function MainLayout({
+export default function ProjectsLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -8,7 +9,11 @@ export default function MainLayout({
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-      <main>{children}</main>
+
+      <div className="flex h-[calc(100vh-4rem)]">
+        <Sidebar />
+        <main className="flex-1 overflow-auto p-8">{children}</main>
+      </div>
     </div>
   );
 }
