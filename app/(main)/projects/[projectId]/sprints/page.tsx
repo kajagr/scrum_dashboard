@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import CreateSprintModal from "@/components/features/sprints/CreateSprintModal";
 import SprintCard from "@/components/features/sprints/SprintCard";
+import SprintHelpTooltip from "@/components/features/sprints/SprintHelpTooltip";
 import type { Sprint } from "@/lib/types";
 
 export default function SprintsPage() {
@@ -58,7 +59,10 @@ export default function SprintsPage() {
           <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">
             Project
           </p>
-          <h1 className="text-3xl font-bold text-foreground leading-tight">Sprints</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-foreground leading-tight">Sprints</h1>
+            <SprintHelpTooltip />
+          </div>
           <p className="text-sm text-muted mt-1">
             {sprints.length > 0
               ? `${sprints.length} sprint${sprints.length === 1 ? "" : "s"}`
