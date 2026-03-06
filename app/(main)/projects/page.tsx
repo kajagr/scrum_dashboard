@@ -1,49 +1,56 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import CreateProjectModal from "@/components/features/projects/CreateProjectModal";
 import ProjectCard from "@/components/features/projects/ProjectCard";
 import type { Project } from "@/lib/types";
 
 export default function ProjectsPage() {
-  const supabase = createClient();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  useEffect(() => {
-    const loadProjects = async () => {
-      const { data, error } = await supabase
-        .from("projects")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Error fetching projects:", error);
-      } else {
-        setProjects(data || []);
+  const fetchProjects = async () => {
+    try {
+      const response = await fetch("/api/projects");
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Napaka pri nalaganju projektov");
       }
+
+      const data = await response.json();
+      setProjects(data);
+    } catch (err) {
+      console.error("Error fetching projects:", err);
+      setError(err instanceof Error ? err.message : "Neznana napaka");
+    } finally {
       setLoading(false);
-    };
+    }
+  };
 
-    loadProjects();
-  }, [supabase]);
+  useEffect(() => {
+    fetchProjects();
+  }, []);
 
-  const handleModalClose = async () => {
+  const handleModalClose = () => {
     setIsModalOpen(false);
-    // Refresh projects
-    const { data } = await supabase
-      .from("projects")
-      .select("*")
-      .order("created_at", { ascending: false });
-    setProjects(data || []);
+    fetchProjects(); // Refresh projects after creating
   };
 
   if (loading) {
     return (
       <div className="p-8">
         <p className="text-gray-500">Nalaganje...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <p className="text-red-500">Napaka: {error}</p>
       </div>
     );
   }
