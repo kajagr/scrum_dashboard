@@ -7,8 +7,8 @@ import { useRouter } from "next/navigation";
 
 const navigation = [
   { name: "Dashboard", href: "", icon: "📊" },
-  { name: "Sprint Board", href: "/board", icon: "📋" },
   { name: "Backlog", href: "/backlog", icon: "📝" },
+  { name: "Sprint Board", href: "/board", icon: "📋" },
   { name: "Sprints", href: "/sprints", icon: "🏃" },
   { name: "Time Tracking", href: "/time-tracking", icon: "⏱️" },
   { name: "Team", href: "/team", icon: "👥" },
