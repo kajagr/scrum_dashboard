@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 
 interface CreateSprintModalProps {
   isOpen: boolean;
@@ -10,14 +9,18 @@ interface CreateSprintModalProps {
   projectId: string;
 }
 
-export default function CreateSprintModal({ isOpen, onClose, projectId }: CreateSprintModalProps) {
+export default function CreateSprintModal({
+  isOpen,
+  onClose,
+  projectId,
+}: CreateSprintModalProps) {
   const router = useRouter();
-  const supabase = createClient();
 
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [velocity, setVelocity] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -26,37 +29,48 @@ export default function CreateSprintModal({ isOpen, onClose, projectId }: Create
     setLoading(true);
     setError(null);
 
-    if (new Date(endDate) <= new Date(startDate)) {
-      setError("Končni datum mora biti po začetnem datumu");
+    if (endDate <= startDate) {
+      setError("Končni datum mora biti po začetnem datumu.");
       setLoading(false);
       return;
     }
 
-    const { error: insertError } = await supabase
-      .from("sprints")
-      .insert({
-        project_id: projectId,
-        name,
-        goal,
-        start_date: startDate,
-        end_date: endDate,
-        status: "planned",
+    try {
+      const res = await fetch(`/api/projects/${projectId}/sprints`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          name,
+          goal,
+          start_date: startDate,
+          end_date: endDate,
+          velocity: velocity ? Number(velocity) : null,
+        }),
       });
 
-    if (insertError) {
-      setError(insertError.message);
-      setLoading(false);
-      return;
-    }
+      const data = await res.json();
 
-    // Reset form
-    setName("");
-    setGoal("");
-    setStartDate("");
-    setEndDate("");
-    setLoading(false);
-    onClose();
-    router.refresh();
+      if (!res.ok) {
+        setError(data.error || "Napaka pri ustvarjanju sprinta.");
+        setLoading(false);
+        return;
+      }
+
+      setName("");
+      setGoal("");
+      setStartDate("");
+      setEndDate("");
+      setVelocity("");
+      setLoading(false);
+      onClose();
+      router.refresh();
+    } catch {
+      setError("Prišlo je do napake na strežniku.");
+      setLoading(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -66,13 +80,14 @@ export default function CreateSprintModal({ isOpen, onClose, projectId }: Create
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md p-6 m-4">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">
-          Nov Sprint
-        </h2>
+        <h2 className="text-xl font-bold text-gray-900 mb-4">Nov Sprint</h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-gray-700"
+            >
               Ime sprinta *
             </label>
             <input
@@ -88,7 +103,10 @@ export default function CreateSprintModal({ isOpen, onClose, projectId }: Create
           </div>
 
           <div>
-            <label htmlFor="goal" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="goal"
+              className="block text-sm font-medium text-gray-700"
+            >
               Cilj sprinta
             </label>
             <textarea
@@ -103,7 +121,10 @@ export default function CreateSprintModal({ isOpen, onClose, projectId }: Create
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="startDate"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Začetek *
               </label>
               <input
@@ -117,7 +138,10 @@ export default function CreateSprintModal({ isOpen, onClose, projectId }: Create
             </div>
 
             <div>
-              <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="endDate"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Konec *
               </label>
               <input
@@ -131,9 +155,7 @@ export default function CreateSprintModal({ isOpen, onClose, projectId }: Create
             </div>
           </div>
 
-          {error && (
-            <p className="text-red-500 text-sm">{error}</p>
-          )}
+          {error && <p className="text-red-500 text-sm">{error}</p>}
 
           <div className="flex justify-end gap-3 pt-2">
             <button

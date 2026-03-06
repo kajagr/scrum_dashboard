@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import CreateSprintModal from "@/components/features/sprints/CreateSprintModal";
 import SprintCard from "@/components/features/sprints/SprintCard";
 import type { Sprint } from "@/lib/types";
@@ -10,40 +9,42 @@ import type { Sprint } from "@/lib/types";
 export default function SprintsPage() {
   const params = useParams();
   const projectId = params.projectId as string;
-  const supabase = createClient();
 
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  useEffect(() => {
-    const loadSprints = async () => {
-      const { data, error } = await supabase
-        .from("sprints")
-        .select("*")
-        .eq("project_id", projectId)
-        .order("start_date", { ascending: false });
+  const loadSprints = async () => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/sprints`, {
+        method: "GET",
+        credentials: "include",
+      });
 
-      if (error) {
-        console.error("Error fetching sprints:", error);
-      } else {
-        setSprints(data || []);
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error("Error fetching sprints:", data.error);
+        setSprints([]);
+        return;
       }
-      setLoading(false);
-    };
 
-    loadSprints();
-  }, [supabase, projectId]);
+      setSprints(data || []);
+    } catch (error) {
+      console.error("Error fetching sprints:", error);
+      setSprints([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadSprints();
+  }, [projectId]);
 
   const handleModalClose = async () => {
     setIsModalOpen(false);
-    // Refresh sprints
-    const { data } = await supabase
-      .from("sprints")
-      .select("*")
-      .eq("project_id", projectId)
-      .order("start_date", { ascending: false });
-    setSprints(data || []);
+    await loadSprints();
   };
 
   if (loading) {
