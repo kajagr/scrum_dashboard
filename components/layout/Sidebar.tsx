@@ -12,14 +12,15 @@ import {
   Users,
   Settings,
   LogOut,
+  Flag,
 } from "lucide-react";
 
 const navigation = [
   { name: "Projects", type: "global", href: "/projects", icon: FolderKanban },
   { name: "Dashboard", type: "project", href: "" as const, icon: LayoutDashboard },
-  
   { name: "Backlog", type: "project", href: "/backlog", icon: ClipboardList },
   { name: "Sprint Board", type: "project", href: "/board", icon: KanbanSquare },
+  { name: "Sprints", type: "project", href: "/sprints", icon: Flag },
   { name: "Time Tracking", type: "project", href: "/time-tracking", icon: Timer },
   { name: "Team", type: "project", href: "/team", icon: Users },
   { name: "Settings", type: "project", href: "/settings", icon: Settings },
