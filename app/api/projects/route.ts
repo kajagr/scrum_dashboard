@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { canCreateProject, projectNameExists } from "@/lib/permissions";
 
 // GET /api/projects - Fetch all projects for current user
 export async function GET() {
@@ -23,7 +24,7 @@ export async function GET() {
   return NextResponse.json(data);
 }
 
-// POST /api/projects - Create a new project
+// POST /api/projects - Create a new project (ADMIN ONLY)
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
 
@@ -33,11 +34,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Preveri ali je admin
+  const canCreate = await canCreateProject(user.id);
+  if (!canCreate) {
+    return NextResponse.json(
+      { error: "Samo administrator lahko ustvari projekt" }, 
+      { status: 403 }
+    );
+  }
+
   const body = await request.json();
-  const { name, description } = body;
+  const { name, description, members } = body;
 
   if (!name) {
-    return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    return NextResponse.json({ error: "Ime projekta je obvezno" }, { status: 400 });
+  }
+
+  // Preveri podvajanje imen
+  const nameExists = await projectNameExists(name);
+  if (nameExists) {
+    return NextResponse.json(
+      { error: "Projekt s tem imenom že obstaja" }, 
+      { status: 400 }
+    );
   }
 
   // Create project
@@ -55,7 +74,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: projectError.message }, { status: 500 });
   }
 
-  // Add owner as project member
+  // Dodaj člane če so poslani
+  if (members && Array.isArray(members) && members.length > 0) {
+    const memberInserts = members.map((member: { user_id: string; role: string }) => ({
+      project_id: project.id,
+      user_id: member.user_id,
+      role: member.role,
+    }));
+
+    const { error: membersError } = await supabase
+      .from("project_members")
+      .insert(memberInserts);
+
+    if (membersError) {
+      console.error("Error adding members:", membersError);
+    }
+  }
+
+  // Dodaj ustvarjalca kot člana (product_owner)
   await supabase.from("project_members").insert({
     project_id: project.id,
     user_id: user.id,
