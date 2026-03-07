@@ -1,9 +1,16 @@
+"use client";
+
+import { useState } from "react";
 import type { UserStory } from "@/lib/types";
+import CreateTaskModal from "./CreateTaskModal";
+
 
 interface StoryCardProps {
   story: UserStory;
+  projectId: string;
   onClick?: () => void;
 }
+
 
 const priorityColors = {
   must_have: "bg-red-100 text-red-800",
@@ -26,9 +33,16 @@ const statusColors = {
   done: "bg-green-100 text-green-800",
 };
 
-export default function StoryCard({ story, onClick }: StoryCardProps) {
+export default function StoryCard({
+  story,
+  projectId,
+  onClick,
+}: StoryCardProps) {
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+
   return (
-    <div
+    <>
+      <div
       onClick={onClick}
       className={`p-4 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow ${onClick ? "cursor-pointer" : ""}`}
     >
@@ -53,6 +67,26 @@ export default function StoryCard({ story, onClick }: StoryCardProps) {
           {story.status.replace("_", " ")}
         </span>
       </div>
+      <div className="mt-3">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsTaskModalOpen(true);
+          }}
+          className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md"
+        >
+          Dodaj nalogo
+        </button>
+      </div>
     </div>
-  );
+
+    <CreateTaskModal
+      isOpen={isTaskModalOpen}
+      onClose={() => setIsTaskModalOpen(false)}
+      storyId={story.id}
+      projectId={projectId}
+    />
+  </>
+);
 }

@@ -72,9 +72,15 @@ export default function BacklogPage() {
         </button>
       </div>
 
-      <div className="space-y-4">
+       <div className="space-y-4">
         {stories.length > 0 ? (
-          stories.map((story) => <StoryCard key={story.id} story={story} />)
+          stories.map((story) => (
+            <StoryCard
+              key={story.id}
+              story={story}
+              projectId={projectId}
+            />
+          ))
         ) : (
           <div className="bg-white p-8 rounded-lg border border-gray-200 text-center text-gray-500">
             <p>Ni še user stories.</p>
