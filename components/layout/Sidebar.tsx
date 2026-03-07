@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
@@ -21,6 +22,25 @@ export default function Sidebar() {
   const router = useRouter();
   const supabase = createClient();
   const projectId = params.projectId as string;
+
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from("users")
+        .select("system_role")
+        .eq("id", user.id)
+        .single();
+
+      setIsAdmin(data?.system_role === "admin");
+    };
+
+    checkAdmin();
+  }, [supabase]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -63,6 +83,24 @@ export default function Sidebar() {
             </Link>
           );
         })}
+
+        {/* Admin only */}
+        {isAdmin && (
+          <>
+            <div className="border-t border-gray-200 my-3"></div>
+            <Link
+              href="/users"
+              className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                pathname === "/users"
+                  ? "bg-purple-50 text-purple-700"
+                  : "text-gray-700 hover:bg-gray-100"
+              }`}
+            >
+              <span>👤</span>
+              Uporabniki
+            </Link>
+          </>
+        )}
       </nav>
 
       {/* User section */}

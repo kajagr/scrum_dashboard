@@ -8,15 +8,12 @@ interface CreateUserModalProps {
   onClose: () => void;
 }
 
-type UserRole = "admin" | "scrum_master" | "developer" | "product_owner";
-
 interface FormData {
   username: string;
   password: string;
   firstName: string;
   lastName: string;
   email: string;
-  role: UserRole | "";
 }
 
 interface FormErrors {
@@ -25,7 +22,6 @@ interface FormErrors {
   firstName?: string;
   lastName?: string;
   email?: string;
-  role?: string;
   general?: string;
 }
 
@@ -41,7 +37,6 @@ export default function CreateUserModal({
     firstName: "",
     lastName: "",
     email: "",
-    role: "",
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
@@ -49,9 +44,7 @@ export default function CreateUserModal({
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
 
     setFormData((prev) => ({
@@ -75,6 +68,8 @@ export default function CreateUserModal({
 
     if (!formData.password.trim()) {
       newErrors.password = "Geslo je obvezno.";
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Geslo mora imeti vsaj 6 znakov.";
     }
 
     if (!formData.firstName.trim()) {
@@ -91,10 +86,6 @@ export default function CreateUserModal({
       newErrors.email = "Vnesi veljaven e-poštni naslov.";
     }
 
-    if (!formData.role) {
-      newErrors.role = "Vloga je obvezna.";
-    }
-
     return newErrors;
   };
 
@@ -105,7 +96,6 @@ export default function CreateUserModal({
       firstName: "",
       lastName: "",
       email: "",
-      role: "",
     });
     setErrors({});
   };
@@ -140,7 +130,6 @@ export default function CreateUserModal({
           first_name: formData.firstName,
           last_name: formData.lastName,
           email: formData.email,
-          role: formData.role,
         }),
       });
 
@@ -213,7 +202,7 @@ export default function CreateUserModal({
               name="password"
               value={formData.password}
               onChange={handleChange}
-              placeholder="Vnesi geslo"
+              placeholder="Vsaj 6 znakov"
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             />
             {errors.password && (
@@ -283,31 +272,6 @@ export default function CreateUserModal({
             />
             {errors.email && (
               <p className="text-red-500 text-sm mt-1">{errors.email}</p>
-            )}
-          </div>
-
-          <div>
-            <label
-              htmlFor="role"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Vloga *
-            </label>
-            <select
-              id="role"
-              name="role"
-              value={formData.role}
-              onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">Izberi vlogo</option>
-              <option value="admin">Admin</option>
-              <option value="scrum_master">Scrum Master</option>
-              <option value="developer">Developer</option>
-              <option value="product_owner">Product Owner</option>
-            </select>
-            {errors.role && (
-              <p className="text-red-500 text-sm mt-1">{errors.role}</p>
             )}
           </div>
 
