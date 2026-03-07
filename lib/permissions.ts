@@ -26,7 +26,7 @@ export async function projectNameExists(name: string): Promise<boolean> {
     .from("projects")
     .select("id")
     .ilike("name", name)
-    .single();
+    .maybeSingle();
   
   return !!data;
 }
