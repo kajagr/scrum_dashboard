@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
+import AddMemberButton from "@/components/features/users/AddMemberButton";
 
 interface Props {
   params: Promise<{ projectId: string }>;
@@ -44,9 +45,7 @@ export default async function TeamPage({ params }: Props) {
           <h1 className="text-2xl font-bold text-gray-900">Team</h1>
           <p className="text-gray-600">Manage project members and roles</p>
         </div>
-        <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-          + Add Member
-        </button>
+        <AddMemberButton />
       </div>
 
       {/* Team members */}
