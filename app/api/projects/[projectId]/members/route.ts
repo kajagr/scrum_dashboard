@@ -13,10 +13,10 @@ interface MemberInput {
 // GET /api/projects/[id]/members - Fetch all members of a project
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const { id: projectId } = await params;
+    const { projectId } = await params;
     const supabase = await createClient();
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -61,10 +61,10 @@ export async function GET(
 // POST /api/projects/[id]/members - Add members to project (bulk)
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const { id: projectId } = await params;
+    const { projectId: projectId } = await params;
     const supabase = await createClient();
 
     const { data: { user } } = await supabase.auth.getUser();
