@@ -1,42 +1,37 @@
 @import "tailwindcss";
 
 @theme inline {
-  /* ── Rosé Studio ── */
-  --color-background: #F9EDED;
-  --color-surface: #FDF5F5;
-  --color-foreground: #1F1215;
+  /* ── Midnight Slate ── */
+  --color-background: #151C2B;
+  --color-surface: #1C2333;
+  --color-foreground: #E8EDF5;
 
-  --color-primary: #C4607A;
-  --color-primary-hover: #A84F68;
-  --color-primary-light: #FDE8EC;
-  --color-primary-border: #F0AABB;
+  --color-primary: #5B8DEF;
+  --color-primary-hover: #4A7ADE;
+  --color-primary-light: rgba(91,141,239,0.12);
+  --color-primary-border: rgba(91,141,239,0.25);
 
-  --color-accent: #E8956A;
-  --color-accent-light: #FEF0E8;
-  --color-accent-border: #F0C8A8;
-  --color-accent-text: #A05030;
+  --color-accent: #8B5CF6;
+  --color-accent-light: rgba(139,92,246,0.12);
+  --color-accent-border: rgba(139,92,246,0.25);
+  --color-accent-text: #A78BFA;
 
-  --color-border: #F0D0D5;
-  --color-muted: #8A5560;
-  --color-subtle: #C0909A;
+  --color-border: #2D3748;
+  --color-muted: #6B7A99;
+  --color-subtle: #4A5568;
 
-  --color-error: #A02020;
-  --color-error-light: #FEE8E8;
-  --color-error-border: #F0AAAA;
+  --color-error: #FC8181;
+  --color-error-light: rgba(252,129,129,0.1);
+  --color-error-border: rgba(252,129,129,0.25);
 
-  --font-sans: 'Plus Jakarta Sans', sans-serif;
-  --font-display: 'Fraunces', serif;
+  --font-sans: 'Outfit', sans-serif;
+  --font-display: 'Syne', sans-serif;
 }
 
 body {
   background: var(--color-background);
   color: var(--color-foreground);
   font-family: var(--font-sans);
-  font-size: 25px;
 }
 
 h1, h2, h3 { font-family: var(--font-display); }
-
-h1 { font-size: 35px; }
-h2 { font-size: 30px; }
-h3 { font-size: 25px; }
