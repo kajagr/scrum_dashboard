@@ -3,14 +3,14 @@ import { createClient } from "@/lib/supabase/server";
 
 function validatePassword(password: string) {
   if (password.length < 12) {
-    return "Geslo mora imeti vsaj 12 znakov.";
+    return "Password must be at least 12 characters.";
   }
 
   if (password.length > 128) {
-    return "Geslo ne sme biti daljše od 128 znakov.";
+    return "Password cannot be longer than 128 characters.";
   }
 
-  // nič trimanja, nič spreminjanja whitespace
+  // no trimming, no changing whitespace
 
   return null;
 }
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
 
-    // preveri ali je user prijavljen
+    // check if user is logged in
     const {
       data: { user },
       error: userError,
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     if (userError || !user || !user.email) {
       return NextResponse.json(
-        { error: "Uporabnik ni prijavljen." },
+        { error: "User is not authenticated." },
         { status: 401 },
       );
     }
@@ -37,18 +37,18 @@ export async function POST(request: NextRequest) {
 
     if (!oldPassword || !newPassword) {
       return NextResponse.json(
-        { error: "Staro in novo geslo sta obvezna." },
+        { error: "Old and new password are required." },
         { status: 400 },
       );
     }
 
-    // validacija novega gesla
+    // validate new password
     const passwordError = validatePassword(newPassword);
     if (passwordError) {
       return NextResponse.json({ error: passwordError }, { status: 400 });
     }
 
-    // preveri staro geslo (ponovna prijava)
+    // verify old password (re-authenticate)
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email: user.email,
       password: oldPassword,
@@ -56,12 +56,12 @@ export async function POST(request: NextRequest) {
 
     if (signInError) {
       return NextResponse.json(
-        { error: "Napačno staro geslo." },
+        { error: "Incorrect old password." },
         { status: 401 },
       );
     }
 
-    // spremeni geslo
+    // change password
     const { error: updateError } = await supabase.auth.updateUser({
       password: newPassword,
     });
@@ -71,12 +71,12 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { message: "Geslo uspešno spremenjeno." },
+      { message: "Password changed successfully." },
       { status: 200 },
     );
   } catch {
     return NextResponse.json(
-      { error: "Napaka pri spremembi gesla." },
+      { error: "An error occurred while changing the password." },
       { status: 500 },
     );
   }

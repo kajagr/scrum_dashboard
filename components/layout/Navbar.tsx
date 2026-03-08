@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import ProfileModal from "@/components/features/users/ProfileModal";
+import ProfileModal from "@/components/features/profile/ProfileModal";
 
 interface UserProfile {
   first_name: string | null;
