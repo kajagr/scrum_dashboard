@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { User, ProjectRole } from "@/lib/types";
+import RoleSelect from "@/components/features/projects/RoleSelect";
 
 interface AddMemberModalProps {
   isOpen: boolean;
@@ -238,13 +239,12 @@ export default function AddMemberModal({
                           {user?.first_name?.[0]}{user?.last_name?.[0]}
                         </div>
                         <span className="text-sm font-medium text-foreground flex-1 truncate">{user?.first_name} {user?.last_name}</span>
-                        <select value={member.role} onChange={(e) => handleRoleChange(member.user_id, e.target.value as ProjectRole)}
-                          className="text-xs bg-background border border-border text-foreground rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary">
-                          {ROLES.map((r) => {
-                            const isDisabled = UNIQUE_ROLES.includes(r.value) && takenRoles.has(r.value) && member.role !== r.value;
-                            return <option key={r.value} value={r.value} disabled={isDisabled}>{r.label}{isDisabled ? " (taken)" : ""}</option>;
-                          })}
-                        </select>
+                        <RoleSelect
+                          value={member.role}
+                          onChange={(role) => handleRoleChange(member.user_id, role)}
+                          takenRoles={takenRoles}
+                          currentMemberRole={member.role}
+                        />
                         <button type="button" onClick={() => handleRemoveUser(member.user_id)}
                           className="w-6 h-6 flex items-center justify-center rounded-full text-muted hover:text-error hover:bg-error-light transition-colors flex-shrink-0">
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
