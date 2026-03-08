@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import type { Priority } from "@/lib/types";
 
 interface CreateStoryModalProps {
@@ -11,15 +10,19 @@ interface CreateStoryModalProps {
   projectId: string;
 }
 
-export default function CreateStoryModal({ isOpen, onClose, projectId }: CreateStoryModalProps) {
+export default function CreateStoryModal({
+  isOpen,
+  onClose,
+  projectId,
+}: CreateStoryModalProps) {
   const router = useRouter();
-  const supabase = createClient();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [acceptanceCriteria, setAcceptanceCriteria] = useState("");
   const [priority, setPriority] = useState<Priority>("should_have");
   const [storyPoints, setStoryPoints] = useState<number | "">("");
+  const [businessValue, setBusinessValue] = useState<number | "">("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -28,53 +31,49 @@ export default function CreateStoryModal({ isOpen, onClose, projectId }: CreateS
     setLoading(true);
     setError(null);
 
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      setError("Nisi prijavljen");
+    if (businessValue === "") {
+      setError("Business value obvezen.");
       setLoading(false);
       return;
     }
 
-    // Get max position
-    const { data: stories } = await supabase
-      .from("user_stories")
-      .select("position")
-      .eq("project_id", projectId)
-      .order("position", { ascending: false })
-      .limit(1);
-
-    const nextPosition = stories && stories.length > 0 ? stories[0].position + 1 : 0;
-
-    const { error: insertError } = await supabase
-      .from("user_stories")
-      .insert({
-        project_id: projectId,
-        title,
-        description,
-        acceptance_criteria: acceptanceCriteria,
-        priority,
-        story_points: storyPoints === "" ? null : storyPoints,
-        status: "backlog",
-        position: nextPosition,
-        created_by: user.id,
+    try {
+      const res = await fetch(`/api/projects/${projectId}/stories`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          title,
+          description,
+          acceptance_criteria: acceptanceCriteria,
+          priority,
+          story_points: storyPoints === "" ? null : storyPoints,
+          business_value: businessValue,
+        }),
       });
+      const data = await res.json();
 
-    if (insertError) {
-      setError(insertError.message);
+      if (!res.ok) {
+        setError(data.error || "Napaka pri ustrvarjanju user story.");
+        setLoading(false);
+        return;
+      }
+
+      setTitle("");
+      setDescription("");
+      setAcceptanceCriteria("");
+      setPriority("should_have");
+      setStoryPoints("");
+      setBusinessValue("");
       setLoading(false);
-      return;
+      onClose();
+      router.refresh();
+    } catch {
+      setError("Prišlo je do napake na strežniku.");
+      setLoading(false);
     }
-
-    // Reset form
-    setTitle("");
-    setDescription("");
-    setAcceptanceCriteria("");
-    setPriority("should_have");
-    setStoryPoints("");
-    setLoading(false);
-    onClose();
-    router.refresh();
   };
 
   if (!isOpen) return null;
@@ -90,7 +89,10 @@ export default function CreateStoryModal({ isOpen, onClose, projectId }: CreateS
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="title"
+              className="block text-sm font-medium text-gray-700"
+            >
               Naslov *
             </label>
             <input
@@ -106,7 +108,10 @@ export default function CreateStoryModal({ isOpen, onClose, projectId }: CreateS
           </div>
 
           <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="description"
+              className="block text-sm font-medium text-gray-700"
+            >
               Opis
             </label>
             <textarea
@@ -119,7 +124,10 @@ export default function CreateStoryModal({ isOpen, onClose, projectId }: CreateS
           </div>
 
           <div>
-            <label htmlFor="acceptanceCriteria" className="block text-sm font-medium text-gray-700">
+            <label
+              htmlFor="acceptanceCriteria"
+              className="block text-sm font-medium text-gray-700"
+            >
               Sprejemni kriteriji
             </label>
             <textarea
@@ -134,7 +142,10 @@ export default function CreateStoryModal({ isOpen, onClose, projectId }: CreateS
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="priority" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="priority"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Prioriteta
               </label>
               <select
@@ -151,7 +162,10 @@ export default function CreateStoryModal({ isOpen, onClose, projectId }: CreateS
             </div>
 
             <div>
-              <label htmlFor="storyPoints" className="block text-sm font-medium text-gray-700">
+              <label
+                htmlFor="storyPoints"
+                className="block text-sm font-medium text-gray-700"
+              >
                 Story Points
               </label>
               <input
@@ -159,15 +173,41 @@ export default function CreateStoryModal({ isOpen, onClose, projectId }: CreateS
                 type="number"
                 min="0"
                 value={storyPoints}
-                onChange={(e) => setStoryPoints(e.target.value === "" ? "" : Number(e.target.value))}
+                onChange={(e) =>
+                  setStoryPoints(
+                    e.target.value === "" ? "" : Number(e.target.value),
+                  )
+                }
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
           </div>
 
-          {error && (
-            <p className="text-red-500 text-sm">{error}</p>
-          )}
+          <div>
+            <label
+              htmlFor="businessValue"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Business Value *
+            </label>
+            <input
+              id="businessValue"
+              type="number"
+              min="1"
+              max="100"
+              value={businessValue}
+              onChange={(e) =>
+                setBusinessValue(
+                  e.target.value === "" ? "" : Number(e.target.value),
+                )
+              }
+              placeholder="1 - 100"
+              required
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+
+          {error && <p className="text-red-500 text-sm">{error}</p>}
 
           <div className="flex justify-end gap-3 pt-2">
             <button

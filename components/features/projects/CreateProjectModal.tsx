@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 
 interface CreateProjectModalProps {
   isOpen: boolean;
@@ -11,7 +10,6 @@ interface CreateProjectModalProps {
 
 export default function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps) {
   const router = useRouter();
-  const supabase = createClient();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -23,61 +21,47 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
     setLoading(true);
     setError(null);
 
-    // Get current user
-    const { data: { user } } = await supabase.auth.getUser();
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name, description }),
+      });
 
-    if (!user) {
-      setError("Nisi prijavljen");
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Napaka pri ustvarjanju projekta");
+        setLoading(false);
+        return;
+      }
+
+      // Reset form
+      setName("");
+      setDescription("");
       setLoading(false);
-      return;
-    }
+      onClose();
 
-    // Create project
-    const { data: project, error: projectError } = await supabase
-      .from("projects")
-      .insert({
-        name,
-        description,
-        owner_id: user.id,
-      })
-      .select()
-      .single();
-
-    if (projectError) {
-      setError(projectError.message);
+      // Redirect to new project
+      router.push(`/projects/${data.id}`);
+      router.refresh();
+    } catch (err) {
+      setError("Napaka pri povezavi s strežnikom");
       setLoading(false);
-      return;
     }
-
-    // Add owner as project member (product_owner role)
-    await supabase.from("project_members").insert({
-      project_id: project.id,
-      user_id: user.id,
-      role: "product_owner",
-    });
-
-    // Reset form
-    setName("");
-    setDescription("");
-    setLoading(false);
-    onClose();
-
-    // Redirect to new project
-    router.push(`/projects/${project.id}`);
-    router.refresh();
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/50" 
         onClick={onClose}
       />
 
-      {/* Modal */}
       <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md p-6 m-4">
         <h2 className="text-xl font-bold text-gray-900 mb-4">
           Ustvari nov projekt
