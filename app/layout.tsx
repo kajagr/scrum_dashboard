@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-// @ts-expect-error lalal
 import "./globals.css";
 
 export const metadata: Metadata = {
