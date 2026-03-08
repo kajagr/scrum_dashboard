@@ -46,7 +46,7 @@ export default function ProjectsPage() {
     if (activeFilter === "All") return projects;
 
     return projects.filter((project) => {
-      const status = project.status?.toLowerCase();
+      const status = (project as any).status?.toLowerCase();
 
       if (activeFilter === "Active") return status === "active";
       if (activeFilter === "On Hold") return status === "on hold";
@@ -78,7 +78,7 @@ export default function ProjectsPage() {
     <div className="px-6 py-8 md:px-8">
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
+          <h1 className="text-3xl font-bold text-foreground leading-tight">
             Projects
           </h1>
           <p className="mt-1 text-sm text-gray-500">
