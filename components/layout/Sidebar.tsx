@@ -35,23 +35,19 @@ export default function Sidebar() {
   const supabase = createClient();
 
   const projectId = params?.projectId as string | undefined;
-
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const checkAdmin = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
       const { data } = await supabase
         .from("users")
         .select("system_role")
         .eq("id", user.id)
         .single();
-
       setIsAdmin(data?.system_role === "admin");
     };
-
     checkAdmin();
   }, [supabase]);
 
@@ -61,105 +57,99 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="flex w-72 flex-col border-r border-gray-200 bg-gradient-to-b from-slate-100 via-blue-50 to-slate-200 shadow-xl">
+    <aside className="flex w-64 flex-col bg-surface border-r border-border">
       {/* Navigation */}
-      <nav className="flex-1 px-4 py-6">
-        <div className="space-y-1">
-          {navigation.map((item) => {
-            const Icon = item.icon;
+      <nav className="flex-1 px-3 py-5 space-y-0.5">
+        {navigation.map((item) => {
+          const Icon = item.icon;
 
-            let href = "#";
-            let isDisabled = false;
-            let isActive = false;
+          let href = "#";
+          let isDisabled = false;
+          let isActive = false;
 
-            if (item.type === "global") {
-              href = item.href;
-              isActive = pathname === href;
+          if (item.type === "global") {
+            href = item.href;
+            isActive = pathname === href;
+          }
+
+          if (item.type === "project") {
+            if (!projectId) {
+              isDisabled = true;
+            } else {
+              href = `/projects/${projectId}${item.href}`;
+              isActive =
+                item.href === ""
+                  ? pathname === `/projects/${projectId}`
+                  : pathname.startsWith(href);
             }
+          }
 
-            if (item.type === "project") {
-              if (!projectId) {
-                isDisabled = true;
-              } else {
-                href = `/projects/${projectId}${item.href}`;
-                isActive =
-                  item.href === ""
-                    ? pathname === `/projects/${projectId}`
-                    : pathname.startsWith(href);
-              }
-            }
-
-            if (isDisabled) {
-              return (
-                <div
-                  key={item.name}
-                  className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-gray-400 cursor-not-allowed"
-                >
-                  <Icon size={18} />
-                  <span>{item.name}</span>
-                </div>
-              );
-            }
-
+          if (isDisabled) {
             return (
-              <Link
+              <div
                 key={item.name}
-                href={href}
-                className={`group relative flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
-                  isActive
-                    ? "bg-white text-blue-700 shadow-sm"
-                    : "text-gray-700 hover:bg-white/60 hover:text-gray-900"
-                }`}
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-subtle cursor-not-allowed opacity-40"
               >
-                {isActive && (
-                  <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r bg-blue-600"></span>
-                )}
-
-                <Icon
-                  size={18}
-                  className={isActive ? "text-blue-700" : "text-gray-500 group-hover:text-gray-700"}
-                />
-
+                <Icon size={17} />
                 <span>{item.name}</span>
-              </Link>
+              </div>
             );
-          })}
+          }
 
-          {/* Admin only - Uporabniki */}
-          {isAdmin && (
-            <>
-              <div className="border-t border-gray-200 my-3"></div>
-              <Link
-                href="/users"
-                className={`group relative flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
-                  pathname === "/users"
-                    ? "bg-white text-purple-700 shadow-sm"
-                    : "text-gray-700 hover:bg-white/60 hover:text-gray-900"
-                }`}
-              >
-                {pathname === "/users" && (
-                  <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r bg-purple-600"></span>
-                )}
+          return (
+            <Link
+              key={item.name}
+              href={href}
+              className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
+                isActive
+                  ? "bg-primary-light text-primary"
+                  : "text-muted hover:bg-background hover:text-foreground"
+              }`}
+            >
+              {isActive && (
+                <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r bg-primary" />
+              )}
+              <Icon
+                size={17}
+                className={isActive ? "text-primary" : "text-subtle group-hover:text-muted"}
+              />
+              <span>{item.name}</span>
+            </Link>
+          );
+        })}
 
-                <UserPlus
-                  size={18}
-                  className={pathname === "/users" ? "text-purple-700" : "text-gray-500 group-hover:text-gray-700"}
-                />
-
-                <span>Uporabniki</span>
-              </Link>
-            </>
-          )}
-        </div>
+        {/* Admin only */}
+        {isAdmin && (
+          <>
+            <div className="border-t border-border my-3" />
+            <Link
+              href="/users"
+              className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
+                pathname === "/users"
+                  ? "bg-accent-light text-accent-text"
+                  : "text-muted hover:bg-background hover:text-foreground"
+              }`}
+            >
+              {pathname === "/users" && (
+                <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r bg-accent" />
+              )}
+              <UserPlus
+                size={17}
+                className={pathname === "/users" ? "text-accent-text" : "text-subtle group-hover:text-muted"}
+              />
+              <span>Uporabniki</span>
+            </Link>
+          </>
+        )}
       </nav>
 
-      {/* Bottom section */}
-      <div className="border-t border-gray-200 p-4">
+      {/* Bottom */}
+      <div className="border-t border-border p-3">
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-100 hover:text-gray-900"
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted transition-all hover:bg-background hover:text-foreground"
         >
-          <LogOut size={18} className="text-gray-500" />
+          <LogOut size={17} className="text-subtle" />
           <span>Odjava</span>
         </button>
       </div>
