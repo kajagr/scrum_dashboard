@@ -34,11 +34,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Preveri ali je admin
+  // Check if user is admin
   const canCreate = await canCreateProject(user.id);
   if (!canCreate) {
     return NextResponse.json(
-      { error: "Samo administrator lahko ustvari projekt" }, 
+      { error: "Only an administrator can create a project" }, 
       { status: 403 }
     );
   }
@@ -47,14 +47,14 @@ export async function POST(request: NextRequest) {
   const { name, description, members } = body;
 
   if (!name) {
-    return NextResponse.json({ error: "Ime projekta je obvezno" }, { status: 400 });
+    return NextResponse.json({ error: "Project name is required" }, { status: 400 });
   }
 
-  // Preveri podvajanje imen
+  // Check for duplicate project name
   const nameExists = await projectNameExists(name);
   if (nameExists) {
     return NextResponse.json(
-      { error: "Projekt s tem imenom že obstaja" }, 
+      { error: "A project with this name already exists" }, 
       { status: 400 }
     );
   }
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: projectError.message }, { status: 500 });
   }
 
-  // Dodaj člane če so poslani
+  // Add members if provided
   if (members && Array.isArray(members) && members.length > 0) {
     const memberInserts = members.map((member: { user_id: string; role: string }) => ({
       project_id: project.id,
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Dodaj ustvarjalca kot člana (product_owner)
+  // Add creator as a member (product_owner)
   await supabase.from("project_members").insert({
     project_id: project.id,
     user_id: user.id,
