@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard,
@@ -13,6 +14,7 @@ import {
   Settings,
   LogOut,
   Flag,
+  UserPlus,
 } from "lucide-react";
 
 const navigation = [
@@ -34,6 +36,25 @@ export default function Sidebar() {
 
   const projectId = params?.projectId as string | undefined;
 
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from("users")
+        .select("system_role")
+        .eq("id", user.id)
+        .single();
+
+      setIsAdmin(data?.system_role === "admin");
+    };
+
+    checkAdmin();
+  }, [supabase]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/login");
@@ -41,9 +62,6 @@ export default function Sidebar() {
 
   return (
     <aside className="flex w-72 flex-col border-r border-gray-200 bg-gradient-to-b from-slate-100 via-blue-50 to-slate-200 shadow-xl">
-      {/* Logo / brand */}
-     
-
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6">
         <div className="space-y-1">
@@ -106,6 +124,32 @@ export default function Sidebar() {
               </Link>
             );
           })}
+
+          {/* Admin only - Uporabniki */}
+          {isAdmin && (
+            <>
+              <div className="border-t border-gray-200 my-3"></div>
+              <Link
+                href="/users"
+                className={`group relative flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
+                  pathname === "/users"
+                    ? "bg-white text-purple-700 shadow-sm"
+                    : "text-gray-700 hover:bg-white/60 hover:text-gray-900"
+                }`}
+              >
+                {pathname === "/users" && (
+                  <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r bg-purple-600"></span>
+                )}
+
+                <UserPlus
+                  size={18}
+                  className={pathname === "/users" ? "text-purple-700" : "text-gray-500 group-hover:text-gray-700"}
+                />
+
+                <span>Uporabniki</span>
+              </Link>
+            </>
+          )}
         </div>
       </nav>
 
