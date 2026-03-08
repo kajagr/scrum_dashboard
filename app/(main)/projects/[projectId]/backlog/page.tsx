@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import CreateStoryModal from "@/components/features/stories/CreateStoryModal";
 import StoryCard from "@/components/features/stories/StoryCard";
 import type { UserStory } from "@/lib/types";
@@ -10,40 +9,42 @@ import type { UserStory } from "@/lib/types";
 export default function BacklogPage() {
   const params = useParams();
   const projectId = params.projectId as string;
-  const supabase = createClient();
 
   const [stories, setStories] = useState<UserStory[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  useEffect(() => {
-    const loadStories = async () => {
-      const { data, error } = await supabase
-        .from("user_stories")
-        .select("*")
-        .eq("project_id", projectId)
-        .order("position", { ascending: true });
+  const loadStories = async () => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/stories`, {
+        method: "GET",
+        credentials: "include",
+      });
 
-      if (error) {
-        console.error("Error fetching stories:", error);
-      } else {
-        setStories(data || []);
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error("Error fetching stories:", data.error);
+        setStories([]);
+        return;
       }
-      setLoading(false);
-    };
 
-    loadStories();
-  }, [supabase, projectId]);
+      setStories(data || []);
+    } catch (error) {
+      console.error("Error fetching stories:", error);
+      setStories([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadStories();
+  }, [projectId]);
 
   const handleModalClose = async () => {
     setIsModalOpen(false);
-    // Refresh stories
-    const { data } = await supabase
-      .from("user_stories")
-      .select("*")
-      .eq("project_id", projectId)
-      .order("position", { ascending: true });
-    setStories(data || []);
+    await loadStories();
   };
 
   if (loading) {
@@ -59,7 +60,9 @@ export default function BacklogPage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Backlog</h1>
-          <p className="text-gray-600">Manage your product backlog and user stories</p>
+          <p className="text-gray-600">
+            Manage your product backlog and user stories
+          </p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
@@ -71,9 +74,7 @@ export default function BacklogPage() {
 
       <div className="space-y-4">
         {stories.length > 0 ? (
-          stories.map((story) => (
-            <StoryCard key={story.id} story={story} />
-          ))
+          stories.map((story) => <StoryCard key={story.id} story={story} />)
         ) : (
           <div className="bg-white p-8 rounded-lg border border-gray-200 text-center text-gray-500">
             <p>Ni še user stories.</p>
