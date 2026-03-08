@@ -35,3 +35,20 @@ body {
 }
 
 h1, h2, h3 { font-family: var(--font-display); }
+
+input,
+textarea,
+select {
+  background-color: var(--color-surface);
+  color: var(--color-foreground);
+  border: 1px solid var(--color-border);
+}
+
+/* Chrome / Edge autofill fix */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-foreground);
+  -webkit-box-shadow: 0 0 0px 1000px var(--color-surface) inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
