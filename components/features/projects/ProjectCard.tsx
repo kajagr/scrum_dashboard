@@ -140,7 +140,7 @@ export default function ProjectCard({ project, onStatusChange }: ProjectCardProp
 
         {/* Description */}
         <p className="text-sm text-muted leading-relaxed line-clamp-2 mb-4">
-          {project.description || "Ni opisa."}
+          {project.description || "No description."}
         </p>
 
         {/* Footer */}
@@ -153,7 +153,7 @@ export default function ProjectCard({ project, onStatusChange }: ProjectCardProp
               <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
             <span>
-              Ustvarjen {new Date(project.created_at).toLocaleDateString("sl-SI", {
+              Created {new Date(project.created_at).toLocaleDateString("sl-SI", {
                 day: "numeric", month: "short", year: "numeric",
               })}
             </span>

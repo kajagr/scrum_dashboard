@@ -14,6 +14,7 @@ export default function SprintsPage() {
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [projectRole, setProjectRole] = useState<string | null>(null);
 
   const loadSprints = async () => {
     try {
@@ -32,12 +33,22 @@ export default function SprintsPage() {
     }
   };
 
-  useEffect(() => { void loadSprints(); }, [projectId]);
+  useEffect(() => {
+    void loadSprints();
+    // Fetch current user's role in this project
+    fetch(`/api/projects/${projectId}/members/me`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => { if (d.role) setProjectRole(d.role); })
+      .catch(() => {});
+  }, [projectId]);
 
   const handleModalClose = async () => {
     setIsModalOpen(false);
     await loadSprints();
   };
+
+  // Only scrum_master can create sprints
+  const canCreateSprint = projectRole === "scrum_master";
 
   if (loading) {
     return (
@@ -70,13 +81,15 @@ export default function SprintsPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors shadow-sm bg-primary hover:bg-primary-hover"
-        >
-          <span className="text-lg leading-none">+</span>
-          New Sprint
-        </button>
+        {canCreateSprint && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors shadow-sm bg-primary hover:bg-primary-hover"
+          >
+            <span className="text-lg leading-none">+</span>
+            New Sprint
+          </button>
+        )}
       </div>
 
       {/* Sprint list */}
@@ -94,16 +107,20 @@ export default function SprintsPage() {
             </svg>
           </div>
           <p className="font-semibold text-foreground mb-1">No sprints yet</p>
-          <p className="text-sm text-subtle">Create your first sprint</p>
+          <p className="text-sm text-subtle">
+            {canCreateSprint ? "Create your first sprint to get started." : "No sprints have been created yet."}
+          </p>
         </div>
       )}
 
-      <CreateSprintModal
-        isOpen={isModalOpen}
-        onClose={handleModalClose}
-        projectId={projectId}
-        existingSprints={sprints}
-      />
+      {canCreateSprint && (
+        <CreateSprintModal
+          isOpen={isModalOpen}
+          onClose={handleModalClose}
+          projectId={projectId}
+          existingSprints={sprints}
+        />
+      )}
     </div>
   );
 }

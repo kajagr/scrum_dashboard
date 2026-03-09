@@ -22,6 +22,7 @@ export default function ProjectsPage() {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterStatus>("All");
+  const [systemRole, setSystemRole] = useState<string | null>(null);
 
   const fetchProjects = async () => {
     try {
@@ -38,7 +39,13 @@ export default function ProjectsPage() {
     }
   };
 
-  useEffect(() => { fetchProjects(); }, []);
+  useEffect(() => {
+    fetchProjects();
+    fetch("/api/users/profile", { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => { if (d.role) setSystemRole(d.role); })
+      .catch(() => {});
+  }, []);
 
   const handleModalClose = () => { setIsModalOpen(false); fetchProjects(); };
 
@@ -102,13 +109,15 @@ export default function ProjectsPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors shadow-sm bg-primary hover:bg-primary-hover"
-        >
-          <span className="text-lg leading-none">+</span>
-          New Project
-        </button>
+        {systemRole === "admin" && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors shadow-sm bg-primary hover:bg-primary-hover"
+          >
+            <span className="text-lg leading-none">+</span>
+            New Project
+          </button>
+        )}
       </div>
 
       {/* Filters */}
