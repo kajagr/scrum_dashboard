@@ -37,7 +37,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const businessValue = body.business_value;
     const storyPoints = body.story_points ?? null;
 
-    //preverjanje obveznih polj
+    // Check required fields
     if (
       !title ||
       !priority ||
@@ -45,48 +45,48 @@ export async function POST(request: NextRequest, context: RouteContext) {
       businessValue === null
     ) {
       return NextResponse.json(
-        { error: "title, priority in business_value so obvezni." },
+        { error: "title, priority and business_value are required." },
         { status: 400 },
       );
     }
 
-    //preverjanje pravilnosti prioritete
+    // Check valid priority
     if (!ALLOWED_PRIORITIES.includes(priority)) {
       return NextResponse.json(
-        { error: "Neveljavna prioriteta." },
+        { error: "Invalid priority value." },
         { status: 400 },
       );
     }
 
     const businessValueNumber = Number(businessValue);
 
-    //preverjanje pravilnosti business_value
+    // Check valid business_value
     if (
       !Number.isFinite(businessValueNumber) ||
       businessValueNumber <= 0 ||
       businessValueNumber > 100
     ) {
       return NextResponse.json(
-        { error: "business_value mora biti med 1 in 100." },
+        { error: "business_value must be between 1 and 100." },
         { status: 400 },
       );
     }
 
     let storyPointsNumber: number | null = null;
 
-    //preverjanje pravilnosti story_points
+    // Check valid story_points
     if (storyPoints !== null && storyPoints !== "") {
       storyPointsNumber = Number(storyPoints);
 
       if (!Number.isFinite(storyPointsNumber) || storyPointsNumber < 0) {
         return NextResponse.json(
-          { error: "story_points mora biti 0 ali več." },
+          { error: "story_points must be 0 or greater." },
           { status: 400 },
         );
       }
     }
 
-    //poda nov story na pravo mesto (backlog se sortira po position)
+    // Place new story at the correct position (backlog is sorted by position)
     const { data: existingStory, error: duplicateCheckError } = await supabase
       .from("user_stories")
       .select("id")
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     if (existingStory) {
       return NextResponse.json(
-        { error: "User story s tem naslovom že obstaja." },
+        { error: "A user story with this title already exists." },
         { status: 409 },
       );
     }
@@ -142,14 +142,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .select()
       .single();
 
-    //preveri RLS pravila (le PO in SM lahko dodajata story)
+    // RLS check (only PO and SM can add a story)
     if (error) {
       if (
         error.message.toLowerCase().includes("row-level security") ||
         error.message.toLowerCase().includes("permission denied")
       ) {
         return NextResponse.json(
-          { error: "Nimaš pravic za ustvarjanje user story." },
+          { error: "You do not have permission to create a user story." },
           { status: 403 },
         );
       }
@@ -160,7 +160,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json(data, { status: 201 });
   } catch {
     return NextResponse.json(
-      { error: "Napaka pri ustvarjanju user story." },
+      { error: "An error occurred while creating the user story." },
       { status: 500 },
     );
   }
@@ -192,7 +192,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         error.message.toLowerCase().includes("permission denied")
       ) {
         return NextResponse.json(
-          { error: "Nimaš pravic za ogled user stories." },
+          { error: "You do not have permission to view user stories." },
           { status: 403 },
         );
       }
@@ -203,7 +203,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return NextResponse.json(data ?? [], { status: 200 });
   } catch {
     return NextResponse.json(
-      { error: "Napaka pri pridobivanju user stories." },
+      { error: "An error occurred while fetching user stories." },
       { status: 500 },
     );
   }

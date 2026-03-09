@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 type RouteContext = {
-  params: Promise<{
-    projectId: string;
-  }>;
+  params: Promise<{ projectId: string }>;
 };
 
 function getTodayDateString() {
@@ -16,11 +14,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const supabase = await createClient();
     const { projectId } = await context.params;
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -30,17 +24,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     if (!Array.isArray(storyIds) || storyIds.length === 0) {
       return NextResponse.json(
-        { error: "storyIds mora biti neprazen seznam." },
-        { status: 400 },
+        { error: "storyIds must be a non-empty array." },
+        { status: 400 }
       );
     }
 
     const today = getTodayDateString();
 
-    // najdi aktivni sprint
+    // Find active sprint
     const { data: activeSprint, error: sprintError } = await supabase
       .from("sprints")
-      .select("id, name, start_date, end_date")
+      .select("id, name, start_date, end_date, velocity")
       .eq("project_id", projectId)
       .lte("start_date", today)
       .gte("end_date", today)
@@ -52,12 +46,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     if (!activeSprint) {
       return NextResponse.json(
-        { error: "Aktivni sprint ne obstaja." },
-        { status: 400 },
+        { error: "No active sprint exists for this project." },
+        { status: 400 }
       );
     }
 
-    // preberi izbrane zgodbe
+    // Fetch selected stories
     const { data: stories, error: storiesError } = await supabase
       .from("user_stories")
       .select("id, project_id, status, sprint_id, story_points")
@@ -65,39 +59,65 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .eq("project_id", projectId);
 
     if (storiesError) {
-      return NextResponse.json(
-        { error: storiesError.message },
-        { status: 500 },
-      );
+      return NextResponse.json({ error: storiesError.message }, { status: 500 });
     }
 
     if (!stories || stories.length !== storyIds.length) {
       return NextResponse.json(
-        { error: "Nekatere zgodbe ne obstajajo ali ne pripadajo projektu." },
-        { status: 400 },
+        { error: "Some stories do not exist or do not belong to this project." },
+        { status: 400 }
       );
     }
 
-    // validacije
-    const invalidDone = stories.find((story) => story.status === "done");
+    // Validate: velocity not exceeded
+    if (activeSprint.velocity != null) {
+      const { data: alreadyInSprint } = await supabase
+        .from("user_stories")
+        .select("story_points")
+        .eq("sprint_id", activeSprint.id)
+        .eq("project_id", projectId);
+
+      const usedPoints = (alreadyInSprint ?? []).reduce((sum, s) => sum + (s.story_points ?? 0), 0);
+      const incomingPoints = stories.reduce((sum, s) => sum + (s.story_points ?? 0), 0);
+
+      if (usedPoints + incomingPoints > activeSprint.velocity) {
+        return NextResponse.json(
+          {
+            error: `Adding these stories (${incomingPoints} pts) would exceed the sprint velocity of ${activeSprint.velocity} pts. Currently ${usedPoints} pts are assigned.`,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Validate: no story points missing
+    const missingPoints = stories.find((s) => s.story_points == null);
+    if (missingPoints) {
+      return NextResponse.json(
+        { error: "All stories must have story points set before being assigned to a sprint." },
+        { status: 400 }
+      );
+    }
+
+    // Validate: none are done
+    const invalidDone = stories.find((s) => s.status === "done");
     if (invalidDone) {
       return NextResponse.json(
-        { error: "Realiziranih zgodb ni mogoče dodeliti sprintu." },
-        { status: 400 },
+        { error: "Completed stories cannot be assigned to a sprint." },
+        { status: 400 }
       );
     }
 
-    const alreadyAssignedToActive = stories.find(
-      (story) => story.sprint_id === activeSprint.id,
-    );
-    if (alreadyAssignedToActive) {
+    // Validate: none already in the active sprint
+    const alreadyAssigned = stories.find((s) => s.sprint_id === activeSprint.id);
+    if (alreadyAssigned) {
       return NextResponse.json(
-        { error: "Nekatere zgodbe so že dodeljene aktivnemu sprintu." },
-        { status: 400 },
+        { error: "Some stories are already assigned to the active sprint." },
+        { status: 400 }
       );
     }
 
-    // update vseh izbranih zgodb
+    // Assign all selected stories to the active sprint
     const { error: updateError } = await supabase
       .from("user_stories")
       .update({ sprint_id: activeSprint.id })
@@ -110,26 +130,25 @@ export async function POST(request: NextRequest, context: RouteContext) {
         updateError.message.toLowerCase().includes("permission denied")
       ) {
         return NextResponse.json(
-          { error: "Nimaš pravic za dodeljevanje zgodb sprintu." },
-          { status: 403 },
+          { error: "You don't have permission to assign stories to a sprint." },
+          { status: 403 }
         );
       }
-
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 
     return NextResponse.json(
       {
-        message: "Zgodbe uspešno dodeljene aktivnemu sprintu.",
+        message: `Successfully assigned ${storyIds.length} stor${storyIds.length === 1 ? "y" : "ies"} to sprint "${activeSprint.name}".`,
         sprint: activeSprint,
         assignedCount: storyIds.length,
       },
-      { status: 200 },
+      { status: 200 }
     );
   } catch {
     return NextResponse.json(
-      { error: "Napaka pri dodeljevanju zgodb sprintu." },
-      { status: 500 },
+      { error: "An error occurred while assigning stories to the sprint." },
+      { status: 500 }
     );
   }
 }

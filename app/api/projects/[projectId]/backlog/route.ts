@@ -29,7 +29,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const { data: activeSprint, error: activeSprintError } = await supabase
       .from("sprints")
-      .select("id, name, start_date, end_date, status")
+      .select("id, name, start_date, end_date, status, velocity")
       .eq("project_id", projectId)
       .lte("start_date", today)
       .gte("end_date", today)
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     );
   } catch {
     return NextResponse.json(
-      { error: "Napaka pri pridobivanju product backloga." },
+      { error: "Error loading product backlog." },
       { status: 500 },
     );
   }

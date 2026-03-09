@@ -25,13 +25,7 @@ const navigation = [
     href: "" as const,
     icon: LayoutDashboard,
   },
-  { name: "Backlog", type: "project", href: "/backlog", icon: ClipboardList },
-  {
-    name: "Product Backlog",
-    type: "project",
-    href: "/product-backlog",
-    icon: ClipboardList,
-  },
+  { name: "Product Backlog", type: "project", href: "/backlog", icon: ClipboardList },
   { name: "Sprint Board", type: "project", href: "/board", icon: KanbanSquare },
   { name: "Sprints", type: "project", href: "/sprints", icon: Flag },
   {
