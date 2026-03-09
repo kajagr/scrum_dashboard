@@ -7,6 +7,14 @@ type RouteContext = {
   }>;
 };
 
+function getSprintStatus(startDate: string, endDate: string) {
+  const today = new Date().toISOString().split("T")[0];
+
+  if (today < startDate) return "planned";
+  if (today > endDate) return "completed";
+  return "active";
+}
+
 // GET /api/projects/:projectId/sprints
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
@@ -32,7 +40,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json(data, { status: 200 });
+    const sprintsWithUpdatedStatus = (data ?? []).map((sprint) => ({
+      ...sprint,
+      status: getSprintStatus(sprint.start_date, sprint.end_date),
+    }));
+
+    return NextResponse.json(sprintsWithUpdatedStatus, { status: 200 });
   } catch {
     return NextResponse.json(
       { error: "Napaka pri pridobivanju sprintov." },
@@ -66,37 +79,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // const startDate = new Date(start_date);
-    // const endDate = new Date(end_date);
-    // const today = new Date();
-    // today.setHours(0, 0, 0, 0);
     const today = new Date().toISOString().split("T")[0];
 
-    // console.log("start_date:", start_date);
-    // console.log("end_date:", end_date);
-    // console.log("today:", today);
-    // console.log("typeof start_date:", typeof start_date);
-
-    // if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-    //   return NextResponse.json(
-    //     { error: "Neveljaven format datuma." },
-    //     { status: 400 },
-    //   );
-    // }
-
-    // if (startDate < today) {
-    //   return NextResponse.json(
-    //     { error: "Začetni datum ne sme biti v preteklosti." },
-    //     { status: 400 },
-    //   );
-    // }
-
-    // if (endDate <= startDate) {
-    //   return NextResponse.json(
-    //     { error: "Končni datum mora biti po začetnem." },
-    //     { status: 400 },
-    //   );
-    // }
     if (start_date < today) {
       return NextResponse.json(
         { error: "Začetni datum ne sme biti v preteklosti." },
