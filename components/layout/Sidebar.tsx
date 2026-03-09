@@ -19,11 +19,21 @@ import {
 
 const navigation = [
   { name: "Projects", type: "global", href: "/projects", icon: FolderKanban },
-  { name: "Dashboard", type: "project", href: "" as const, icon: LayoutDashboard },
-  { name: "Backlog", type: "project", href: "/backlog", icon: ClipboardList },
+  {
+    name: "Dashboard",
+    type: "project",
+    href: "" as const,
+    icon: LayoutDashboard,
+  },
+  { name: "Product Backlog", type: "project", href: "/backlog", icon: ClipboardList },
   { name: "Sprint Board", type: "project", href: "/board", icon: KanbanSquare },
   { name: "Sprints", type: "project", href: "/sprints", icon: Flag },
-  { name: "Time Tracking", type: "project", href: "/time-tracking", icon: Timer },
+  {
+    name: "Time Tracking",
+    type: "project",
+    href: "/time-tracking",
+    icon: Timer,
+  },
   { name: "Team", type: "project", href: "/team", icon: Users },
   { name: "Settings", type: "project", href: "/settings", icon: Settings },
 ];
@@ -39,7 +49,9 @@ export default function Sidebar() {
 
   useEffect(() => {
     const checkAdmin = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase
         .from("users")
@@ -111,7 +123,11 @@ export default function Sidebar() {
               )}
               <Icon
                 size={17}
-                className={isActive ? "text-primary" : "text-subtle group-hover:text-muted"}
+                className={
+                  isActive
+                    ? "text-primary"
+                    : "text-subtle group-hover:text-muted"
+                }
               />
               <span>{item.name}</span>
             </Link>
@@ -135,7 +151,11 @@ export default function Sidebar() {
               )}
               <UserPlus
                 size={17}
-                className={pathname === "/users" ? "text-accent-text" : "text-subtle group-hover:text-muted"}
+                className={
+                  pathname === "/users"
+                    ? "text-accent-text"
+                    : "text-subtle group-hover:text-muted"
+                }
               />
               <span>Uporabniki</span>
             </Link>
