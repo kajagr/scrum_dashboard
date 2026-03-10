@@ -1,9 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
+"use client";
 
-interface Props {
-  params: Promise<{ projectId: string }>;
-}
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import StoryDetailModal from "@/components/features/board/StoryDetailModal";
 
 type Story = {
   id: string;
@@ -25,6 +24,10 @@ type Sprint = {
   velocity: number | null;
 };
 
+type ProjectMember = {
+  role: string;
+};
+
 const PRIORITY_CONFIG: Record<string, { label: string; pill: string; dot: string }> = {
   must_have:   { label: "Must Have",   pill: "bg-[rgba(252,129,129,0.1)] text-[#FC8181] border border-[rgba(252,129,129,0.25)]",   dot: "bg-[#FC8181]" },
   should_have: { label: "Should Have", pill: "bg-[rgba(139,92,246,0.12)] text-[#A78BFA] border border-[rgba(139,92,246,0.25)]",   dot: "bg-[#8B5CF6]" },
@@ -39,47 +42,54 @@ const STATUS_CONFIG: Record<string, { label: string; pill: string; order: number
   done:        { label: "Done",        pill: "bg-[rgba(52,211,153,0.12)] text-[#34D399] border border-[rgba(52,211,153,0.25)]",   order: 3 },
 };
 
-function getTodayDateString() {
-  return new Date().toISOString().split("T")[0];
-}
+const PRIORITY_ORDER: Record<string, number> = { must_have: 0, should_have: 1, could_have: 2, wont_have: 3 };
 
-export default async function SprintBoardPage({ params }: Props) {
-  const { projectId } = await params;
-  const supabase = await createClient();
+export default function SprintBoardPage() {
+  const params = useParams();
+  const projectId = params.projectId as string;
 
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id, name")
-    .eq("id", projectId)
-    .single();
+  const [loading, setLoading] = useState(true);
+  const [activeSprint, setActiveSprint] = useState<Sprint | null>(null);
+  const [stories, setStories] = useState<Story[]>([]);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [selectedStory, setSelectedStory] = useState<Story | null>(null);
 
-  if (!project) notFound();
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Fetch backlog data (includes active sprint and stories)
+        const backlogRes = await fetch(`/api/projects/${projectId}/backlog`, {
+          credentials: "include",
+        });
 
-  const today = getTodayDateString();
+        if (backlogRes.ok) {
+          const data = await backlogRes.json();
+          setActiveSprint(data.activeSprint);
+          // Get only stories in active sprint
+          setStories(data.assigned ?? []);
+        }
 
-  // Active sprint
-  const { data: activeSprint } = await supabase
-    .from("sprints")
-    .select("id, name, start_date, end_date, status, velocity")
-    .eq("project_id", projectId)
-    .lte("start_date", today)
-    .gte("end_date", today)
-    .maybeSingle() as { data: Sprint | null };
+        // Fetch user's role in project
+        const memberRes = await fetch(`/api/projects/${projectId}/members/me`, {
+          credentials: "include",
+        });
 
-  // Stories in active sprint
-  const stories: Story[] = [];
-  if (activeSprint) {
-    const { data } = await supabase
-      .from("user_stories")
-      .select("id, title, description, priority, status, story_points, business_value, sprint_id")
-      .eq("project_id", projectId)
-      .eq("sprint_id", activeSprint.id)
-      .order("status", { ascending: true });
-    if (data) stories.push(...data);
-  }
+        if (memberRes.ok) {
+          const memberData: ProjectMember = await memberRes.json();
+          setUserRole(memberData.role);
+        }
+      } catch {
+        console.error("Error loading sprint board");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Sort by status order, then priority
-  const PRIORITY_ORDER: Record<string, number> = { must_have: 0, should_have: 1, could_have: 2, wont_have: 3 };
+    fetchData();
+  }, [projectId]);
+
+  // Sort stories by status order, then priority
   const sorted = [...stories].sort((a, b) => {
     const statusDiff = (STATUS_CONFIG[a.status]?.order ?? 99) - (STATUS_CONFIG[b.status]?.order ?? 99);
     if (statusDiff !== 0) return statusDiff;
@@ -87,8 +97,23 @@ export default async function SprintBoardPage({ params }: Props) {
   });
 
   const totalPoints = stories.reduce((sum, s) => sum + (s.story_points ?? 0), 0);
-  const donePoints  = stories.filter((s) => s.status === "done").reduce((sum, s) => sum + (s.story_points ?? 0), 0);
-  const doneCount   = stories.filter((s) => s.status === "done").length;
+  const donePoints = stories.filter((s) => s.status === "done").reduce((sum, s) => sum + (s.story_points ?? 0), 0);
+  const doneCount = stories.filter((s) => s.status === "done").length;
+
+  // Can add tasks: scrum_master or developer
+  const canAddTasks = userRole === "scrum_master" || userRole === "developer";
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 p-6 text-[#6B7A99]">
+        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+        </svg>
+        <span className="text-sm">Nalaganje Sprint Board...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -143,7 +168,7 @@ export default async function SprintBoardPage({ params }: Props) {
             <div className="space-y-2">
               {sorted.map((story, i) => {
                 const priority = PRIORITY_CONFIG[story.priority] ?? PRIORITY_CONFIG.wont_have;
-                const status   = STATUS_CONFIG[story.status]     ?? STATUS_CONFIG.backlog;
+                const status = STATUS_CONFIG[story.status] ?? STATUS_CONFIG.backlog;
                 const prevStatus = i > 0 ? sorted[i - 1].status : null;
                 const showDivider = i > 0 && story.status !== prevStatus;
 
@@ -159,7 +184,10 @@ export default async function SprintBoardPage({ params }: Props) {
                       </div>
                     )}
 
-                    <div className="flex items-start gap-3 p-4 rounded-xl border border-[#2D3748] bg-[#1C2333] hover:border-[#4A5568] transition-colors">
+                    <div
+                      onClick={() => setSelectedStory(story)}
+                      className="flex items-start gap-3 p-4 rounded-xl border border-[#2D3748] bg-[#1C2333] hover:border-[#5B8DEF] hover:bg-[#1C2333]/80 transition-all cursor-pointer"
+                    >
                       {/* Position number */}
                       <span className="text-xs text-[#6B7A99] font-mono mt-0.5 w-5 text-right flex-shrink-0">{i + 1}</span>
 
@@ -194,6 +222,11 @@ export default async function SprintBoardPage({ params }: Props) {
                           </span>
                         </div>
                       </div>
+
+                      {/* Arrow icon */}
+                      <svg className="w-5 h-5 text-[#6B7A99] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
                     </div>
                   </div>
                 );
@@ -221,6 +254,17 @@ export default async function SprintBoardPage({ params }: Props) {
           <p className="font-semibold text-[var(--color-foreground,#E8EDF5)] mb-1">No active sprint</p>
           <p className="text-sm text-[#6B7A99]">Start a sprint from the Sprints page to see stories here.</p>
         </div>
+      )}
+
+      {/* Story Detail Modal */}
+      {selectedStory && (
+        <StoryDetailModal
+          isOpen={!!selectedStory}
+          onClose={() => setSelectedStory(null)}
+          story={selectedStory}
+          projectId={projectId}
+          canAddTasks={canAddTasks}
+        />
       )}
     </div>
   );
