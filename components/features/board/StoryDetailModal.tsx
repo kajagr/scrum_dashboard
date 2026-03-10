@@ -18,7 +18,7 @@ interface StoryDetailModalProps {
     business_value: number | null;
   };
   projectId: string;
-  canAddTasks: boolean; // true če je scrum_master ali developer
+  canAddTasks: boolean;
 }
 
 interface TaskWithAssignee extends Task {
@@ -44,10 +44,20 @@ const STATUS_CONFIG: Record<string, { label: string; pill: string }> = {
   done:        { label: "Done",        pill: "bg-green-100 text-green-800" },
 };
 
-const TASK_STATUS_CONFIG: Record<string, { label: string; pill: string }> = {
-  todo:        { label: "To Do",       pill: "bg-gray-100 text-gray-700" },
-  in_progress: { label: "In Progress", pill: "bg-blue-100 text-blue-700" },
-  done:        { label: "Done",        pill: "bg-green-100 text-green-700" },
+type TaskCategory = "unassigned" | "assigned" | "active" | "done";
+
+function getTaskCategory(task: TaskWithAssignee): TaskCategory {
+  if (task.status === "done") return "done";
+  if (task.status === "in_progress") return "active";
+  if (task.assignee_id) return "assigned";
+  return "unassigned";
+}
+
+const TASK_CATEGORY_CONFIG: Record<TaskCategory, { label: string; color: string; border: string; bg: string }> = {
+  unassigned: { label: "Unassigned", color: "bg-gray-400", border: "border-gray-300", bg: "bg-gray-50" },
+  assigned:   { label: "Assigned",   color: "bg-blue-400", border: "border-blue-300", bg: "bg-blue-50" },
+  active:     { label: "Active",     color: "bg-purple-500", border: "border-purple-400", bg: "bg-purple-50" },
+  done:       { label: "Done",       color: "bg-green-500", border: "border-green-400", bg: "bg-green-50" },
 };
 
 export default function StoryDetailModal({
@@ -61,12 +71,12 @@ export default function StoryDetailModal({
   
   const [tasks, setTasks] = useState<TaskWithAssignee[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
+  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
 
   const priority = PRIORITY_CONFIG[story.priority] ?? PRIORITY_CONFIG.should_have;
   const status = STATUS_CONFIG[story.status] ?? STATUS_CONFIG.backlog;
 
-  // Fetch tasks for this story
   const fetchTasks = async () => {
     setLoadingTasks(true);
     try {
@@ -78,7 +88,7 @@ export default function StoryDetailModal({
         setTasks(data);
       }
     } catch {
-      console.error("Napaka pri nalaganju nalog.");
+      console.error("Error loading tasks.");
     } finally {
       setLoadingTasks(false);
     }
@@ -92,14 +102,46 @@ export default function StoryDetailModal({
 
   const handleCreateTaskClose = () => {
     setIsCreateTaskOpen(false);
-    fetchTasks(); // Refresh tasks after creating
+    fetchTasks();
     router.refresh();
+  };
+
+  const updateTaskStatus = async (taskId: string, newStatus: string) => {
+    setUpdatingTaskId(taskId);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (res.ok) {
+        await fetchTasks();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Error updating task.");
+      }
+    } catch {
+      alert("Error updating task.");
+    } finally {
+      setUpdatingTaskId(null);
+    }
   };
 
   if (!isOpen) return null;
 
   const totalEstimated = tasks.reduce((sum, t) => sum + (t.estimated_hours ?? 0), 0);
   const totalLogged = tasks.reduce((sum, t) => sum + (t.logged_hours ?? 0), 0);
+
+  const groupedTasks: Record<TaskCategory, TaskWithAssignee[]> = {
+    unassigned: tasks.filter((t) => getTaskCategory(t) === "unassigned"),
+    assigned: tasks.filter((t) => getTaskCategory(t) === "assigned"),
+    active: tasks.filter((t) => getTaskCategory(t) === "active"),
+    done: tasks.filter((t) => getTaskCategory(t) === "done"),
+  };
+
+  const categoryOrder: TaskCategory[] = ["active", "assigned", "unassigned", "done"];
 
   return (
     <>
@@ -130,7 +172,6 @@ export default function StoryDetailModal({
               </button>
             </div>
 
-            {/* Story meta */}
             <div className="flex items-center gap-4 mt-3 text-sm text-gray-500">
               {story.story_points != null && (
                 <span className="flex items-center gap-1">
@@ -147,24 +188,23 @@ export default function StoryDetailModal({
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-6">
-            {/* Description */}
             {story.description && (
               <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Opis</h3>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">Description</h3>
                 <p className="text-sm text-gray-600">{story.description}</p>
               </div>
             )}
 
             {/* Tasks section */}
             <div>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-700">
-                    Naloge ({tasks.length})
+                    Tasks ({tasks.length})
                   </h3>
                   {tasks.length > 0 && (
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {totalLogged}h / {totalEstimated}h opravljeno
+                      {totalLogged}h / {totalEstimated}h completed
                     </p>
                   )}
                 </div>
@@ -173,45 +213,126 @@ export default function StoryDetailModal({
                     onClick={() => setIsCreateTaskOpen(true)}
                     className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md"
                   >
-                    + Dodaj nalogo
+                    + Add Task
                   </button>
                 )}
               </div>
 
+              {tasks.length > 0 && (
+                <div className="flex items-center gap-4 mb-4 text-xs">
+                  {categoryOrder.map((cat) => {
+                    const config = TASK_CATEGORY_CONFIG[cat];
+                    const count = groupedTasks[cat].length;
+                    return (
+                      <span key={cat} className="flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${config.color}`}></span>
+                        <span className="text-gray-500">{config.label}</span>
+                        <span className="font-medium text-gray-700">{count}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+
               {loadingTasks ? (
                 <div className="text-center py-8 text-gray-500">
-                  <p className="text-sm">Nalaganje nalog...</p>
+                  <p className="text-sm">Loading tasks...</p>
                 </div>
               ) : tasks.length > 0 ? (
-                <div className="space-y-2">
-                  {tasks.map((task) => {
-                    const taskStatus = TASK_STATUS_CONFIG[task.status] ?? TASK_STATUS_CONFIG.todo;
+                <div className="space-y-4">
+                  {categoryOrder.map((category) => {
+                    const categoryTasks = groupedTasks[category];
+                    if (categoryTasks.length === 0) return null;
+                    const config = TASK_CATEGORY_CONFIG[category];
+
                     return (
-                      <div
-                        key={task.id}
-                        className="p-3 bg-gray-50 border border-gray-200 rounded-lg"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900">
-                              {task.description || task.title}
-                            </p>
-                            <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-                              <span className={`px-2 py-0.5 rounded text-xs font-medium ${taskStatus.pill}`}>
-                                {taskStatus.label}
-                              </span>
-                              {task.estimated_hours && (
-                                <span>
-                                  ⏱️ {task.logged_hours ?? 0}h / {task.estimated_hours}h
-                                </span>
-                              )}
-                              {task.assignee && (
-                                <span>
-                                  👤 {task.assignee.first_name} {task.assignee.last_name}
-                                </span>
-                              )}
-                            </div>
-                          </div>
+                      <div key={category}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`w-2 h-2 rounded-full ${config.color}`}></span>
+                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            {config.label} ({categoryTasks.length})
+                          </span>
+                        </div>
+                        <div className="space-y-2">
+                          {categoryTasks.map((task) => {
+                            const isUpdating = updatingTaskId === task.id;
+                            
+                            return (
+                              <div
+                                key={task.id}
+                                className={`p-3 rounded-lg border ${config.border} ${config.bg} ${isUpdating ? "opacity-50" : ""}`}
+                              >
+                                <div className="flex items-start gap-3">
+                                  {/* Checkbox for done */}
+                                  <button
+                                    onClick={() => updateTaskStatus(task.id, task.status === "done" ? "todo" : "done")}
+                                    disabled={isUpdating}
+                                    className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                                      task.status === "done"
+                                        ? "bg-green-500 border-green-500 text-white"
+                                        : "border-gray-300 hover:border-green-400"
+                                    }`}
+                                  >
+                                    {task.status === "done" && (
+                                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    )}
+                                  </button>
+
+                                  <div className="flex-1 min-w-0">
+                                    <p className={`text-sm font-medium ${task.status === "done" ? "text-gray-500 line-through" : "text-gray-900"}`}>
+                                      {task.description || task.title}
+                                    </p>
+                                    <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                                      {task.estimated_hours && (
+                                        <span>⏱️ {task.logged_hours ?? 0}h / {task.estimated_hours}h</span>
+                                      )}
+                                      {task.assignee ? (
+                                        <span className="flex items-center gap-1">
+                                          <span className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-[10px] font-medium">
+                                            {task.assignee.first_name?.[0]}{task.assignee.last_name?.[0]}
+                                          </span>
+                                          {task.assignee.first_name} {task.assignee.last_name}
+                                        </span>
+                                      ) : (
+                                        <span className="flex items-center gap-1 text-gray-400">
+                                          <span className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center">
+                                            <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                              <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                            </svg>
+                                          </span>
+                                          Unassigned
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Action buttons */}
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    {task.status === "todo" && (
+                                      <button
+                                        onClick={() => updateTaskStatus(task.id, "in_progress")}
+                                        disabled={isUpdating}
+                                        className="px-2 py-1 text-xs font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded transition-colors"
+                                      >
+                                        Start
+                                      </button>
+                                    )}
+                                    {task.status === "in_progress" && (
+                                      <button
+                                        onClick={() => updateTaskStatus(task.id, "todo")}
+                                        disabled={isUpdating}
+                                        className="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                                      >
+                                        Pause
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     );
@@ -219,23 +340,22 @@ export default function StoryDetailModal({
                 </div>
               ) : (
                 <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-gray-500 text-sm">Ni še nalog.</p>
+                  <p className="text-gray-500 text-sm">No tasks yet.</p>
                   {canAddTasks && story.status !== "done" && (
                     <button
                       onClick={() => setIsCreateTaskOpen(true)}
                       className="mt-2 text-blue-600 hover:text-blue-700 text-sm font-medium"
                     >
-                      Dodaj prvo nalogo →
+                      Add first task →
                     </button>
                   )}
                 </div>
               )}
 
-              {/* Warning if story is done */}
               {story.status === "done" && (
                 <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <p className="text-sm text-yellow-800">
-                    ⚠️ Ta zgodba je že realizirana. Nalog ni mogoče več dodajati.
+                    ⚠️ This story is already completed. Tasks cannot be added.
                   </p>
                 </div>
               )}
@@ -248,7 +368,7 @@ export default function StoryDetailModal({
               onClick={onClose}
               className="w-full px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-md"
             >
-              Zapri
+              Close
             </button>
           </div>
         </div>
