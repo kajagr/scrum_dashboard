@@ -38,11 +38,10 @@ export default function CreateTaskModal({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Naloži člane projekta (samo developerji)
   useEffect(() => {
     const fetchMembers = async () => {
       if (!isOpen) return;
-      
+
       setLoadingMembers(true);
       try {
         const res = await fetch(`/api/projects/${projectId}/members`, {
@@ -51,12 +50,13 @@ export default function CreateTaskModal({
 
         if (res.ok) {
           const data: ProjectMember[] = await res.json();
-          // Filtriraj developerje in scrum masterje
-          const assignable = data.filter((m) => m.role === "developer" || m.role === "scrum_master");
+          const assignable = data.filter(
+            (m) => m.role === "developer" || m.role === "scrum_master"
+          );
           setMembers(assignable);
         }
       } catch {
-        console.error("Napaka pri nalaganju članov.");
+        console.error("Error loading project members.");
       } finally {
         setLoadingMembers(false);
       }
@@ -83,13 +83,13 @@ export default function CreateTaskModal({
     setError(null);
 
     if (!description.trim()) {
-      setError("Opis naloge je obvezen.");
+      setError("Task description is required.");
       setLoading(false);
       return;
     }
 
     if (estimatedHours === "" || Number(estimatedHours) <= 0) {
-      setError("Ocena časa mora biti večja od 0.");
+      setError("Estimated time must be greater than 0.");
       setLoading(false);
       return;
     }
@@ -111,7 +111,7 @@ export default function CreateTaskModal({
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Napaka pri ustvarjanju naloge.");
+        setError(data.error || "Failed to create task.");
         setLoading(false);
         return;
       }
@@ -121,7 +121,7 @@ export default function CreateTaskModal({
       onClose();
       router.refresh();
     } catch {
-      setError("Prišlo je do napake na strežniku.");
+      setError("A server error occurred.");
       setLoading(false);
     }
   };
@@ -130,29 +130,46 @@ export default function CreateTaskModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={handleClose} />
+      <div
+        className="absolute inset-0 bg-black/50"
+        onClick={handleClose}
+      />
 
-      <div className="relative bg-white rounded-lg shadow-xl w-full max-w-lg p-6 m-4">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Nova naloga</h2>
+      <div
+        className="relative m-4 w-full max-w-lg rounded-2xl p-6 shadow-xl"
+        style={{
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          color: "var(--color-foreground)",
+        }}
+      >
+        <h2 className="mb-4 text-xl font-bold text-[var(--color-foreground)]">
+          New Task
+        </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Opis naloge *
+            <label className="block text-sm font-medium text-[var(--color-foreground)]">
+              Task Description *
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               required
               rows={3}
-              placeholder="Opišite nalogo..."
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Describe the task..."
+              className="mt-1 block w-full rounded-md px-3 py-2 text-sm outline-none transition"
+              style={{
+                border: "1px solid var(--color-border)",
+                background: "var(--color-background)",
+                color: "var(--color-foreground)",
+              }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Ocena časa (ure) *
+            <label className="block text-sm font-medium text-[var(--color-foreground)]">
+              Estimated Time (hours) *
             </label>
             <input
               type="number"
@@ -164,23 +181,33 @@ export default function CreateTaskModal({
                   e.target.value === "" ? "" : Number(e.target.value)
                 )
               }
-              placeholder="npr. 4"
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              placeholder="e.g. 4"
+              className="mt-1 block w-full rounded-md px-3 py-2 text-sm outline-none transition"
+              style={{
+                border: "1px solid var(--color-border)",
+                background: "var(--color-background)",
+                color: "var(--color-foreground)",
+              }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Predlagan član ekipe (neobvezno)
+            <label className="block text-sm font-medium text-[var(--color-foreground)]">
+              Suggested Team Member (optional)
             </label>
             <select
               value={assigneeId}
               onChange={(e) => setAssigneeId(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className="mt-1 block w-full rounded-md px-3 py-2 text-sm outline-none transition"
+              style={{
+                border: "1px solid var(--color-border)",
+                background: "var(--color-background)",
+                color: "var(--color-foreground)",
+              }}
             >
-              <option value="">-- Brez dodelitve --</option>
+              <option value="">-- Unassigned --</option>
               {loadingMembers ? (
-                <option disabled>Nalaganje...</option>
+                <option disabled>Loading...</option>
               ) : (
                 members.map((member) => (
                   <option key={member.user_id} value={member.user_id}>
@@ -189,14 +216,26 @@ export default function CreateTaskModal({
                 ))
               )}
             </select>
-            <p className="mt-1 text-xs text-gray-500">
-              Član mora nalogo še sprejeti, preden mu je dodeljena.
+
+            <p className="mt-1 text-xs text-[var(--color-muted)]">
+              The team member must accept the task before it becomes assigned.
             </p>
           </div>
 
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-red-600 text-sm">{error}</p>
+            <div
+              className="rounded-md p-3"
+              style={{
+                background: "var(--color-error-light)",
+                border: "1px solid var(--color-error-border)",
+              }}
+            >
+              <p
+                className="text-sm"
+                style={{ color: "var(--color-error)" }}
+              >
+                {error}
+              </p>
             </div>
           )}
 
@@ -204,17 +243,26 @@ export default function CreateTaskModal({
             <button
               type="button"
               onClick={handleClose}
-              className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-md"
+              className="rounded-md px-4 py-2 font-medium transition hover:opacity-90"
+              style={{
+                background: "var(--color-background)",
+                color: "var(--color-foreground)",
+                border: "1px solid var(--color-border)",
+              }}
             >
-              Prekliči
+              Cancel
             </button>
 
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md disabled:opacity-50"
+              className="rounded-md px-4 py-2 font-medium text-white transition disabled:opacity-50 hover:opacity-90"
+              style={{
+                background: "var(--color-primary)",
+                border: "1px solid var(--color-primary-border)",
+              }}
             >
-              {loading ? "Shranjujem..." : "Dodaj nalogo"}
+              {loading ? "Saving..." : "Add Task"}
             </button>
           </div>
         </form>

@@ -9,7 +9,6 @@ export default async function ProjectDashboardPage({ params }: Props) {
   const { projectId } = await params;
   const supabase = await createClient();
 
-  // Fetch project details
   const { data: project, error } = await supabase
     .from("projects")
     .select("*")
@@ -20,7 +19,6 @@ export default async function ProjectDashboardPage({ params }: Props) {
     notFound();
   }
 
-  // Fetch stats (example queries - adjust based on your needs)
   const { count: storiesCount } = await supabase
     .from("user_stories")
     .select("*", { count: "exact", head: true })
@@ -32,34 +30,80 @@ export default async function ProjectDashboardPage({ params }: Props) {
     .eq("project_id", projectId);
 
   return (
-    <div>
+    <div className="text-[var(--color-foreground)]">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">{project.name}</h1>
-        <p className="text-gray-600">{project.description || "No description"}</p>
+        <h1 className="text-2xl font-bold text-[var(--color-foreground)]">
+          {project.name}
+        </h1>
+        <p className="text-[var(--color-muted)]">
+          {project.description || "No description"}
+        </p>
       </div>
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
-          <div className="text-sm text-gray-500 mb-1">User Stories</div>
-          <div className="text-2xl font-bold">{storiesCount || 0}</div>
+      <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
+        <div
+          className="rounded-xl p-6"
+          style={{
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+          }}
+        >
+          <div className="mb-1 text-sm text-[var(--color-muted)]">
+            User Stories
+          </div>
+          <div className="text-2xl font-bold text-[var(--color-foreground)]">
+            {storiesCount || 0}
+          </div>
         </div>
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
-          <div className="text-sm text-gray-500 mb-1">Sprints</div>
-          <div className="text-2xl font-bold">{sprintsCount || 0}</div>
+
+        <div
+          className="rounded-xl p-6"
+          style={{
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+          }}
+        >
+          <div className="mb-1 text-sm text-[var(--color-muted)]">
+            Sprints
+          </div>
+          <div className="text-2xl font-bold text-[var(--color-foreground)]">
+            {sprintsCount || 0}
+          </div>
         </div>
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
-          <div className="text-sm text-gray-500 mb-1">Team Members</div>
-          <div className="text-2xl font-bold">-</div>
+
+        <div
+          className="rounded-xl p-6"
+          style={{
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+          }}
+        >
+          <div className="mb-1 text-sm text-[var(--color-muted)]">
+            Team Members
+          </div>
+          <div className="text-2xl font-bold text-[var(--color-foreground)]">
+            -
+          </div>
         </div>
-        <div className="bg-white p-6 rounded-lg border border-gray-200">
-          <div className="text-sm text-gray-500 mb-1">Progress</div>
-          <div className="text-2xl font-bold">-</div>
+
+        <div
+          className="rounded-xl p-6"
+          style={{
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+          }}
+        >
+          <div className="mb-1 text-sm text-[var(--color-muted)]">
+            Progress
+          </div>
+          <div className="text-2xl font-bold text-[var(--color-foreground)]">
+            -
+          </div>
         </div>
       </div>
 
-      <p className="text-gray-500 text-sm">
-        To je dashboard projekta. Tukaj lahko dodaš več statistik in grafov.
+      <p className="text-sm text-[var(--color-muted)]">
+        This is the project dashboard. You can add more statistics and charts here.
       </p>
     </div>
   );
