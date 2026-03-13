@@ -7,7 +7,7 @@ export type SystemRole = 'admin' | 'user';
 export type ProjectRole = 'product_owner' | 'scrum_master' | 'developer';
 export type SprintStatus = 'planned' | 'active' | 'completed';
 export type StoryStatus = 'backlog' | 'ready' | 'in_progress' | 'done';
-export type TaskStatus = 'todo' | 'in_progress' | 'done';
+export type TaskStatus = 'unassigned' | 'assigned' | 'in_progress' | 'completed';
 export type Priority = 'must_have' | 'should_have' | 'could_have' | 'wont_have';
 
 // Database Tables
@@ -76,6 +76,9 @@ export interface Task {
   description: string | null;
   status: TaskStatus;
   assignee_id: string | null;
+  is_accepted: boolean;
+  is_active: boolean;
+  active_since: string | null;
   estimated_hours: number | null;
   logged_hours: number | null;
   position: number;

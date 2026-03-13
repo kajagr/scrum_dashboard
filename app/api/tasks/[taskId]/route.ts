@@ -2,50 +2,34 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 type RouteContext = {
-  params: Promise<{
-    taskId: string;
-  }>;
+  params: Promise<{ taskId: string }>;
 };
 
-// PATCH /api/tasks/[taskId] - Update task status
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     const supabase = await createClient();
     const { taskId } = await context.params;
 
     const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // 1. Pridobi nalogo
     const { data: task, error: taskError } = await supabase
       .from("tasks")
-      .select("id, user_story_id, status, assignee_id")
+      .select("id, user_story_id, status, assignee_id, is_accepted")
       .eq("id", taskId)
       .maybeSingle();
 
-    if (taskError) {
-      return NextResponse.json({ error: taskError.message }, { status: 500 });
-    }
+    if (taskError) return NextResponse.json({ error: taskError.message }, { status: 500 });
+    if (!task) return NextResponse.json({ error: "Task not found." }, { status: 404 });
 
-    if (!task) {
-      return NextResponse.json({ error: "Task not found." }, { status: 404 });
-    }
-
-    // 2. Pridobi zgodbo za preverjanje projekta
     const { data: story, error: storyError } = await supabase
       .from("user_stories")
-      .select("id, project_id, status")
+      .select("id, project_id, sprint_id, status")
       .eq("id", task.user_story_id)
       .maybeSingle();
 
-    if (storyError || !story) {
-      return NextResponse.json({ error: "Story not found." }, { status: 404 });
-    }
+    if (storyError || !story) return NextResponse.json({ error: "Story not found." }, { status: 404 });
 
-    // 3. Preveri da je uporabnik član projekta
     const { data: membership, error: memberError } = await supabase
       .from("project_members")
       .select("role")
@@ -53,32 +37,107 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (memberError) {
-      return NextResponse.json({ error: memberError.message }, { status: 500 });
-    }
+    if (memberError) return NextResponse.json({ error: memberError.message }, { status: 500 });
+    if (!membership) return NextResponse.json({ error: "You are not a member of this project." }, { status: 403 });
 
-    if (!membership) {
-      return NextResponse.json({ error: "You are not a member of this project." }, { status: 403 });
-    }
-
-    // 4. Preberi body
     const body = await request.json();
-    const { status: newStatus } = body;
+    const { action, status: newStatus } = body;
 
-    // 5. Validacija statusa
-    const validStatuses = ["todo", "in_progress", "done"];
+    // -------------------------------------------------------
+    // #16 - SPREJEMANJE NALOGE
+    // -------------------------------------------------------
+    if (action === "accept") {
+      if (membership.role !== "developer" && membership.role !== "scrum_master") {
+        return NextResponse.json(
+          { error: "Samo razvijalci in skrbniki metodologije lahko sprejmejo nalogo." },
+          { status: 403 }
+        );
+      }
+
+      if (!story.sprint_id) {
+        return NextResponse.json({ error: "Naloga ni v nobenem sprintu." }, { status: 400 });
+      }
+
+      const { data: sprint } = await supabase
+        .from("sprints")
+        .select("start_date, end_date")
+        .eq("id", story.sprint_id)
+        .maybeSingle();
+
+      if (!sprint) return NextResponse.json({ error: "Sprint ne obstaja." }, { status: 400 });
+
+      const today = new Date().toISOString().split("T")[0];
+      const sprintStatus =
+        today < sprint.start_date ? "planned" :
+        today > sprint.end_date ? "completed" : "active";
+
+      if (sprintStatus !== "active") {
+        return NextResponse.json({ error: "Nalogo lahko sprejmete samo v aktivnem sprintu." }, { status: 400 });
+      }
+
+      // Že sprejeta
+      if (task.is_accepted) {
+        return NextResponse.json({ error: "Naloga je že sprejeta." }, { status: 400 });
+      }
+
+      // Predlagana drugemu članu
+      if (task.assignee_id && task.assignee_id !== user.id) {
+        return NextResponse.json({ error: "Naloga je dodeljena drugemu članu." }, { status: 400 });
+      }
+
+      const { data: updatedTask, error: updateError } = await supabase
+        .from("tasks")
+        .update({
+          assignee_id: user.id,
+          is_accepted: true,
+          status: "assigned",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", taskId)
+        .select("*, assignee:users(id, first_name, last_name, email)")
+        .single();
+
+      if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+      return NextResponse.json(updatedTask);
+    }
+
+    // -------------------------------------------------------
+    // #17 - ODPOVEDOVANJE NALOGI
+    // -------------------------------------------------------
+    if (action === "resign") {
+      if (!task.is_accepted || task.assignee_id !== user.id) {
+        return NextResponse.json({ error: "Niste lastnik te naloge." }, { status: 400 });
+      }
+
+      const { data: updatedTask, error: updateError } = await supabase
+        .from("tasks")
+        .update({
+          assignee_id: null,
+          is_accepted: false,
+          status: "unassigned",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", taskId)
+        .select("*, assignee:users(id, first_name, last_name, email)")
+        .single();
+
+      if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+      return NextResponse.json(updatedTask);
+    }
+
+    // -------------------------------------------------------
+    // POSODOBITEV STATUSA (obstoječa logika, posodobljena)
+    // -------------------------------------------------------
+    const validStatuses = ["unassigned", "assigned", "in_progress", "completed"];
     if (!newStatus || !validStatuses.includes(newStatus)) {
       return NextResponse.json(
-        { error: "Invalid status. Must be: todo, in_progress, or done." },
+        { error: "Invalid status. Must be: unassigned, assigned, in_progress, or completed." },
         { status: 400 }
       );
     }
 
-    // 6. Če se naloga začne (in_progress), mora imeti assignee
-    //    Če nima, jo dodeli trenutnemu uporabniku
     let assigneeId = task.assignee_id;
     if (newStatus === "in_progress" && !assigneeId) {
-      // Preveri da je uporabnik developer ali scrum_master
       if (membership.role !== "developer" && membership.role !== "scrum_master") {
         return NextResponse.json(
           { error: "Only developers and scrum masters can work on tasks." },
@@ -88,7 +147,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       assigneeId = user.id;
     }
 
-    // 7. Posodobi nalogo
     const { data: updatedTask, error: updateError } = await supabase
       .from("tasks")
       .update({
@@ -97,55 +155,34 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         updated_at: new Date().toISOString(),
       })
       .eq("id", taskId)
-      .select(`
-        *,
-        assignee:users(id, first_name, last_name, email)
-      `)
+      .select("*, assignee:users(id, first_name, last_name, email)")
       .single();
 
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
-    }
-
+    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
     return NextResponse.json(updatedTask);
+
   } catch {
-    return NextResponse.json(
-      { error: "Error updating task." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Error updating task." }, { status: 500 });
   }
 }
 
-// GET /api/tasks/[taskId] - Get single task
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const supabase = await createClient();
     const { taskId } = await context.params;
 
     const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { data, error } = await supabase
       .from("tasks")
-      .select(`
-        *,
-        assignee:users(id, first_name, last_name, email)
-      `)
+      .select("*, assignee:users(id, first_name, last_name, email)")
       .eq("id", taskId)
       .single();
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json(data);
   } catch {
-    return NextResponse.json(
-      { error: "Error fetching task." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Error fetching task." }, { status: 500 });
   }
 }
