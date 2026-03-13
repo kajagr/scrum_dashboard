@@ -47,17 +47,17 @@ const STATUS_CONFIG: Record<string, { label: string; pill: string }> = {
 type TaskCategory = "unassigned" | "assigned" | "active" | "done";
 
 function getTaskCategory(task: TaskWithAssignee): TaskCategory {
-  if (task.status === "done") return "done";
+  if (task.status === "completed") return "done";
   if (task.status === "in_progress") return "active";
-  if (task.assignee_id) return "assigned";
+  if (task.is_accepted && task.assignee_id) return "assigned";
   return "unassigned";
 }
 
 const TASK_CATEGORY_CONFIG: Record<TaskCategory, { label: string; color: string; border: string; bg: string }> = {
-  unassigned: { label: "Unassigned", color: "bg-gray-400", border: "border-gray-300", bg: "bg-gray-50" },
-  assigned:   { label: "Assigned",   color: "bg-blue-400", border: "border-blue-300", bg: "bg-blue-50" },
-  active:     { label: "Active",     color: "bg-purple-500", border: "border-purple-400", bg: "bg-purple-50" },
-  done:       { label: "Done",       color: "bg-green-500", border: "border-green-400", bg: "bg-green-50" },
+  unassigned: { label: "Unassigned", color: "bg-gray-400",    border: "border-gray-300",   bg: "bg-gray-50" },
+  assigned:   { label: "Assigned",   color: "bg-blue-400",    border: "border-blue-300",   bg: "bg-blue-50" },
+  active:     { label: "Active",     color: "bg-purple-500",  border: "border-purple-400", bg: "bg-purple-50" },
+  done:       { label: "Done",       color: "bg-green-500",   border: "border-green-400",  bg: "bg-green-50" },
 };
 
 export default function StoryDetailModal({
@@ -68,11 +68,13 @@ export default function StoryDetailModal({
   canAddTasks,
 }: StoryDetailModalProps) {
   const router = useRouter();
-  
+
   const [tasks, setTasks] = useState<TaskWithAssignee[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
   const priority = PRIORITY_CONFIG[story.priority] ?? PRIORITY_CONFIG.should_have;
   const status = STATUS_CONFIG[story.status] ?? STATUS_CONFIG.backlog;
@@ -80,9 +82,7 @@ export default function StoryDetailModal({
   const fetchTasks = async () => {
     setLoadingTasks(true);
     try {
-      const res = await fetch(`/api/stories/${story.id}/tasks`, {
-        credentials: "include",
-      });
+      const res = await fetch(`/api/stories/${story.id}/tasks`, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         setTasks(data);
@@ -100,6 +100,35 @@ export default function StoryDetailModal({
     }
   }, [isOpen, story.id]);
 
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const res = await fetch("/api/auth/me", { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          setCurrentUserId(data.id);
+        }
+      } catch {
+        console.error("Error fetching current user.");
+      }
+    };
+
+    const fetchCurrentRole = async () => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/members/me`, { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          setCurrentUserRole(data.role);
+        }
+      } catch {
+        console.error("Error fetching current role.");
+      }
+    };
+
+    fetchCurrentUser();
+    fetchCurrentRole();
+  }, [projectId]);
+
   const handleCreateTaskClose = () => {
     setIsCreateTaskOpen(false);
     fetchTasks();
@@ -115,7 +144,6 @@ export default function StoryDetailModal({
         credentials: "include",
         body: JSON.stringify({ status: newStatus }),
       });
-
       if (res.ok) {
         await fetchTasks();
       } else {
@@ -129,6 +157,51 @@ export default function StoryDetailModal({
     }
   };
 
+  const acceptTask = async (taskId: string) => {
+    setUpdatingTaskId(taskId);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action: "accept" }),
+      });
+      if (res.ok) {
+        await fetchTasks();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Napaka pri sprejemanju naloge.");
+      }
+    } catch {
+      alert("Napaka pri sprejemanju naloge.");
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  };
+
+  const resignTask = async (taskId: string) => {
+    if (!confirm("Ali ste prepričani, da se želite odpovedati tej nalogi?")) return;
+    setUpdatingTaskId(taskId);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action: "resign" }),
+      });
+      if (res.ok) {
+        await fetchTasks();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Napaka pri odpovedovanju naloge.");
+      }
+    } catch {
+      alert("Napaka pri odpovedovanju naloge.");
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  };
+
   if (!isOpen) return null;
 
   const totalEstimated = tasks.reduce((sum, t) => sum + (t.estimated_hours ?? 0), 0);
@@ -136,12 +209,14 @@ export default function StoryDetailModal({
 
   const groupedTasks: Record<TaskCategory, TaskWithAssignee[]> = {
     unassigned: tasks.filter((t) => getTaskCategory(t) === "unassigned"),
-    assigned: tasks.filter((t) => getTaskCategory(t) === "assigned"),
-    active: tasks.filter((t) => getTaskCategory(t) === "active"),
-    done: tasks.filter((t) => getTaskCategory(t) === "done"),
+    assigned:   tasks.filter((t) => getTaskCategory(t) === "assigned"),
+    active:     tasks.filter((t) => getTaskCategory(t) === "active"),
+    done:       tasks.filter((t) => getTaskCategory(t) === "done"),
   };
 
   const categoryOrder: TaskCategory[] = ["active", "assigned", "unassigned", "done"];
+
+  const canAccept = currentUserRole === "developer" || currentUserRole === "scrum_master";
 
   return (
     <>
@@ -256,24 +331,29 @@ export default function StoryDetailModal({
                         <div className="space-y-2">
                           {categoryTasks.map((task) => {
                             const isUpdating = updatingTaskId === task.id;
-                            
+                            const isMyTask = task.assignee_id === currentUserId && task.is_accepted;
+                            const isProposedToMe = task.assignee_id === currentUserId && !task.is_accepted;
+                            const isUnassigned = !task.assignee_id && !task.is_accepted;
+
                             return (
                               <div
                                 key={task.id}
                                 className={`p-3 rounded-lg border ${config.border} ${config.bg} ${isUpdating ? "opacity-50" : ""}`}
                               >
                                 <div className="flex items-start gap-3">
-                                  {/* Checkbox for done */}
+                                  {/* Checkbox za done */}
                                   <button
-                                    onClick={() => updateTaskStatus(task.id, task.status === "done" ? "todo" : "done")}
-                                    disabled={isUpdating}
+                                    onClick={() => updateTaskStatus(task.id, task.status === "completed" ? "assigned" : "completed")}
+                                    disabled={isUpdating || !isMyTask}
                                     className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                                      task.status === "done"
+                                      task.status === "completed"
                                         ? "bg-green-500 border-green-500 text-white"
-                                        : "border-gray-300 hover:border-green-400"
+                                        : isMyTask
+                                          ? "border-gray-300 hover:border-green-400"
+                                          : "border-gray-200 opacity-40 cursor-not-allowed"
                                     }`}
                                   >
-                                    {task.status === "done" && (
+                                    {task.status === "completed" && (
                                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                       </svg>
@@ -281,7 +361,7 @@ export default function StoryDetailModal({
                                   </button>
 
                                   <div className="flex-1 min-w-0">
-                                    <p className={`text-sm font-medium ${task.status === "done" ? "text-gray-500 line-through" : "text-gray-900"}`}>
+                                    <p className={`text-sm font-medium ${task.status === "completed" ? "text-gray-500 line-through" : "text-gray-900"}`}>
                                       {task.description || task.title}
                                     </p>
                                     <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
@@ -294,6 +374,9 @@ export default function StoryDetailModal({
                                             {task.assignee.first_name?.[0]}{task.assignee.last_name?.[0]}
                                           </span>
                                           {task.assignee.first_name} {task.assignee.last_name}
+                                          {!task.is_accepted && (
+                                            <span className="text-orange-500 text-[10px]">(predlagano)</span>
+                                          )}
                                         </span>
                                       ) : (
                                         <span className="flex items-center gap-1 text-gray-400">
@@ -310,7 +393,19 @@ export default function StoryDetailModal({
 
                                   {/* Action buttons */}
                                   <div className="flex items-center gap-1 flex-shrink-0">
-                                    {task.status === "todo" && (
+                                    {/* Sprejmi — za unassigned ali predlagane trenutnemu uporabniku */}
+                                    {canAccept && !task.is_accepted && (isUnassigned || isProposedToMe) && task.status !== "completed" && (
+                                      <button
+                                        onClick={() => acceptTask(task.id)}
+                                        disabled={isUpdating}
+                                        className="px-2 py-1 text-xs font-medium text-green-700 bg-green-100 hover:bg-green-200 rounded transition-colors"
+                                      >
+                                        Sprejmi
+                                      </button>
+                                    )}
+
+                                    {/* Start — samo za tistega ki je sprejel nalogo */}
+                                    {isMyTask && task.status === "assigned" && (
                                       <button
                                         onClick={() => updateTaskStatus(task.id, "in_progress")}
                                         disabled={isUpdating}
@@ -319,13 +414,26 @@ export default function StoryDetailModal({
                                         Start
                                       </button>
                                     )}
-                                    {task.status === "in_progress" && (
+
+                                    {/* Pause — samo za tistega ki dela na njej */}
+                                    {isMyTask && task.status === "in_progress" && (
                                       <button
-                                        onClick={() => updateTaskStatus(task.id, "todo")}
+                                        onClick={() => updateTaskStatus(task.id, "assigned")}
                                         disabled={isUpdating}
                                         className="px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
                                       >
                                         Pause
+                                      </button>
+                                    )}
+
+                                    {/* Odpovej — samo za tistega ki je sprejel nalogo */}
+                                    {isMyTask && task.status !== "completed" && (
+                                      <button
+                                        onClick={() => resignTask(task.id)}
+                                        disabled={isUpdating}
+                                        className="px-2 py-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded transition-colors"
+                                      >
+                                        Odpovej
                                       </button>
                                     )}
                                   </div>
