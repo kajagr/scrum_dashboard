@@ -16,14 +16,14 @@ export default function AdminUsersPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Napaka pri nalaganju uporabnikov.");
+        setError(data.error || "Failed to load users.");
         setLoading(false);
         return;
       }
 
       setUsers(data);
     } catch {
-      setError("Napaka pri povezavi s strežnikom.");
+      setError("Server connection error.");
     } finally {
       setLoading(false);
     }
@@ -41,7 +41,7 @@ export default function AdminUsersPage() {
   if (loading) {
     return (
       <div className="p-8">
-        <p className="text-gray-500">Nalaganje...</p>
+        <p className="text-[var(--color-muted)]">Loading...</p>
       </div>
     );
   }
@@ -49,60 +49,113 @@ export default function AdminUsersPage() {
   if (error) {
     return (
       <div className="p-8">
-        <p className="text-red-500">{error}</p>
+        <div
+          className="rounded-xl px-4 py-3"
+          style={{
+            border: "1px solid var(--color-error-border)",
+            background: "var(--color-error-light)",
+            color: "var(--color-error)",
+          }}
+        >
+          <p>{error}</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
+    <div className="p-8 text-[var(--color-foreground)]">
+      <div className="mb-8 flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Uporabniki</h1>
-          <p className="text-gray-600">Upravljaj uporabnike sistema</p>
+          <h1 className="text-2xl font-bold text-[var(--color-foreground)]">
+            Users
+          </h1>
+          <p className="text-[var(--color-muted)]">
+            Manage system users
+          </p>
         </div>
+
         <button
           onClick={() => setIsModalOpen(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
+          style={{
+            background: "var(--color-primary)",
+            color: "#ffffff",
+            border: "1px solid var(--color-primary-border)",
+          }}
+          className="flex items-center gap-2 rounded-lg px-4 py-2 font-medium transition hover:opacity-90"
         >
-          + Dodaj uporabnika
+          + Add user
         </button>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200">
+      <div
+        className="overflow-hidden rounded-xl"
+        style={{
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+        }}
+      >
         {users.length > 0 ? (
-          users.map((user) => (
+          users.map((user, index) => (
             <div
               key={user.id}
-              className="p-4 border-b border-gray-200 last:border-b-0 flex justify-between items-center"
+              className="flex items-center justify-between p-4"
+              style={{
+                borderBottom:
+                  index < users.length - 1
+                    ? "1px solid var(--color-border)"
+                    : "none",
+              }}
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-medium">
+                <div
+                  className="flex h-10 w-10 items-center justify-center rounded-full font-medium"
+                  style={{
+                    background: "var(--color-primary-light)",
+                    color: "var(--color-primary)",
+                    border: "1px solid var(--color-primary-border)",
+                  }}
+                >
                   {user.first_name?.[0]}
                   {user.last_name?.[0]}
                 </div>
+
                 <div>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-[var(--color-foreground)]">
                     {user.first_name} {user.last_name}
                   </p>
-                  <p className="text-sm text-gray-500">{user.email}</p>
-                  <p className="text-xs text-gray-400">@{user.username}</p>
+                  <p className="text-sm text-[var(--color-muted)]">
+                    {user.email}
+                  </p>
+                  <p className="text-xs text-[var(--color-subtle)]">
+                    @{user.username}
+                  </p>
                 </div>
               </div>
+
               <span
-                className={`px-2 py-1 text-xs rounded ${
+                className="rounded-full px-2.5 py-1 text-xs font-medium capitalize"
+                style={
                   user.system_role === "admin"
-                    ? "bg-purple-100 text-purple-800"
-                    : "bg-gray-100 text-gray-800"
-                }`}
+                    ? {
+                        background: "var(--color-accent-light)",
+                        color: "var(--color-accent-text)",
+                        border: "1px solid var(--color-accent-border)",
+                      }
+                    : {
+                        background: "var(--color-background)",
+                        color: "var(--color-muted)",
+                        border: "1px solid var(--color-border)",
+                      }
+                }
               >
                 {user.system_role}
               </span>
             </div>
           ))
         ) : (
-          <div className="p-8 text-center text-gray-500">
-            <p>Ni še uporabnikov.</p>
+          <div className="p-8 text-center">
+            <p className="text-[var(--color-muted)]">No users yet.</p>
           </div>
         )}
       </div>

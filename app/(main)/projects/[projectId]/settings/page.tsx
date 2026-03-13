@@ -20,38 +20,65 @@ export default async function SettingsPage({ params }: Props) {
   }
 
   return (
-    <div>
+    <div className="text-[var(--color-foreground)]">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-600">Manage project settings</p>
+        <h1 className="text-2xl font-bold text-[var(--color-foreground)]">
+          Settings
+        </h1>
+        <p className="text-[var(--color-muted)]">
+          Manage project settings
+        </p>
       </div>
 
-      <div className="bg-white p-6 rounded-lg border border-gray-200 max-w-xl">
-        <h2 className="font-semibold text-gray-900 mb-4">Project Details</h2>
-        
+      <div
+        className="max-w-xl rounded-xl p-6"
+        style={{
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+        }}
+      >
+        <h2 className="mb-4 font-semibold text-[var(--color-foreground)]">
+          Project Details
+        </h2>
+
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Name</label>
+            <label className="block text-sm font-medium text-[var(--color-muted)]">
+              Name
+            </label>
             <input
               type="text"
               defaultValue={project.name}
               disabled
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+              className="mt-1 w-full rounded-md px-3 py-2 text-sm"
+              style={{
+                border: "1px solid var(--color-border)",
+                background: "var(--color-background)",
+                color: "var(--color-foreground)",
+              }}
             />
           </div>
+
           <div>
-            <label className="block text-sm font-medium text-gray-700">Description</label>
+            <label className="block text-sm font-medium text-[var(--color-muted)]">
+              Description
+            </label>
             <textarea
               defaultValue={project.description || ""}
               disabled
               rows={3}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+              className="mt-1 w-full rounded-md px-3 py-2 text-sm"
+              style={{
+                border: "1px solid var(--color-border)",
+                background: "var(--color-background)",
+                color: "var(--color-foreground)",
+              }}
             />
           </div>
         </div>
 
-        <p className="text-sm text-gray-500 mt-4">
-          Urejanje nastavitev bo omogočeno kmalu.
+        <p className="mt-4 text-sm text-[var(--color-muted)]">
+          Editing project settings will be available soon.
         </p>
       </div>
     </div>
