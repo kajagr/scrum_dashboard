@@ -18,17 +18,26 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        email,
+        password,
+      }),
     });
 
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-    } else {
-      router.push("/projects");
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.error || "Napaka pri prijavi.");
+      return;
     }
+
+    router.push("/projects");
   };
 
   return (
