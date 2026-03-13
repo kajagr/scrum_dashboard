@@ -53,7 +53,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 1. Pridobi zgodbo in preveri da obstaja
     const { data: story, error: storyError } = await supabase
       .from("user_stories")
       .select("id, project_id, sprint_id, status")
@@ -71,7 +70,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // 2. Preveri da zgodba ni že realizirana
     if (story.status === "done") {
       return NextResponse.json(
         { error: "Naloge ni mogoče dodati k že realizirani zgodbi." },
@@ -79,7 +77,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // 3. Preveri da je zgodba v aktivnem sprintu
     if (!story.sprint_id) {
       return NextResponse.json(
         { error: "Naloge je mogoče dodati samo zgodbam v aktivnem sprintu." },
@@ -87,7 +84,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // Preveri status sprinta
     const { data: sprint, error: sprintError } = await supabase
       .from("sprints")
       .select("id, status, start_date, end_date")
@@ -101,9 +97,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // Izračunaj status sprinta (ker se računa dinamično)
     const today = new Date().toISOString().split("T")[0];
-    const sprintStatus = 
+    const sprintStatus =
       today < sprint.start_date ? "planned" :
       today > sprint.end_date ? "completed" : "active";
 
@@ -114,7 +109,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // 4. Preveri da je uporabnik scrum_master ali developer na projektu
     const { data: membership, error: memberError } = await supabase
       .from("project_members")
       .select("role")
@@ -140,13 +134,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // 5. Preberi body
     const body = await request.json();
     const description = body.description?.trim();
     const estimatedHours = body.estimated_hours;
     const assigneeId = body.assignee_id || null;
 
-    // 6. Validacija opisa
     if (!description) {
       return NextResponse.json(
         { error: "Opis naloge je obvezen." },
@@ -154,7 +146,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // 7. Validacija ocene časa
     if (estimatedHours === undefined || estimatedHours === null || estimatedHours === "") {
       return NextResponse.json(
         { error: "Ocena časa je obvezna." },
@@ -170,7 +161,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // 8. Če je assignee podan, preveri da je član projekta
     if (assigneeId) {
       const { data: assigneeMembership, error: assigneeError } = await supabase
         .from("project_members")
@@ -190,7 +180,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
         );
       }
 
-      // Dodatno: samo developerji lahko prevzamejo naloge
       if (assigneeMembership.role !== "developer" && assigneeMembership.role !== "scrum_master") {
         return NextResponse.json(
           { error: "Naloge lahko prevzamejo samo razvijalci in skrbniki metodologije." },
@@ -199,7 +188,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
     }
 
-    // 9. Pridobi naslednjo pozicijo
     const { data: tasks } = await supabase
       .from("tasks")
       .select("position")
@@ -209,16 +197,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const nextPosition = tasks && tasks.length > 0 ? tasks[0].position + 1 : 0;
 
-    // 10. Ustvari nalogo
     const { data: task, error: insertError } = await supabase
       .from("tasks")
       .insert({
         user_story_id: storyId,
-        title: description, // Uporabljamo description kot title
+        title: description,
         description: description,
         estimated_hours: hours,
         assignee_id: assigneeId,
-        status: "todo",
+        status: "unassigned",
         position: nextPosition,
       })
       .select(`
