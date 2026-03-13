@@ -32,10 +32,7 @@ interface TaskWithAssignee extends Task {
 
 type TaskCategory = "unassigned" | "assigned" | "active" | "done";
 
-const PRIORITY_CONFIG: Record
-  string,
-  { label: string; pillStyle: React.CSSProperties; dotStyle: React.CSSProperties }
-> = {
+const PRIORITY_CONFIG: Record<string, { label: string; pillStyle: React.CSSProperties; dotStyle: React.CSSProperties }> = {
   must_have: {
     label: "Must Have",
     pillStyle: {
@@ -74,10 +71,7 @@ const PRIORITY_CONFIG: Record
   },
 };
 
-const STATUS_CONFIG: Record
-  string,
-  { label: string; pillStyle: React.CSSProperties }
-> = {
+const STATUS_CONFIG: Record<string, { label: string; pillStyle: React.CSSProperties }> = {
   backlog: {
     label: "Backlog",
     pillStyle: {
@@ -119,14 +113,7 @@ function getTaskCategory(task: TaskWithAssignee): TaskCategory {
   return "unassigned";
 }
 
-const TASK_CATEGORY_CONFIG: Record
-  TaskCategory,
-  {
-    label: string;
-    dotStyle: React.CSSProperties;
-    containerStyle: React.CSSProperties;
-  }
-> = {
+const TASK_CATEGORY_CONFIG: Record<TaskCategory, { label: string; dotStyle: React.CSSProperties; containerStyle: React.CSSProperties }> = {
   unassigned: {
     label: "Unassigned",
     dotStyle: { background: "var(--color-subtle)" },
