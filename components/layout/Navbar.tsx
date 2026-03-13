@@ -7,6 +7,7 @@ import ProfileModal from "@/components/features/profile/ProfileModal";
 interface UserProfile {
   first_name: string | null;
   last_name: string | null;
+  last_login_at: string | null;
 }
 
 export default function Navbar() {
@@ -26,6 +27,7 @@ export default function Navbar() {
         setUser({
           first_name: data.first_name || "",
           last_name: data.last_name || "",
+          last_login_at: data.last_login_at || null,
         });
       } catch {
         // optional: handle error
@@ -37,7 +39,10 @@ export default function Navbar() {
     const saved = localStorage.getItem("theme");
     const dark = saved ? saved === "dark" : true;
     setIsDark(dark);
-    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    document.documentElement.setAttribute(
+      "data-theme",
+      dark ? "dark" : "light",
+    );
   }, []);
 
   const toggleTheme = () => {
@@ -49,12 +54,16 @@ export default function Navbar() {
   };
 
   const initials =
-    `${user?.first_name?.charAt(0) ?? ""}${user?.last_name?.charAt(0) ?? ""}`.toUpperCase() || "U";
+    `${user?.first_name?.charAt(0) ?? ""}${user?.last_name?.charAt(0) ?? ""}`.toUpperCase() ||
+    "U";
 
   return (
     <>
       <nav className="h-16 bg-[var(--color-surface)] border-b border-[var(--color-border)] px-6 flex items-center justify-between">
-        <Link href="/projects" className="text-xl font-bold text-[var(--color-foreground)]">
+        <Link
+          href="/projects"
+          className="text-xl font-bold text-[var(--color-foreground)]"
+        >
           ScrumBoard
         </Link>
 
@@ -66,13 +75,33 @@ export default function Navbar() {
             className="w-9 h-9 flex items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] hover:bg-[var(--color-primary-light)] hover:border-[var(--color-primary-border)] transition-colors text-[var(--color-muted)] hover:text-[var(--color-primary)]"
           >
             {isDark ? (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
                 <circle cx="12" cy="12" r="4" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
+                />
               </svg>
             ) : (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"
+                />
               </svg>
             )}
           </button>
@@ -88,13 +117,29 @@ export default function Navbar() {
             My Profile
           </button>
 
-          <div className="text-sm text-[var(--color-muted)]">
-            {new Date().toLocaleDateString("en-US", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
+          <div className="text-right">
+            <div className="text-sm text-[var(--color-muted)]">
+              {new Date().toLocaleDateString("en-US", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </div>
+
+            {user?.last_login_at && (
+              <div className="text-xs text-[var(--color-subtle)] mt-0.5">
+                Last login:{" "}
+                {new Date(user.last_login_at).toLocaleString("sl-SI", {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                })}
+              </div>
+            )}
           </div>
         </div>
       </nav>

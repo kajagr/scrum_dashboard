@@ -21,14 +21,16 @@ export async function GET() {
 
     const { data, error } = await supabaseAdmin
       .from("users")
-      .select("username, email, first_name, last_name, system_role")
+      .select(
+        "username, email, first_name, last_name, system_role, last_login_at",
+      )
       .eq("id", currentUser.id)
       .single();
 
     if (error || !data) {
       return NextResponse.json(
         { error: "Failed to fetch profile." },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -38,11 +40,12 @@ export async function GET() {
       first_name: data.first_name,
       last_name: data.last_name,
       role: data.system_role,
+      last_login_at: data.last_login_at,
     });
   } catch {
     return NextResponse.json(
       { error: "A server error occurred while fetching the profile." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -70,7 +73,7 @@ export async function PUT(req: Request) {
     if (!username || !email) {
       return NextResponse.json(
         { error: "Username and email are required." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -85,7 +88,7 @@ export async function PUT(req: Request) {
     if (existingUsername) {
       return NextResponse.json(
         { error: "Username already exists." },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -100,7 +103,7 @@ export async function PUT(req: Request) {
     if (existingEmail) {
       return NextResponse.json(
         { error: "Email already exists." },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -115,7 +118,7 @@ export async function PUT(req: Request) {
       if (password.length < 6) {
         return NextResponse.json(
           { error: "Password must be at least 6 characters long." },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -123,16 +126,14 @@ export async function PUT(req: Request) {
     }
 
     if (Object.keys(updateAuthPayload).length > 0) {
-      const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
-        currentUser.id,
-        updateAuthPayload
-      );
+      const { error: authError } =
+        await supabaseAdmin.auth.admin.updateUserById(
+          currentUser.id,
+          updateAuthPayload,
+        );
 
       if (authError) {
-        return NextResponse.json(
-          { error: authError.message },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: authError.message }, { status: 400 });
       }
     }
 
@@ -150,7 +151,7 @@ export async function PUT(req: Request) {
     if (profileError) {
       return NextResponse.json(
         { error: profileError.message },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -160,7 +161,7 @@ export async function PUT(req: Request) {
   } catch {
     return NextResponse.json(
       { error: "A server error occurred while updating the profile." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
