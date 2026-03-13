@@ -32,7 +32,7 @@ interface TaskWithAssignee extends Task {
 
 type TaskCategory = "unassigned" | "assigned" | "active" | "done";
 
-const PRIORITY_CONFIG: Record<
+const PRIORITY_CONFIG: Record
   string,
   { label: string; pillStyle: React.CSSProperties; dotStyle: React.CSSProperties }
 > = {
@@ -68,13 +68,13 @@ const PRIORITY_CONFIG: Record<
     pillStyle: {
       background: "var(--color-surface)",
       color: "var(--color-muted)",
-      border: "2x solid var(--color-border)",
+      border: "2px solid var(--color-border)",
     },
     dotStyle: { background: "var(--color-subtle)" },
   },
 };
 
-const STATUS_CONFIG: Record<
+const STATUS_CONFIG: Record
   string,
   { label: string; pillStyle: React.CSSProperties }
 > = {
@@ -113,13 +113,13 @@ const STATUS_CONFIG: Record<
 };
 
 function getTaskCategory(task: TaskWithAssignee): TaskCategory {
-  if (task.status === "done") return "done";
+  if (task.status === "completed") return "done";
   if (task.status === "in_progress") return "active";
-  if (task.assignee_id) return "assigned";
+  if (task.is_accepted && task.assignee_id) return "assigned";
   return "unassigned";
 }
 
-const TASK_CATEGORY_CONFIG: Record<
+const TASK_CATEGORY_CONFIG: Record
   TaskCategory,
   {
     label: string;
@@ -174,6 +174,8 @@ export default function StoryDetailModal({
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
   const priority = PRIORITY_CONFIG[story.priority] ?? PRIORITY_CONFIG.should_have;
   const status = STATUS_CONFIG[story.status] ?? STATUS_CONFIG.backlog;
@@ -181,9 +183,7 @@ export default function StoryDetailModal({
   const fetchTasks = async () => {
     setLoadingTasks(true);
     try {
-      const res = await fetch(`/api/stories/${story.id}/tasks`, {
-        credentials: "include",
-      });
+      const res = await fetch(`/api/stories/${story.id}/tasks`, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         setTasks(data);
@@ -201,6 +201,35 @@ export default function StoryDetailModal({
     }
   }, [isOpen, story.id]);
 
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const res = await fetch("/api/auth/me", { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          setCurrentUserId(data.id);
+        }
+      } catch {
+        console.error("Error fetching current user.");
+      }
+    };
+
+    const fetchCurrentRole = async () => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/members/me`, { credentials: "include" });
+        if (res.ok) {
+          const data = await res.json();
+          setCurrentUserRole(data.role);
+        }
+      } catch {
+        console.error("Error fetching current role.");
+      }
+    };
+
+    fetchCurrentUser();
+    fetchCurrentRole();
+  }, [projectId]);
+
   const handleCreateTaskClose = () => {
     setIsCreateTaskOpen(false);
     fetchTasks();
@@ -216,7 +245,6 @@ export default function StoryDetailModal({
         credentials: "include",
         body: JSON.stringify({ status: newStatus }),
       });
-
       if (res.ok) {
         await fetchTasks();
       } else {
@@ -230,6 +258,51 @@ export default function StoryDetailModal({
     }
   };
 
+  const acceptTask = async (taskId: string) => {
+    setUpdatingTaskId(taskId);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action: "accept" }),
+      });
+      if (res.ok) {
+        await fetchTasks();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Napaka pri sprejemanju naloge.");
+      }
+    } catch {
+      alert("Napaka pri sprejemanju naloge.");
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  };
+
+  const resignTask = async (taskId: string) => {
+    if (!confirm("Ali ste prepričani, da se želite odpovedati tej nalogi?")) return;
+    setUpdatingTaskId(taskId);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action: "resign" }),
+      });
+      if (res.ok) {
+        await fetchTasks();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Napaka pri odpovedovanju naloge.");
+      }
+    } catch {
+      alert("Napaka pri odpovedovanju naloge.");
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  };
+
   if (!isOpen) return null;
 
   const totalEstimated = tasks.reduce((sum, t) => sum + (t.estimated_hours ?? 0), 0);
@@ -237,12 +310,13 @@ export default function StoryDetailModal({
 
   const groupedTasks: Record<TaskCategory, TaskWithAssignee[]> = {
     unassigned: tasks.filter((t) => getTaskCategory(t) === "unassigned"),
-    assigned: tasks.filter((t) => getTaskCategory(t) === "assigned"),
-    active: tasks.filter((t) => getTaskCategory(t) === "active"),
-    done: tasks.filter((t) => getTaskCategory(t) === "done"),
+    assigned:   tasks.filter((t) => getTaskCategory(t) === "assigned"),
+    active:     tasks.filter((t) => getTaskCategory(t) === "active"),
+    done:       tasks.filter((t) => getTaskCategory(t) === "done"),
   };
 
   const categoryOrder: TaskCategory[] = ["active", "assigned", "unassigned", "done"];
+  const canAccept = currentUserRole === "developer" || currentUserRole === "scrum_master";
 
   return (
     <>
@@ -257,10 +331,8 @@ export default function StoryDetailModal({
             color: "var(--color-foreground)",
           }}
         >
-          <div
-            className="p-6"
-            style={{ borderBottom: "1px solid var(--color-border)" }}
-          >
+          {/* Header */}
+          <div className="p-6" style={{ borderBottom: "1px solid var(--color-border)" }}>
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="mb-2 flex items-center gap-2">
@@ -271,7 +343,6 @@ export default function StoryDetailModal({
                     <span className="h-1.5 w-1.5 rounded-full" style={priority.dotStyle} />
                     {priority.label}
                   </span>
-
                   <span
                     className="rounded-full px-2 py-0.5 text-xs font-medium"
                     style={status.pillStyle}
@@ -279,19 +350,14 @@ export default function StoryDetailModal({
                     {status.label}
                   </span>
                 </div>
-
                 <h2 className="text-xl font-bold text-[var(--color-foreground)]">
                   {story.title}
                 </h2>
               </div>
-
               <button
                 onClick={onClose}
                 className="flex h-8 w-8 items-center justify-center rounded-full transition hover:opacity-90"
-                style={{
-                  color: "var(--color-muted)",
-                  background: "transparent",
-                }}
+                style={{ color: "var(--color-muted)" }}
               >
                 ✕
               </button>
@@ -300,29 +366,23 @@ export default function StoryDetailModal({
             <div className="mt-3 flex items-center gap-4 text-sm text-[var(--color-muted)]">
               {story.story_points != null && (
                 <span className="flex items-center gap-1">
-                  <span className="font-medium text-[var(--color-foreground)]">
-                    {story.story_points}
-                  </span>
+                  <span className="font-medium text-[var(--color-foreground)]">{story.story_points}</span>
                   story points
                 </span>
               )}
               {story.business_value != null && (
                 <span className="flex items-center gap-1">
-                  BV:{" "}
-                  <span className="font-medium text-[var(--color-foreground)]">
-                    {story.business_value}
-                  </span>
+                  BV: <span className="font-medium text-[var(--color-foreground)]">{story.business_value}</span>
                 </span>
               )}
             </div>
           </div>
 
+          {/* Content */}
           <div className="flex-1 overflow-y-auto p-6">
             {story.description && (
               <div className="mb-6">
-                <h3 className="mb-2 text-sm font-semibold text-[var(--color-foreground)]">
-                  Description
-                </h3>
+                <h3 className="mb-2 text-sm font-semibold text-[var(--color-foreground)]">Description</h3>
                 <p className="text-sm text-[var(--color-muted)]">{story.description}</p>
               </div>
             )}
@@ -339,7 +399,6 @@ export default function StoryDetailModal({
                     </p>
                   )}
                 </div>
-
                 {canAddTasks && story.status !== "done" && (
                   <button
                     onClick={() => setIsCreateTaskOpen(true)}
@@ -360,14 +419,11 @@ export default function StoryDetailModal({
                   {categoryOrder.map((cat) => {
                     const config = TASK_CATEGORY_CONFIG[cat];
                     const count = groupedTasks[cat].length;
-
                     return (
                       <span key={cat} className="flex items-center gap-1.5">
                         <span className="h-2 w-2 rounded-full" style={config.dotStyle} />
                         <span className="text-[var(--color-muted)]">{config.label}</span>
-                        <span className="font-medium text-[var(--color-foreground)]">
-                          {count}
-                        </span>
+                        <span className="font-medium text-[var(--color-foreground)]">{count}</span>
                       </span>
                     );
                   })}
@@ -397,76 +453,49 @@ export default function StoryDetailModal({
                         <div className="space-y-2">
                           {categoryTasks.map((task) => {
                             const isUpdating = updatingTaskId === task.id;
+                            const isMyTask = task.assignee_id === currentUserId && task.is_accepted;
+                            const isProposedToMe = task.assignee_id === currentUserId && !task.is_accepted;
+                            const isUnassigned = !task.assignee_id && !task.is_accepted;
 
                             return (
                               <div
                                 key={task.id}
-                                className={isUpdating ? "rounded-lg p-3 opacity-50" : "rounded-lg p-3"}
+                                className={`rounded-lg p-3 ${isUpdating ? "opacity-50" : ""}`}
                                 style={config.containerStyle}
                               >
                                 <div className="flex items-start gap-3">
+                                  {/* Checkbox za done */}
                                   <button
-                                    onClick={() =>
-                                      updateTaskStatus(
-                                        task.id,
-                                        task.status === "done" ? "todo" : "done"
-                                      )
-                                    }
-                                    disabled={isUpdating}
+                                    onClick={() => updateTaskStatus(task.id, task.status === "completed" ? "assigned" : "completed")}
+                                    disabled={isUpdating || !isMyTask}
                                     className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-2 transition-colors"
                                     style={
-                                      task.status === "done"
-                                        ? {
-                                            background: "#34D399",
-                                            borderColor: "#34D399",
-                                            color: "#ffffff",
-                                          }
-                                        : {
-                                            borderColor: "var(--color-border)",
-                                            color: "var(--color-muted)",
-                                            background: "transparent",
-                                          }
+                                      task.status === "completed"
+                                        ? { background: "#34D399", borderColor: "#34D399", color: "#ffffff" }
+                                        : isMyTask
+                                          ? { borderColor: "var(--color-border)", background: "transparent" }
+                                          : { borderColor: "var(--color-border)", background: "transparent", opacity: 0.4, cursor: "not-allowed" }
                                     }
                                   >
-                                    {task.status === "done" && (
-                                      <svg
-                                        className="h-3 w-3"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                        strokeWidth={3}
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          d="M5 13l4 4L19 7"
-                                        />
+                                    {task.status === "completed" && (
+                                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                       </svg>
                                     )}
                                   </button>
 
                                   <div className="min-w-0 flex-1">
                                     <p
-                                      className={`text-sm font-medium ${
-                                        task.status === "done" ? "line-through" : ""
-                                      }`}
-                                      style={{
-                                        color:
-                                          task.status === "done"
-                                            ? "var(--color-muted)"
-                                            : "var(--color-foreground)",
-                                      }}
+                                      className={`text-sm font-medium ${task.status === "completed" ? "line-through" : ""}`}
+                                      style={{ color: task.status === "completed" ? "var(--color-muted)" : "var(--color-foreground)" }}
                                     >
                                       {task.description || task.title}
                                     </p>
 
                                     <div className="mt-2 flex items-center gap-3 text-xs text-[var(--color-muted)]">
                                       {task.estimated_hours && (
-                                        <span>
-                                          ⏱️ {task.logged_hours ?? 0}h / {task.estimated_hours}h
-                                        </span>
+                                        <span>⏱️ {task.logged_hours ?? 0}h / {task.estimated_hours}h</span>
                                       )}
-
                                       {task.assignee ? (
                                         <span className="flex items-center gap-1">
                                           <span
@@ -477,36 +506,21 @@ export default function StoryDetailModal({
                                               border: "1px solid var(--color-primary-border)",
                                             }}
                                           >
-                                            {task.assignee.first_name?.[0]}
-                                            {task.assignee.last_name?.[0]}
+                                            {task.assignee.first_name?.[0]}{task.assignee.last_name?.[0]}
                                           </span>
                                           {task.assignee.first_name} {task.assignee.last_name}
+                                          {!task.is_accepted && (
+                                            <span style={{ color: "var(--color-warning, #F59E0B)", fontSize: "10px" }}>(predlagano)</span>
+                                          )}
                                         </span>
                                       ) : (
-                                        <span
-                                          className="flex items-center gap-1"
-                                          style={{ color: "var(--color-subtle)" }}
-                                        >
+                                        <span className="flex items-center gap-1" style={{ color: "var(--color-subtle)" }}>
                                           <span
                                             className="flex h-5 w-5 items-center justify-center rounded-full"
-                                            style={{
-                                              background: "var(--color-surface)",
-                                              border: "1px solid var(--color-border)",
-                                            }}
+                                            style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)" }}
                                           >
-                                            <svg
-                                              className="h-3 w-3"
-                                              style={{ color: "var(--color-subtle)" }}
-                                              fill="none"
-                                              viewBox="0 0 24 24"
-                                              stroke="currentColor"
-                                              strokeWidth={2}
-                                            >
-                                              <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                                              />
+                                            <svg className="h-3 w-3" style={{ color: "var(--color-subtle)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                              <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                             </svg>
                                           </span>
                                           Unassigned
@@ -515,8 +529,26 @@ export default function StoryDetailModal({
                                     </div>
                                   </div>
 
+                                  {/* Action buttons */}
                                   <div className="flex flex-shrink-0 items-center gap-1">
-                                    {task.status === "todo" && (
+                                    {/* Sprejmi */}
+                                    {canAccept && !task.is_accepted && (isUnassigned || isProposedToMe) && task.status !== "completed" && (
+                                      <button
+                                        onClick={() => acceptTask(task.id)}
+                                        disabled={isUpdating}
+                                        className="rounded px-2 py-1 text-xs font-medium transition hover:opacity-90"
+                                        style={{
+                                          background: "color-mix(in srgb, #34D399 15%, transparent)",
+                                          color: "#34D399",
+                                          border: "1px solid color-mix(in srgb, #34D399 30%, transparent)",
+                                        }}
+                                      >
+                                        Sprejmi
+                                      </button>
+                                    )}
+
+                                    {/* Start */}
+                                    {isMyTask && task.status === "assigned" && (
                                       <button
                                         onClick={() => updateTaskStatus(task.id, "in_progress")}
                                         disabled={isUpdating}
@@ -531,9 +563,10 @@ export default function StoryDetailModal({
                                       </button>
                                     )}
 
-                                    {task.status === "in_progress" && (
+                                    {/* Pause */}
+                                    {isMyTask && task.status === "in_progress" && (
                                       <button
-                                        onClick={() => updateTaskStatus(task.id, "todo")}
+                                        onClick={() => updateTaskStatus(task.id, "assigned")}
                                         disabled={isUpdating}
                                         className="rounded px-2 py-1 text-xs font-medium transition hover:opacity-90"
                                         style={{
@@ -543,6 +576,22 @@ export default function StoryDetailModal({
                                         }}
                                       >
                                         Pause
+                                      </button>
+                                    )}
+
+                                    {/* Odpovej */}
+                                    {isMyTask && task.status !== "completed" && (
+                                      <button
+                                        onClick={() => resignTask(task.id)}
+                                        disabled={isUpdating}
+                                        className="rounded px-2 py-1 text-xs font-medium transition hover:opacity-90"
+                                        style={{
+                                          background: "color-mix(in srgb, #EF4444 10%, transparent)",
+                                          color: "#EF4444",
+                                          border: "1px solid color-mix(in srgb, #EF4444 25%, transparent)",
+                                        }}
+                                      >
+                                        Odpovej
                                       </button>
                                     )}
                                   </div>
@@ -558,10 +607,7 @@ export default function StoryDetailModal({
               ) : (
                 <div
                   className="rounded-lg py-8 text-center"
-                  style={{
-                    background: "var(--color-background)",
-                    border: "1px solid var(--color-border)",
-                  }}
+                  style={{ background: "var(--color-background)", border: "1px solid var(--color-border)" }}
                 >
                   <p className="text-sm text-[var(--color-muted)]">No tasks yet.</p>
                   {canAddTasks && story.status !== "done" && (
@@ -585,20 +631,16 @@ export default function StoryDetailModal({
                     color: "#F59E0B",
                   }}
                 >
-                  <p className="text-sm">
-                    ⚠️ This story is already completed. Tasks cannot be added.
-                  </p>
+                  <p className="text-sm">⚠️ This story is already completed. Tasks cannot be added.</p>
                 </div>
               )}
             </div>
           </div>
 
+          {/* Footer */}
           <div
             className="p-4"
-            style={{
-              borderTop: "1px solid var(--color-border)",
-              background: "var(--color-background)",
-            }}
+            style={{ borderTop: "1px solid var(--color-border)", background: "var(--color-background)" }}
           >
             <button
               onClick={onClose}
