@@ -58,7 +58,6 @@ export default function AdminUsersPage() {
 
   return (
     <div className="p-6">
-      {/* Header */}
       <div className="flex justify-between items-end mb-8">
         <div>
           <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Admin</p>
@@ -78,7 +77,6 @@ export default function AdminUsersPage() {
         </button>
       </div>
 
-      {/* User list */}
       {users.length > 0 ? (
         <div className="rounded-2xl border border-border bg-surface overflow-hidden">
           {users.map((user, i) => {
@@ -91,11 +89,9 @@ export default function AdminUsersPage() {
                   ${i !== users.length - 1 ? "border-b border-border" : ""}`}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  {/* Avatar */}
                   <div className="w-10 h-10 rounded-full bg-primary-light text-primary border border-primary-border flex items-center justify-center text-sm font-bold flex-shrink-0">
                     {initials}
                   </div>
-                  {/* Info */}
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground leading-tight">
                       {user.first_name} {user.last_name}
@@ -104,8 +100,6 @@ export default function AdminUsersPage() {
                     <p className="text-xs text-subtle">@{user.username}</p>
                   </div>
                 </div>
-
-                {/* Role badge */}
                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${
                   isAdmin
                     ? "bg-accent-light text-accent-text border border-accent-border"

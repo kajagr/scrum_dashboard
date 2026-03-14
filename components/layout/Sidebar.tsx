@@ -157,7 +157,7 @@ export default function Sidebar() {
                     : "text-subtle group-hover:text-muted"
                 }
               />
-              <span>Uporabniki</span>
+              <span>Users</span>
             </Link>
           </>
         )}

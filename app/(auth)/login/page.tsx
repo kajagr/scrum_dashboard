@@ -18,73 +18,73 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        email,
+        password,
+      }),
     });
 
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-    } else {
-      router.push("/projects");
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.error || "Napaka pri prijavi.");
+      return;
     }
+
+    router.push("/projects");
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--color-background)]">
-      <div className="max-w-md w-full p-8 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-lg">
-        
-        <h1 className="text-3xl font-bold text-center mb-2">
+    <div className="min-h-screen flex items-center justify-center px-4 bg-[var(--color-background)] text-[var(--color-foreground)]">
+      <div className="w-full max-w-md rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-8 shadow-lg">
+        <h1 className="mb-2 text-center font-[var(--font-display)] text-3xl font-bold">
           ScrumBoard
         </h1>
+        <h2 className="mb-6 text-center text-lg text-[var(--color-muted)]">
+          Sign in to your account
+        </h2>
 
-      
-
-        <form onSubmit={handleLogin} className="space-y-4">
-
+        <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-sm text-[var(--color-muted)]">
+            <label
+              htmlFor="email"
+              className="mb-2 block text-sm font-medium text-[var(--color-foreground)]"
+            >
               Email
             </label>
-
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="mt-1 w-full px-3 py-2 rounded-md
-              bg-[var(--color-background)]
-              border border-[var(--color-border)]
-              text-[var(--color-foreground)]
-              focus:outline-none
-              focus:border-[var(--color-primary)]
-              focus:ring-1 focus:ring-[var(--color-primary)]"
+              className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-light)]"
             />
           </div>
 
           <div>
-            <label className="block text-sm text-[var(--color-muted)]">
+            <label
+              htmlFor="password"
+              className="mb-2 block text-sm font-medium text-[var(--color-foreground)]"
+            >
               Password
             </label>
-
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="mt-1 w-full px-3 py-2 rounded-md
-              bg-[var(--color-background)]
-              border border-[var(--color-border)]
-              text-[var(--color-foreground)]
-              focus:outline-none
-              focus:border-[var(--color-primary)]
-              focus:ring-1 focus:ring-[var(--color-primary)]"
+              className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-light)]"
             />
           </div>
 
           {error && (
-            <p className="text-sm text-[var(--color-error)]">
+            <p className="rounded-lg border border-[var(--color-error-border)] bg-[var(--color-error-light)] px-3 py-2 text-sm text-[var(--color-error)]">
               {error}
             </p>
           )}
@@ -92,18 +92,11 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 px-4 rounded-md font-medium
-            bg-[var(--color-primary)]
-            hover:bg-[var(--color-primary-hover)]
-            text-white
-            disabled:opacity-50
-            transition"
+            className="w-full rounded-lg px-4 py-2 font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]"
           >
-            {loading ? "Loading..." : "Sign in"}
+            {loading ? "Signing in..." : "Sign in"}
           </button>
-
         </form>
-
       </div>
     </div>
   );

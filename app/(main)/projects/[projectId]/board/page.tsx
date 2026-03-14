@@ -31,6 +31,8 @@ type TaskWithAssignee = {
   description: string | null;
   status: string;
   assignee_id: string | null;
+  is_accepted: boolean;
+  is_active: boolean;
   estimated_hours: number | null;
   logged_hours: number | null;
   assignee?: { id: string; first_name: string; last_name: string } | null;
@@ -57,15 +59,15 @@ type TaskCategory = "unassigned" | "assigned" | "active" | "done";
 function getTaskCategory(task: TaskWithAssignee): TaskCategory {
   if (task.status === "completed") return "done";
   if (task.status === "in_progress") return "active";
-  if (task.assignee_id) return "assigned";
+  if (task.is_accepted && task.assignee_id) return "assigned";
   return "unassigned";
 }
 
 const TASK_CATEGORY_CONFIG: Record<TaskCategory, { label: string; dot: string; border: string; bg: string }> = {
-  active:     { label: "Active",     dot: "bg-accent",     border: "border-accent-border",              bg: "bg-accent-light" },
-  assigned:   { label: "Assigned",   dot: "bg-primary",    border: "border-primary-border",             bg: "bg-primary-light" },
-  unassigned: { label: "Unassigned", dot: "bg-subtle",     border: "border-border",                     bg: "bg-background" },
-  done:       { label: "Done",       dot: "bg-[#34D399]",  border: "border-[rgba(52,211,153,0.25)]",    bg: "bg-[rgba(52,211,153,0.08)]" },
+  active:     { label: "Active",     dot: "bg-accent",    border: "border-accent-border",           bg: "bg-accent-light" },
+  assigned:   { label: "Assigned",   dot: "bg-primary",   border: "border-primary-border",          bg: "bg-primary-light" },
+  unassigned: { label: "Unassigned", dot: "bg-subtle",    border: "border-border",                  bg: "bg-background" },
+  done:       { label: "Done",       dot: "bg-[#34D399]", border: "border-[rgba(52,211,153,0.25)]", bg: "bg-[rgba(52,211,153,0.08)]" },
 };
 
 const CATEGORY_ORDER: TaskCategory[] = ["active", "assigned", "unassigned", "done"];
@@ -81,6 +83,16 @@ export default function SprintBoardPage() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [selectedStory, setSelectedStory] = useState<Story | null>(null);
   const [expandedStories, setExpandedStories] = useState<Set<string>>(new Set());
+
+  // Edit task state
+  const [editingTask, setEditingTask] = useState<TaskWithAssignee | null>(null);
+  const [editDescription, setEditDescription] = useState("");
+  const [editHours, setEditHours] = useState("");
+  const [editAssigneeId, setEditAssigneeId] = useState("");
+  const [editDevelopers, setEditDevelopers] = useState<{ user_id: string; role: string; user: { first_name: string; last_name: string; email: string } | null }[]>([]);
+  const [editLoadingMembers, setEditLoadingMembers] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const fetchTasks = async (storyIds: string[]) => {
     const tasksMap: Record<string, TaskWithAssignee[]> = {};
@@ -127,6 +139,71 @@ export default function SprintBoardPage() {
       next.has(storyId) ? next.delete(storyId) : next.add(storyId);
       return next;
     });
+  };
+
+  const openEdit = async (task: TaskWithAssignee) => {
+    setEditDescription(task.description ?? "");
+    setEditHours(task.estimated_hours != null ? String(task.estimated_hours) : "");
+    setEditError(null);
+    setEditLoadingMembers(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/members`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setEditDevelopers(data.filter((m: { role: string }) => m.role === "developer" || m.role === "scrum_master"));
+      }
+    } catch { /* ignore */ } finally {
+      setEditLoadingMembers(false);
+    }
+    setEditAssigneeId(task.assignee_id ?? "");
+    setEditingTask(task);
+  };
+
+  const saveEdit = async () => {
+    if (!editingTask) return;
+    const hours = editHours !== "" ? Number(editHours) : null;
+    if (hours !== null && (isNaN(hours) || hours <= 0)) {
+      setEditError("Estimated hours must be a positive number.");
+      return;
+    }
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      const res = await fetch(`/api/tasks/${editingTask.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          action: "edit",
+          description: editDescription.trim() || null,
+          estimated_hours: hours,
+          assignee_id: editAssigneeId || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setEditError(data.error ?? "Error saving task."); return; }
+      setEditingTask(null);
+      await fetchTasks(stories.map((s) => s.id));
+    } catch {
+      setEditError("A server error occurred.");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const deleteTask = async (taskId: string) => {
+    if (!confirm("Are you sure you want to delete this task?")) return;
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, { method: "DELETE", credentials: "include" });
+      if (res.ok) {
+        await fetchTasks(stories.map((s) => s.id));
+      } else {
+        const data = await res.json();
+        alert(data.error || "Error deleting task.");
+      }
+    } catch {
+      alert("Error deleting task.");
+    }
   };
 
   const sorted = [...stories].sort((a, b) => {
@@ -200,10 +277,7 @@ export default function SprintBoardPage() {
                 <span>{Math.round((donePoints / totalPoints) * 100)}%</span>
               </div>
               <div className="w-full h-2 rounded-full bg-border overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-[#34D399] transition-all"
-                  style={{ width: `${Math.round((donePoints / totalPoints) * 100)}%` }}
-                />
+                <div className="h-full rounded-full bg-[#34D399] transition-all" style={{ width: `${Math.round((donePoints / totalPoints) * 100)}%` }} />
               </div>
             </div>
           )}
@@ -290,7 +364,7 @@ export default function SprintBoardPage() {
                         onClick={(e) => { e.stopPropagation(); setSelectedStory(story); }}
                         className="px-2.5 py-1 text-xs font-semibold text-primary bg-primary-light border border-primary-border rounded-lg hover:bg-primary/20 transition-colors flex-shrink-0"
                       >
-                        Edit
+                        Open
                       </button>
                     </div>
 
@@ -349,6 +423,23 @@ export default function SprintBoardPage() {
                                                 Unassigned
                                               </span>
                                             )}
+                                            {/* Edit / Delete — only for unaccepted, non-completed tasks */}
+                                            {canAddTasks && !task.is_accepted && task.status !== "completed" && (
+                                              <>
+                                                <button
+                                                  onClick={(e) => { e.stopPropagation(); openEdit(task); }}
+                                                  className="px-2 py-0.5 text-xs font-semibold rounded-lg transition-colors bg-primary-light text-primary border border-primary-border hover:bg-primary/20"
+                                                >
+                                                  Edit
+                                                </button>
+                                                <button
+                                                  onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
+                                                  className="px-2 py-0.5 text-xs font-semibold rounded-lg transition-colors bg-error-light text-error border border-error-border hover:bg-error/20"
+                                                >
+                                                  Delete
+                                                </button>
+                                              </>
+                                            )}
                                           </div>
                                         </div>
                                       </div>
@@ -398,6 +489,98 @@ export default function SprintBoardPage() {
           </div>
           <p className="font-semibold text-foreground mb-1">No active sprint</p>
           <p className="text-sm text-muted">Start a sprint from the Sprints page to see stories here.</p>
+        </div>
+      )}
+
+      {/* Edit task modal */}
+      {editingTask && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div className="absolute inset-0 backdrop-blur-sm bg-foreground/20" onClick={() => setEditingTask(null)} />
+          <div className="relative w-full max-w-md mx-4 rounded-2xl shadow-2xl bg-surface border border-border">
+            <div className="h-1 w-full bg-gradient-to-r from-primary to-accent rounded-t-2xl" />
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-0.5">Task</p>
+                  <h2 className="text-xl font-bold text-foreground">Edit task</h2>
+                </div>
+                <button onClick={() => setEditingTask(null)} className="w-8 h-8 flex items-center justify-center rounded-full text-lg leading-none bg-background hover:bg-border text-muted transition-colors">×</button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold tracking-widest uppercase text-primary mb-1">Description</label>
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    rows={3}
+                    className="mt-1 block w-full px-3 py-2.5 rounded-lg text-sm bg-background border border-border text-foreground placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold tracking-widest uppercase text-primary mb-1">Estimated hours</label>
+                  <input
+                    type="number" min="0.1" step="0.5"
+                    value={editHours}
+                    onChange={(e) => setEditHours(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2.5 rounded-lg text-sm bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold tracking-widest uppercase text-primary mb-1">Suggested assignee <span className="normal-case font-normal tracking-normal text-muted">(optional)</span></label>
+                  <select
+                    value={editAssigneeId}
+                    onChange={(e) => setEditAssigneeId(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2.5 rounded-lg text-sm bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  >
+                    <option value="">— No assignment —</option>
+                    {editLoadingMembers ? (
+                      <option disabled>Loading...</option>
+                    ) : (
+                      editDevelopers.map((m) => (
+                        <option key={m.user_id} value={m.user_id}>
+                          {m.user?.first_name} {m.user?.last_name} ({m.user?.email})
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
+                {editError && (
+                  <div className="flex items-start gap-2.5 p-3.5 rounded-xl border border-error-border bg-error-light">
+                    <svg className="w-4 h-4 text-error mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                    </svg>
+                    <p className="text-sm text-error">{editError}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-border pt-4 mt-4 flex justify-end gap-3">
+                <button
+                  onClick={() => setEditingTask(null)}
+                  className="px-5 py-2.5 text-sm font-medium rounded-lg transition-colors bg-background hover:bg-border text-muted"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveEdit}
+                  disabled={editSaving}
+                  className="px-5 py-2.5 text-sm font-semibold text-white rounded-lg transition-colors shadow-sm disabled:opacity-50 bg-primary hover:bg-primary-hover"
+                >
+                  {editSaving ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      Saving...
+                    </span>
+                  ) : "Save changes →"}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
