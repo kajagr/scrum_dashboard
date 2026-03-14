@@ -36,6 +36,7 @@ type TaskWithAssignee = {
   status: string;
   assignee_id: string | null;
   is_accepted: boolean;
+  is_active: boolean;
   estimated_hours: number | null;
   logged_hours: number | null;
   assignee?: {
@@ -138,12 +139,10 @@ const PRIORITY_ORDER: Record<string, number> = {
   wont_have: 3,
 };
 
-function getTaskCategory(
-  task: TaskWithAssignee,
-): "unassigned" | "assigned" | "active" | "done" {
+function getTaskCategory(task: TaskWithAssignee): "unassigned" | "assigned" | "active" | "done" {
   if (task.status === "completed") return "done";
   if (task.status === "in_progress") return "active";
-  if (task.assignee_id) return "assigned";
+  if (task.is_accepted && task.assignee_id) return "assigned";
   return "unassigned";
 }
 
