@@ -13,6 +13,7 @@ interface FormData {
   firstName: string;
   lastName: string;
   email: string;
+  systemRole: "user" | "admin";
 }
 
 interface FormErrors {
@@ -26,14 +27,14 @@ interface FormErrors {
 
 export default function CreateUserModal({ isOpen, onClose }: CreateUserModalProps) {
   const [formData, setFormData] = useState<FormData>({
-    username: "", password: "", firstName: "", lastName: "", email: "",
+    username: "", password: "", firstName: "", lastName: "", email: "", systemRole: "user",
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [loading, setLoading] = useState(false);
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: undefined, general: undefined }));
@@ -41,18 +42,18 @@ export default function CreateUserModal({ isOpen, onClose }: CreateUserModalProp
 
   const validateForm = (): FormErrors => {
     const e: FormErrors = {};
-    if (!formData.username.trim())              e.username  = "Username is required.";
-    if (!formData.password.trim())              e.password  = "Password is required.";
-    else if (formData.password.length < 6)      e.password  = "Password must be at least 6 characters.";
-    if (!formData.firstName.trim())             e.firstName = "First name is required.";
-    if (!formData.lastName.trim())              e.lastName  = "Last name is required.";
-    if (!formData.email.trim())                 e.email     = "Email is required.";
-    else if (!emailRegex.test(formData.email))  e.email     = "Enter a valid email address.";
+    if (!formData.username.trim())             e.username  = "Username is required.";
+    if (!formData.password.trim())             e.password  = "Password is required.";
+    else if (formData.password.length < 6)     e.password  = "Password must be at least 6 characters.";
+    if (!formData.firstName.trim())            e.firstName = "First name is required.";
+    if (!formData.lastName.trim())             e.lastName  = "Last name is required.";
+    if (!formData.email.trim())                e.email     = "Email is required.";
+    else if (!emailRegex.test(formData.email)) e.email     = "Enter a valid email address.";
     return e;
   };
 
   const resetForm = () => {
-    setFormData({ username: "", password: "", firstName: "", lastName: "", email: "" });
+    setFormData({ username: "", password: "", firstName: "", lastName: "", email: "", systemRole: "user" });
     setErrors({});
   };
 
@@ -75,6 +76,7 @@ export default function CreateUserModal({ isOpen, onClose }: CreateUserModalProp
           first_name: formData.firstName,
           last_name: formData.lastName,
           email: formData.email,
+          system_role: formData.systemRole,
         }),
       });
       const data = await res.json();
@@ -102,11 +104,9 @@ export default function CreateUserModal({ isOpen, onClose }: CreateUserModalProp
       <div className="absolute inset-0 backdrop-blur-sm bg-foreground/20" onClick={handleClose} />
 
       <div className="relative w-full max-w-md mx-4 rounded-2xl overflow-hidden shadow-2xl bg-surface">
-        {/* Top accent bar */}
         <div className="h-1 w-full bg-gradient-to-r from-primary to-accent" />
 
         <div className="p-7">
-          {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
               <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-0.5">Admin</p>
@@ -125,7 +125,7 @@ export default function CreateUserModal({ isOpen, onClose }: CreateUserModalProp
             <div>
               <label className={labelClass}>Username <span className="text-error normal-case font-normal tracking-normal">*</span></label>
               <input
-                id="username" type="text" name="username"
+                type="text" name="username"
                 value={formData.username} onChange={handleChange}
                 autoFocus placeholder="e.g. janez123"
                 className={inputClass(!!errors.username)}
@@ -137,7 +137,7 @@ export default function CreateUserModal({ isOpen, onClose }: CreateUserModalProp
             <div>
               <label className={labelClass}>Password <span className="text-error normal-case font-normal tracking-normal">*</span></label>
               <input
-                id="password" type="password" name="password"
+                type="password" name="password"
                 value={formData.password} onChange={handleChange}
                 placeholder="At least 6 characters"
                 className={inputClass(!!errors.password)}
@@ -150,7 +150,7 @@ export default function CreateUserModal({ isOpen, onClose }: CreateUserModalProp
               <div>
                 <label className={labelClass}>First name <span className="text-error normal-case font-normal tracking-normal">*</span></label>
                 <input
-                  id="firstName" type="text" name="firstName"
+                  type="text" name="firstName"
                   value={formData.firstName} onChange={handleChange}
                   placeholder="John"
                   className={inputClass(!!errors.firstName)}
@@ -160,7 +160,7 @@ export default function CreateUserModal({ isOpen, onClose }: CreateUserModalProp
               <div>
                 <label className={labelClass}>Last name <span className="text-error normal-case font-normal tracking-normal">*</span></label>
                 <input
-                  id="lastName" type="text" name="lastName"
+                  type="text" name="lastName"
                   value={formData.lastName} onChange={handleChange}
                   placeholder="Doe"
                   className={inputClass(!!errors.lastName)}
@@ -173,12 +173,26 @@ export default function CreateUserModal({ isOpen, onClose }: CreateUserModalProp
             <div>
               <label className={labelClass}>Email <span className="text-error normal-case font-normal tracking-normal">*</span></label>
               <input
-                id="email" type="email" name="email"
+                type="email" name="email"
                 value={formData.email} onChange={handleChange}
                 placeholder="john.doe@email.com"
                 className={inputClass(!!errors.email)}
               />
               {errors.email && <p className="text-xs text-error mt-1">{errors.email}</p>}
+            </div>
+
+            {/* System Role */}
+            <div>
+              <label className={labelClass}>System role <span className="text-error normal-case font-normal tracking-normal">*</span></label>
+              <select
+                name="systemRole"
+                value={formData.systemRole}
+                onChange={handleChange}
+                className="mt-1 block w-full px-3 py-2.5 rounded-lg text-sm transition-all bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              >
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
             </div>
 
             {/* General error */}
