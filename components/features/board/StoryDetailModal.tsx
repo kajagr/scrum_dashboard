@@ -77,7 +77,8 @@ export default function StoryDetailModal({
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
-  const priority = PRIORITY_CONFIG[story.priority] ?? PRIORITY_CONFIG.should_have;
+  const priority =
+    PRIORITY_CONFIG[story.priority] ?? PRIORITY_CONFIG.should_have;
   const status = STATUS_CONFIG[story.status] ?? STATUS_CONFIG.backlog;
 
   const fetchTasks = async () => {
@@ -150,7 +151,8 @@ export default function StoryDetailModal({
   };
 
   const resignTask = async (taskId: string) => {
-    if (!confirm("Ali ste prepričani, da se želite odpovedati tej nalogi?")) return;
+    if (!confirm("Ali ste prepričani, da se želite odpovedati tej nalogi?"))
+      return;
     setUpdatingTaskId(taskId);
     try {
       const res = await fetch(`/api/tasks/${taskId}`, {
@@ -170,7 +172,10 @@ export default function StoryDetailModal({
 
   if (!isOpen) return null;
 
-  const totalEstimated = tasks.reduce((sum, t) => sum + (t.estimated_hours ?? 0), 0);
+  const totalEstimated = tasks.reduce(
+    (sum, t) => sum + (t.estimated_hours ?? 0),
+    0,
+  );
   const totalLogged = tasks.reduce((sum, t) => sum + (t.logged_hours ?? 0), 0);
   const canAccept = currentUserRole === "developer" || currentUserRole === "scrum_master";
 
@@ -184,7 +189,10 @@ export default function StoryDetailModal({
           style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", color: "var(--color-foreground)" }}
         >
           {/* Header */}
-          <div className="p-6" style={{ borderBottom: "1px solid var(--color-border)" }}>
+          <div
+            className="p-6"
+            style={{ borderBottom: "1px solid var(--color-border)" }}
+          >
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="mb-2 flex items-center gap-2">
@@ -215,7 +223,10 @@ export default function StoryDetailModal({
               )}
               {story.business_value != null && (
                 <span className="flex items-center gap-1">
-                  BV: <span className="font-medium text-[var(--color-foreground)]">{story.business_value}</span>
+                  BV:{" "}
+                  <span className="font-medium text-[var(--color-foreground)]">
+                    {story.business_value}
+                  </span>
                 </span>
               )}
             </div>
@@ -225,8 +236,12 @@ export default function StoryDetailModal({
           <div className="flex-1 overflow-y-auto p-6">
             {story.description && (
               <div className="mb-6">
-                <h3 className="mb-2 text-sm font-semibold text-[var(--color-foreground)]">Description</h3>
-                <p className="text-sm text-[var(--color-muted)]">{story.description}</p>
+                <h3 className="mb-2 text-sm font-semibold text-[var(--color-foreground)]">
+                  Description
+                </h3>
+                <p className="text-sm text-[var(--color-muted)]">
+                  {story.description}
+                </p>
               </div>
             )}
 
