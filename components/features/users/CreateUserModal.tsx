@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 
 interface CreateUserModalProps {
   isOpen: boolean;
@@ -32,12 +33,29 @@ export default function CreateUserModal({ isOpen, onClose }: CreateUserModalProp
   const [errors, setErrors] = useState<FormErrors>({});
   const [loading, setLoading] = useState(false);
 
+  const [showPassword, setShowPassword] = useState(false);
+  const [revealIndex, setRevealIndex] = useState<number | null>(null);
+  const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: undefined, general: undefined }));
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setFormData((prev) => ({ ...prev, password: val }));
+    setErrors((prev) => ({ ...prev, password: undefined, general: undefined }));
+    if (!showPassword && val.length > 0) {
+      setRevealIndex(val.length - 1);
+      if (revealTimer.current) clearTimeout(revealTimer.current);
+      revealTimer.current = setTimeout(() => setRevealIndex(null), 1000);
+    } else {
+      setRevealIndex(null);
+    }
   };
 
   const validateForm = (): FormErrors => {
@@ -55,16 +73,20 @@ export default function CreateUserModal({ isOpen, onClose }: CreateUserModalProp
   const resetForm = () => {
     setFormData({ username: "", password: "", firstName: "", lastName: "", email: "", systemRole: "user" });
     setErrors({});
+    setRevealIndex(null);
   };
 
   const handleClose = () => { resetForm(); onClose(); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const validationErrors = validateForm();
-    if (Object.keys(validationErrors).length > 0) { setErrors(validationErrors); return; }
-
     setLoading(true);
+    const validationErrors = validateForm();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      setLoading(false);
+      return;
+    }
     try {
       const res = await fetch("/api/users", {
         method: "POST",
@@ -80,7 +102,13 @@ export default function CreateUserModal({ isOpen, onClose }: CreateUserModalProp
         }),
       });
       const data = await res.json();
-      if (!res.ok) { setErrors({ general: data.error || "Error creating user." }); return; }
+      if (!res.ok) {
+        setErrors({
+          general: data.error || "Error creating user.",
+        });
+        setLoading(false);
+        return;
+      }
       resetForm();
       onClose();
     } catch {

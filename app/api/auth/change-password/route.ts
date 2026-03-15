@@ -1,13 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import fs from "fs";
+import path from "path";
+
+// Naloži seznam pogostih gesel (500 namesto 100) enkrat ob zagonu serverja - iz rockyyou:
+// https://github.com/gsuberland/CommonPasswordsByPolicy/blob/main/from-rockyou/pwlist_cc_len12_cls1.txt
+// shranjeno v public/common-passwords
+let commonPasswords: Set<string> | null = null;
+
+function getCommonPasswords(): Set<string> {
+  if (commonPasswords) return commonPasswords;
+  try {
+    const filePath = path.join(process.cwd(), "public", "common-passwords.txt");
+    const text = fs.readFileSync(filePath, "utf-8");
+    commonPasswords = new Set(
+      text
+        .split("\n")
+        .map((p) => p.trim().toLowerCase())
+        .filter(Boolean),
+    );
+  } catch {
+    // Če datoteka ne obstaja, vrni prazen set
+    commonPasswords = new Set();
+  }
+  return commonPasswords;
+}
 
 function validatePassword(password: string) {
   if (password.length < 12) {
     return "Password must be at least 12 characters.";
   }
 
-  if (password.length > 128) {
+  if (password.length > 64) {
     return "Password cannot be longer than 128 characters.";
+  }
+
+  // Preveri pogosta gesla
+  const common = getCommonPasswords();
+  if (common.has(password.toLowerCase())) {
+    return "This password is too common. Please choose a stronger one.";
   }
 
   // no trimming, no changing whitespace
