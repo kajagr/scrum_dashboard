@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -61,6 +61,13 @@ export default function ChangePasswordModal({
   const [commonPasswords, setCommonPasswords] = useState<Set<string>>(
     new Set(),
   );
+
+  const [revealIndexNew, setRevealIndexNew] = useState<number | null>(null);
+  const [revealIndexConfirm, setRevealIndexConfirm] = useState<number | null>(
+    null,
+  );
+  const revealTimerNew = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const revealTimerConfirm = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetch("/common-passwords.txt")
@@ -277,7 +284,7 @@ export default function ChangePasswordModal({
                   New password
                 </label>
                 <div className="relative">
-                  {!showNew && newPassword.length > 0 && (
+                  {/* {!showNew && newPassword.length > 0 && (
                     <div
                       className="absolute inset-0 flex items-center pl-3 pr-10 text-sm pointer-events-none select-none rounded-lg overflow-hidden"
                       style={{ color: "var(--color-foreground)" }}
@@ -285,17 +292,50 @@ export default function ChangePasswordModal({
                       {"•".repeat(newPassword.length - 1)}
                       {newPassword[newPassword.length - 1]}
                     </div>
+                  )} */}
+                  {!showNew && newPassword.length > 0 && (
+                    <div
+                      className="absolute inset-0 flex items-center pl-3 pr-10 text-sm pointer-events-none select-none rounded-lg overflow-hidden"
+                      style={{ color: "var(--color-foreground)" }}
+                    >
+                      {newPassword
+                        .split("")
+                        .map((char, i) => (i === revealIndexNew ? char : "•"))}
+                    </div>
                   )}
                   <input
                     type={showNew ? "text" : "password"}
                     value={newPassword}
+                    // onChange={(e) => {
+                    //   setNewPassword(e.target.value);
+                    //   setErrors((p) => ({
+                    //     ...p,
+                    //     newPassword: undefined,
+                    //     confirmPassword: undefined,
+                    //   }));
+                    // }}
                     onChange={(e) => {
-                      setNewPassword(e.target.value);
+                      const val = e.target.value;
+                      setNewPassword(val);
                       setErrors((p) => ({
                         ...p,
                         newPassword: undefined,
                         confirmPassword: undefined,
                       }));
+
+                      if (!showNew && val.length > 0) {
+                        // Razkrij zadnji znak
+                        setRevealIndexNew(val.length - 1);
+                        // Po 1 sekundi skrij
+                        if (revealTimerNew.current)
+                          clearTimeout(revealTimerNew.current);
+                        revealTimerNew.current = setTimeout(
+                          () => setRevealIndexNew(null),
+                          1000,
+                        );
+                      } else {
+                        setRevealIndexNew(null);
+                      }
                     }}
                     onCopy={preventCopy}
                     onCut={preventCopy}
@@ -377,19 +417,8 @@ export default function ChangePasswordModal({
                 <label className="block text-xs font-semibold tracking-widest uppercase text-primary mb-1">
                   Confirm new password
                 </label>
-                {/* <div className="relative">
-                  <input
-                    type={showConfirm ? "text" : "password"}
-                    value={confirmPassword}
-                    onChange={(e) => {
-                      setConfirmPassword(e.target.value);
-                      setErrors((p) => ({ ...p, confirmPassword: undefined }));
-                    }}
-                    placeholder="Repeat new password"
-                    className={inputClass(!!errors.confirmPassword)}
-                  /> */}
                 <div className="relative">
-                  {!showConfirm && confirmPassword.length > 0 && (
+                  {/* {!showConfirm && confirmPassword.length > 0 && (
                     <div
                       className="absolute inset-0 flex items-center pl-3 pr-10 text-sm pointer-events-none select-none rounded-lg overflow-hidden"
                       style={{ color: "var(--color-foreground)" }}
@@ -397,13 +426,42 @@ export default function ChangePasswordModal({
                       {"•".repeat(confirmPassword.length - 1)}
                       {confirmPassword[confirmPassword.length - 1]}
                     </div>
+                  )} */}
+                  {!showConfirm && confirmPassword.length > 0 && (
+                    <div
+                      className="absolute inset-0 flex items-center pl-3 pr-10 text-sm pointer-events-none select-none rounded-lg overflow-hidden"
+                      style={{ color: "var(--color-foreground)" }}
+                    >
+                      {confirmPassword
+                        .split("")
+                        .map((char, i) =>
+                          i === revealIndexConfirm ? char : "•",
+                        )}
+                    </div>
                   )}
                   <input
                     type={showConfirm ? "text" : "password"}
                     value={confirmPassword}
+                    // onChange={(e) => {
+                    //   setConfirmPassword(e.target.value);
+                    //   setErrors((p) => ({ ...p, confirmPassword: undefined }));
+                    // }}
                     onChange={(e) => {
-                      setConfirmPassword(e.target.value);
+                      const val = e.target.value;
+                      setConfirmPassword(val);
                       setErrors((p) => ({ ...p, confirmPassword: undefined }));
+
+                      if (!showConfirm && val.length > 0) {
+                        setRevealIndexConfirm(val.length - 1);
+                        if (revealTimerConfirm.current)
+                          clearTimeout(revealTimerConfirm.current);
+                        revealTimerConfirm.current = setTimeout(
+                          () => setRevealIndexConfirm(null),
+                          1000,
+                        );
+                      } else {
+                        setRevealIndexConfirm(null);
+                      }
                     }}
                     onCopy={preventCopy}
                     onCut={preventCopy}
