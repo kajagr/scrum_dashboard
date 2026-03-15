@@ -103,8 +103,10 @@ export default function CreateUserModal({
     const e: FormErrors = {};
     if (!formData.username.trim()) e.username = "Username is required.";
     if (!formData.password.trim()) e.password = "Password is required.";
-    else if (formData.password.length < 6)
+    else if (formData.password.length < 12)
       e.password = "Password must be at least 12 characters.";
+    else if (formData.password.length > 64)
+      e.password = "Password must be less than 65 characters.";
     if (!formData.firstName.trim()) e.firstName = "First name is required.";
     if (!formData.lastName.trim()) e.lastName = "Last name is required.";
     if (!formData.email.trim()) e.email = "Email is required.";

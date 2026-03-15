@@ -103,6 +103,13 @@ export async function POST(req: Request) {
       );
     }
 
+    if (password.length > 64) {
+      return NextResponse.json(
+        { error: "Geslo ima lahko največ 64 znakov." },
+        { status: 400 },
+      );
+    }
+
     // Preveri ali username obstaja
     const { data: existingUsername } = await supabaseAdmin
       .from("users")
