@@ -257,8 +257,6 @@ export default function BacklogPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [projectRole, setProjectRole] = useState<string | null>(null);
 
-  //////////////////////////////////////////////////////////////////////
-  //////////////////////////////////////////////////////////////////////
   const [editingStory, setEditingStory] = useState<UserStory | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -365,9 +363,6 @@ export default function BacklogPage() {
       setSavingEdit(false);
     }
   };
-
-  //////////////////////////////////////////////////////////////////////////
-  //////////////////////////////////////////////////////////////////////////
 
   const loadBacklog = async () => {
     try {
@@ -762,16 +757,12 @@ export default function BacklogPage() {
               selectable={activeTab === "unassigned" && canAssign}
               selected={selectedIds.includes(story.id)}
               onToggle={() => toggleSelect(story.id)}
-              //////////////////////////////////////////////
-              //////////////////////////////////////////////
               onEdit={(story) => openEditModal(story)}
               canEdit={
                 (projectRole === "scrum_master" ||
                   projectRole === "product_owner") &&
                 activeTab === "unassigned"
               }
-              ///////////////////////////////////////////
-              ////////////////////////////////////////////
             />
           ))}
         </div>
@@ -819,9 +810,6 @@ export default function BacklogPage() {
         }}
         projectId={projectId}
       />
-
-      {/* ///////////////////////////////////// */}
-      {/* ///////////////////////////////////// */}
 
       {editingStory && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -968,9 +956,6 @@ export default function BacklogPage() {
           </div>
         </div>
       )}
-
-      {/* ////////////////////////////////////// */}
-      {/* ////////////////////////////////////// */}
     </div>
   );
 }
