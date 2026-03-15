@@ -284,49 +284,39 @@ export default function ChangePasswordModal({
                   New password
                 </label>
                 <div className="relative">
-                  {/* {!showNew && newPassword.length > 0 && (
-                    <div
-                      className="absolute inset-0 flex items-center pl-3 pr-10 text-sm pointer-events-none select-none rounded-lg overflow-hidden"
-                      style={{ color: "var(--color-foreground)" }}
-                    >
-                      {"•".repeat(newPassword.length - 1)}
-                      {newPassword[newPassword.length - 1]}
-                    </div>
-                  )} */}
-                  {!showNew && newPassword.length > 0 && (
-                    <div
-                      className="absolute inset-0 flex items-center pl-3 pr-10 text-sm pointer-events-none select-none rounded-lg overflow-hidden"
-                      style={{ color: "var(--color-foreground)" }}
-                    >
-                      {newPassword
-                        .split("")
-                        .map((char, i) => (i === revealIndexNew ? char : "•"))}
-                    </div>
-                  )}
                   <input
-                    type={showNew ? "text" : "password"}
-                    value={newPassword}
-                    // onChange={(e) => {
-                    //   setNewPassword(e.target.value);
-                    //   setErrors((p) => ({
-                    //     ...p,
-                    //     newPassword: undefined,
-                    //     confirmPassword: undefined,
-                    //   }));
-                    // }}
+                    type="text"
+                    value={
+                      showNew
+                        ? newPassword
+                        : newPassword
+                            .split("")
+                            .map((char, i) =>
+                              i === revealIndexNew ? char : "•",
+                            )
+                            .join("")
+                    }
                     onChange={(e) => {
                       const val = e.target.value;
-                      setNewPassword(val);
+                      let realValue: string;
+                      if (showNew) {
+                        realValue = val;
+                      } else {
+                        if (val.length > newPassword.length) {
+                          realValue =
+                            newPassword + val.slice(newPassword.length);
+                        } else {
+                          realValue = newPassword.slice(0, val.length);
+                        }
+                      }
+                      setNewPassword(realValue);
                       setErrors((p) => ({
                         ...p,
                         newPassword: undefined,
                         confirmPassword: undefined,
                       }));
-
-                      if (!showNew && val.length > 0) {
-                        // Razkrij zadnji znak
-                        setRevealIndexNew(val.length - 1);
-                        // Po 1 sekundi skrij
+                      if (!showNew && realValue.length > 0) {
+                        setRevealIndexNew(realValue.length - 1);
                         if (revealTimerNew.current)
                           clearTimeout(revealTimerNew.current);
                         revealTimerNew.current = setTimeout(
@@ -341,11 +331,6 @@ export default function ChangePasswordModal({
                     onCut={preventCopy}
                     placeholder="At least 12 characters"
                     className={inputClass(!!errors.newPassword)}
-                    style={
-                      !showNew
-                        ? { color: "transparent", caretColor: "transparent" }
-                        : {}
-                    }
                   />
                   <button
                     type="button"
@@ -361,30 +346,7 @@ export default function ChangePasswordModal({
                     {errors.newPassword}
                   </p>
                 )}
-                {/* Password strength indicator */}
-                {/* {newPassword.length > 0 && (
-                  <div className="mt-2 flex gap-1">
-                    {[12, 16, 20].map((threshold, i) => (
-                      <div
-                        key={i}
-                        className={`h-1 flex-1 rounded-full transition-colors ${
-                          newPassword.length >= threshold
-                            ? "bg-primary"
-                            : "bg-border"
-                        }`}
-                      />
-                    ))}
-                    <span className="text-[10px] text-subtle ml-2">
-                      {newPassword.length < 12
-                        ? "Too weak"
-                        : newPassword.length < 16
-                          ? "Good"
-                          : newPassword.length < 20
-                            ? "Strong"
-                            : "Very strong"}
-                    </span>
-                  </div>
-                )} */}
+
                 {/*  Password meter */}
                 {newPassword.length > 0 && (
                   <div className="mt-2">
@@ -418,41 +380,35 @@ export default function ChangePasswordModal({
                   Confirm new password
                 </label>
                 <div className="relative">
-                  {/* {!showConfirm && confirmPassword.length > 0 && (
-                    <div
-                      className="absolute inset-0 flex items-center pl-3 pr-10 text-sm pointer-events-none select-none rounded-lg overflow-hidden"
-                      style={{ color: "var(--color-foreground)" }}
-                    >
-                      {"•".repeat(confirmPassword.length - 1)}
-                      {confirmPassword[confirmPassword.length - 1]}
-                    </div>
-                  )} */}
-                  {!showConfirm && confirmPassword.length > 0 && (
-                    <div
-                      className="absolute inset-0 flex items-center pl-3 pr-10 text-sm pointer-events-none select-none rounded-lg overflow-hidden"
-                      style={{ color: "var(--color-foreground)" }}
-                    >
-                      {confirmPassword
-                        .split("")
-                        .map((char, i) =>
-                          i === revealIndexConfirm ? char : "•",
-                        )}
-                    </div>
-                  )}
                   <input
-                    type={showConfirm ? "text" : "password"}
-                    value={confirmPassword}
-                    // onChange={(e) => {
-                    //   setConfirmPassword(e.target.value);
-                    //   setErrors((p) => ({ ...p, confirmPassword: undefined }));
-                    // }}
+                    type="text"
+                    value={
+                      showConfirm
+                        ? confirmPassword
+                        : confirmPassword
+                            .split("")
+                            .map((char, i) =>
+                              i === revealIndexConfirm ? char : "•",
+                            )
+                            .join("")
+                    }
                     onChange={(e) => {
                       const val = e.target.value;
-                      setConfirmPassword(val);
+                      let realValue: string;
+                      if (showConfirm) {
+                        realValue = val;
+                      } else {
+                        if (val.length > confirmPassword.length) {
+                          realValue =
+                            confirmPassword + val.slice(confirmPassword.length);
+                        } else {
+                          realValue = confirmPassword.slice(0, val.length);
+                        }
+                      }
+                      setConfirmPassword(realValue);
                       setErrors((p) => ({ ...p, confirmPassword: undefined }));
-
-                      if (!showConfirm && val.length > 0) {
-                        setRevealIndexConfirm(val.length - 1);
+                      if (!showConfirm && realValue.length > 0) {
+                        setRevealIndexConfirm(realValue.length - 1);
                         if (revealTimerConfirm.current)
                           clearTimeout(revealTimerConfirm.current);
                         revealTimerConfirm.current = setTimeout(
@@ -467,11 +423,6 @@ export default function ChangePasswordModal({
                     onCut={preventCopy}
                     placeholder="Repeat new password"
                     className={inputClass(!!errors.confirmPassword)}
-                    style={
-                      !showConfirm
-                        ? { color: "transparent", caretColor: "transparent" }
-                        : {}
-                    }
                   />
                   <button
                     type="button"

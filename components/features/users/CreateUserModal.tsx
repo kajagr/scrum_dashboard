@@ -88,10 +88,28 @@ export default function CreateUserModal({
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-    setFormData((prev) => ({ ...prev, password: val }));
+
+    let realValue: string;
+    if (showPassword) {
+      // Ko je geslo vidno — val je pravo geslo
+      realValue = val;
+    } else {
+      // Ko je geslo maskirano — val vsebuje pike + nove znake
+      // Izračunaj pravo geslo glede na razliko v dolžini
+      if (val.length > formData.password.length) {
+        // Dodani znaki na koncu
+        realValue = formData.password + val.slice(formData.password.length);
+      } else {
+        // Zbrisani znaki
+        realValue = formData.password.slice(0, val.length);
+      }
+    }
+
+    setFormData((prev) => ({ ...prev, password: realValue }));
     setErrors((prev) => ({ ...prev, password: undefined, general: undefined }));
-    if (!showPassword && val.length > 0) {
-      setRevealIndex(val.length - 1);
+
+    if (!showPassword && realValue.length > 0) {
+      setRevealIndex(realValue.length - 1);
       if (revealTimer.current) clearTimeout(revealTimer.current);
       revealTimer.current = setTimeout(() => setRevealIndex(null), 1000);
     } else {
@@ -244,41 +262,33 @@ export default function CreateUserModal({
                   *
                 </span>
               </label>
-              <div className="relative">
-                {/* Overlay — reveal zadnjega znaka za 1s */}
-                {!showPassword && formData.password.length > 0 && (
-                  <div
-                    className="absolute inset-0 flex items-center pl-3 pr-10 text-sm pointer-events-none select-none rounded-lg overflow-hidden"
-                    style={{
-                      color: "var(--color-foreground)",
-                      marginTop: "4px",
-                    }}
-                  >
-                    {formData.password
-                      .split("")
-                      .map((char, i) => (i === revealIndex ? char : "•"))}
-                  </div>
-                )}
+
+              <div className="relative mt-1">
                 <input
-                  type={showPassword ? "text" : "password"}
+                  type="text"
                   name="password"
-                  value={formData.password}
+                  value={
+                    showPassword
+                      ? formData.password
+                      : formData.password
+                          .split("")
+                          .map((char, i) => (i === revealIndex ? char : "•"))
+                          .join("")
+                  }
                   onChange={handlePasswordChange}
                   onCopy={(e) => e.preventDefault()}
                   onCut={(e) => e.preventDefault()}
                   placeholder="At least 12 characters"
-                  className={`${inputClass(!!errors.password)} pr-10`}
-                  style={
-                    !showPassword
-                      ? { color: "transparent", caretColor: "transparent" }
-                      : {}
-                  }
+                  className={`block w-full px-3 py-2.5 rounded-lg text-sm transition-all bg-background border text-foreground placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary pr-10 ${
+                    errors.password
+                      ? "border-error-border focus:ring-error/20 focus:border-error"
+                      : "border-border"
+                  }`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((s) => !s)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle hover:text-muted transition-colors"
-                  style={{ marginTop: "2px" }}
                 >
                   <EyeIcon show={showPassword} />
                 </button>

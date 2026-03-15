@@ -100,25 +100,31 @@ export default function LoginPage() {
               Password
             </label>
             <div className="relative">
-              {/* Overlay — reveal zadnjega znaka za 1s */}
-              {!showPassword && password.length > 0 && (
-                <div
-                  className="absolute inset-0 flex items-center pl-3 pr-10 text-sm pointer-events-none select-none rounded-lg overflow-hidden"
-                  style={{ color: "var(--color-foreground)" }}
-                >
-                  {password
-                    .split("")
-                    .map((char, i) => (i === revealIndex ? char : "•"))}
-                </div>
-              )}
               <input
-                type={showPassword ? "text" : "password"}
-                value={password}
+                type="text"
+                value={
+                  showPassword
+                    ? password
+                    : password
+                        .split("")
+                        .map((char, i) => (i === revealIndex ? char : "•"))
+                        .join("")
+                }
                 onChange={(e) => {
                   const val = e.target.value;
-                  setPassword(val);
-                  if (!showPassword && val.length > 0) {
-                    setRevealIndex(val.length - 1);
+                  let realValue: string;
+                  if (showPassword) {
+                    realValue = val;
+                  } else {
+                    if (val.length > password.length) {
+                      realValue = password + val.slice(password.length);
+                    } else {
+                      realValue = password.slice(0, val.length);
+                    }
+                  }
+                  setPassword(realValue);
+                  if (!showPassword && realValue.length > 0) {
+                    setRevealIndex(realValue.length - 1);
                     if (revealTimer.current) clearTimeout(revealTimer.current);
                     revealTimer.current = setTimeout(
                       () => setRevealIndex(null),
@@ -132,11 +138,6 @@ export default function LoginPage() {
                 onCut={(e) => e.preventDefault()}
                 required
                 className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 pr-10 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-light)]"
-                style={
-                  !showPassword
-                    ? { color: "transparent", caretColor: "transparent" }
-                    : {}
-                }
               />
               <button
                 type="button"
