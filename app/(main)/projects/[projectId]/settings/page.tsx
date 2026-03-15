@@ -20,14 +20,11 @@ export default async function SettingsPage({ params }: Props) {
   }
 
   return (
-    <div className="text-[var(--color-foreground)]">
+    <div className="p-6 text-foreground">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[var(--color-foreground)]">
-          Settings
-        </h1>
-        <p className="text-[var(--color-muted)]">
-          Manage project settings
-        </p>
+        <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Project</p>
+        <h1 className="text-3xl font-bold text-foreground leading-tight">Settings</h1>
+        <p className="text-sm text-muted mt-1">Manage project settings</p>
       </div>
 
       <div
