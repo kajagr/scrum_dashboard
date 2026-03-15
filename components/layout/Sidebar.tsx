@@ -25,7 +25,12 @@ const navigation = [
     href: "" as const,
     icon: LayoutDashboard,
   },
-  { name: "Product Backlog", type: "project", href: "/backlog", icon: ClipboardList },
+  {
+    name: "Product Backlog",
+    type: "project",
+    href: "/backlog",
+    icon: ClipboardList,
+  },
   { name: "Sprint Board", type: "project", href: "/board", icon: KanbanSquare },
   { name: "Sprints", type: "project", href: "/sprints", icon: Flag },
   {
@@ -170,7 +175,7 @@ export default function Sidebar() {
           className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted transition-all hover:bg-background hover:text-foreground"
         >
           <LogOut size={17} className="text-subtle" />
-          <span>Odjava</span>
+          <span>Sign Out</span>
         </button>
       </div>
     </aside>
