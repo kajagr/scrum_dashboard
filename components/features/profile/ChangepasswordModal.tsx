@@ -105,7 +105,7 @@ export default function ChangePasswordModal({
     else if (newPassword.length < 12)
       e.newPassword = "Password must be at least 12 characters.";
     else if (newPassword.length > 64)
-      e.newPassword = "Password cannot be longer than 128 characters.";
+      e.newPassword = "Password cannot be longer than 64 characters.";
     else {
       const isCommon = commonPasswords.has(newPassword.toLowerCase());
       if (isCommon)

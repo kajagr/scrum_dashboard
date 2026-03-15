@@ -124,7 +124,7 @@ export default function CreateUserModal({
     else if (formData.password.length < 12)
       e.password = "Password must be at least 12 characters.";
     else if (formData.password.length > 64)
-      e.password = "Password must be less than 65 characters.";
+      e.password = "Password cannot be longer than 64 characters.";
     if (!formData.firstName.trim()) e.firstName = "First name is required.";
     if (!formData.lastName.trim()) e.lastName = "Last name is required.";
     if (!formData.email.trim()) e.email = "Email is required.";
