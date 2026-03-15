@@ -30,14 +30,11 @@ export default async function ProjectDashboardPage({ params }: Props) {
     .eq("project_id", projectId);
 
   return (
-    <div className="text-[var(--color-foreground)]">
+    <div className="p-6 text-foreground">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[var(--color-foreground)]">
-          {project.name}
-        </h1>
-        <p className="text-[var(--color-muted)]">
-          {project.description || "No description"}
-        </p>
+        <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Project</p>
+        <h1 className="text-3xl font-bold text-foreground leading-tight">{project.name}</h1>
+        <p className="text-sm text-muted mt-1">{project.description || "No description"}</p>
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">

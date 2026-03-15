@@ -20,14 +20,11 @@ export default async function TimeTrackingPage({ params }: Props) {
   }
 
   return (
-    <div className="text-[var(--color-foreground)]">
+    <div className="p-6 text-foreground">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[var(--color-foreground)]">
-          Time Tracking
-        </h1>
-        <p className="text-[var(--color-muted)]">
-          Track time spent on tasks
-        </p>
+        <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Project</p>
+        <h1 className="text-3xl font-bold text-foreground leading-tight">Time Tracking</h1>
+        <p className="text-sm text-muted mt-1">Track time spent on tasks</p>
       </div>
 
       <div
