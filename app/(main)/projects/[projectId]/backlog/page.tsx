@@ -81,26 +81,19 @@ function StoryCard({
   selectable,
   selected,
   onToggle,
-  /////////////////////////////
-  //////////////////////////////
   onEdit,
-  /////////////////////////////
-  //////////////////////////////
 }: {
   story: UserStory;
   selectable?: boolean;
   selected?: boolean;
   onToggle?: () => void;
-  ///////////////////////////////////
-  ////////////////////////////////////
   onEdit?: (story: UserStory) => void;
-  ///////////////////////////////////
-  ////////////////////////////////////
 }) {
   const priority = PRIORITY_CONFIG[story.priority] ?? PRIORITY_CONFIG.wont_have;
   const status = STATUS_CONFIG[story.status] ?? STATUS_CONFIG.backlog;
   const missingPoints = selectable && story.story_points == null;
   const clickable = selectable && !missingPoints;
+
   return (
     <div
       onClick={clickable ? onToggle : undefined}
@@ -112,12 +105,22 @@ function StoryCard({
       className={`flex items-start gap-3 p-4 rounded-xl border transition-all
         ${clickable ? "cursor-pointer" : ""}
         ${missingPoints ? "opacity-50 cursor-not-allowed" : ""}
-        ${selected ? "bg-primary-light border-primary-border shadow-sm" : "bg-background border-border hover:border-subtle"}`}
+        ${
+          selected
+            ? "bg-primary-light border-primary-border shadow-sm"
+            : "bg-background border-border hover:border-subtle"
+        }`}
     >
       {selectable && (
         <div
           className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors
-          ${missingPoints ? "border-subtle opacity-40" : selected ? "bg-primary border-primary" : "border-subtle"}`}
+          ${
+            missingPoints
+              ? "border-subtle opacity-40"
+              : selected
+                ? "bg-primary border-primary"
+                : "border-subtle"
+          }`}
         >
           {selected && !missingPoints && (
             <svg
@@ -136,23 +139,21 @@ function StoryCard({
           )}
         </div>
       )}
+
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2 mb-2">
           <p className="text-sm font-semibold text-foreground leading-snug">
             {story.title}
           </p>
 
-          {/* //////////////////////////////////////////////////// */}
-          {/* //////////////////////////////////////////////////// */}
-
           <div className="flex items-center gap-2 flex-shrink-0">
-            {/* EDIT BUTTON */}
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                if (onEdit) onEdit(story);
+                onEdit?.(story);
               }}
-              className="text-xs text-primary hover:bg-primary-light px-2 py-1 rounded"
+              className="inline-flex items-center rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-colors hover:bg-primary-hover"
             >
               Edit
             </button>
@@ -173,32 +174,14 @@ function StoryCard({
               </span>
             ) : null}
           </div>
-
-          {/* //////////////////////////////////////////////////// */}
-          {/* //////////////////////////////////////////////////// */}
-
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            {story.business_value != null && (
-              <span className="text-xs text-muted bg-surface border border-border px-2 py-0.5 rounded-lg">
-                BV {story.business_value}
-              </span>
-            )}
-            {story.story_points != null ? (
-              <span className="text-xs text-muted bg-surface border border-border px-2 py-0.5 rounded-lg">
-                {story.story_points} pts
-              </span>
-            ) : selectable ? (
-              <span className="text-xs text-error bg-error-light border border-error-border px-2 py-0.5 rounded-lg">
-                No SP
-              </span>
-            ) : null}
-          </div>
         </div>
+
         {story.description && (
           <p className="text-xs text-muted mb-2.5 line-clamp-2">
             {story.description}
           </p>
         )}
+
         <div className="flex items-center gap-1.5 flex-wrap">
           <span
             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${priority.pill}`}
