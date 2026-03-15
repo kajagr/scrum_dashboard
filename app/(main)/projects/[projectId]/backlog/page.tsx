@@ -82,12 +82,14 @@ function StoryCard({
   selected,
   onToggle,
   onEdit,
+  canEdit,
 }: {
   story: UserStory;
   selectable?: boolean;
   selected?: boolean;
   onToggle?: () => void;
   onEdit?: (story: UserStory) => void;
+  canEdit?: boolean;
 }) {
   const priority = PRIORITY_CONFIG[story.priority] ?? PRIORITY_CONFIG.wont_have;
   const status = STATUS_CONFIG[story.status] ?? STATUS_CONFIG.backlog;
@@ -147,16 +149,18 @@ function StoryCard({
           </p>
 
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit?.(story);
-              }}
-              className="inline-flex items-center rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-colors hover:bg-primary-hover"
-            >
-              Edit
-            </button>
+            {canEdit && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit?.(story);
+                }}
+                className="inline-flex items-center rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-colors hover:bg-primary-hover"
+              >
+                Edit
+              </button>
+            )}
 
             {story.business_value != null && (
               <span className="text-xs text-muted bg-surface border border-border px-2 py-0.5 rounded-lg">
@@ -761,6 +765,11 @@ export default function BacklogPage() {
               //////////////////////////////////////////////
               //////////////////////////////////////////////
               onEdit={(story) => openEditModal(story)}
+              canEdit={
+                (projectRole === "scrum_master" ||
+                  projectRole === "product_owner") &&
+                activeTab === "unassigned"
+              }
               ///////////////////////////////////////////
               ////////////////////////////////////////////
             />
