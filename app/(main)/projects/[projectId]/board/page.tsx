@@ -212,11 +212,6 @@ export default function SprintBoardPage() {
     return (PRIORITY_ORDER[a.priority] ?? 99) - (PRIORITY_ORDER[b.priority] ?? 99);
   });
 
-  const totalPoints = stories.reduce((sum, s) => sum + (s.story_points ?? 0), 0);
-  const donePoints  = stories.filter((s) => s.status === "done").reduce((sum, s) => sum + (s.story_points ?? 0), 0);
-  const doneCount   = stories.filter((s) => s.status === "done").length;
-  const canAddTasks = userRole === "scrum_master" || userRole === "developer";
-
   const allTasks = Object.values(tasksByStory).flat();
   const taskStats = {
     active:     allTasks.filter((t) => getTaskCategory(t) === "active").length,
@@ -224,6 +219,11 @@ export default function SprintBoardPage() {
     unassigned: allTasks.filter((t) => getTaskCategory(t) === "unassigned").length,
     done:       allTasks.filter((t) => getTaskCategory(t) === "done").length,
   };
+
+  const totalTasks = allTasks.length;
+  const doneTasks  = allTasks.filter((t) => getTaskCategory(t) === "done").length;
+  const doneCount  = stories.filter((s) => s.status === "done").length;
+  const canAddTasks = userRole === "scrum_master" || userRole === "developer";
 
   if (loading) {
     return (
@@ -262,7 +262,7 @@ export default function SprintBoardPage() {
             </span>
             <div className="ml-auto flex items-center gap-4 text-xs text-muted">
               <span><span className="font-semibold text-foreground">{doneCount}/{stories.length}</span> stories done</span>
-              <span><span className="font-semibold text-foreground">{donePoints}/{totalPoints}</span> pts completed</span>
+              <span><span className="font-semibold text-foreground">{doneTasks}/{totalTasks}</span> tasks done</span>
               {activeSprint.velocity && (
                 <span>Velocity: <span className="font-semibold text-foreground">{activeSprint.velocity}</span></span>
               )}
@@ -270,14 +270,14 @@ export default function SprintBoardPage() {
           </div>
 
           {/* Progress bar */}
-          {totalPoints > 0 && (
+          {totalTasks > 0 && (
             <div className="mb-6">
               <div className="flex justify-between text-xs text-muted mb-1.5">
                 <span>Progress</span>
-                <span>{Math.round((donePoints / totalPoints) * 100)}%</span>
+                <span>{doneTasks}/{totalTasks} tasks completed ({Math.round((doneTasks / totalTasks) * 100)}%)</span>
               </div>
               <div className="w-full h-2 rounded-full bg-border overflow-hidden">
-                <div className="h-full rounded-full bg-[#34D399] transition-all" style={{ width: `${Math.round((donePoints / totalPoints) * 100)}%` }} />
+                <div className="h-full rounded-full bg-[#34D399] transition-all" style={{ width: `${Math.round((doneTasks / totalTasks) * 100)}%` }} />
               </div>
             </div>
           )}
