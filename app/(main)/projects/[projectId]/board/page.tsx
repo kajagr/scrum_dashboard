@@ -24,10 +24,6 @@ type Sprint = {
   velocity: number | null;
 };
 
-type ProjectMember = {
-  role: string;
-};
-
 type TaskWithAssignee = {
   id: string;
   user_story_id: string;
@@ -39,154 +35,42 @@ type TaskWithAssignee = {
   is_active: boolean;
   estimated_hours: number | null;
   logged_hours: number | null;
-  assignee?: {
-    id: string;
-    first_name: string;
-    last_name: string;
-  } | null;
+  assignee?: { id: string; first_name: string; last_name: string } | null;
 };
 
-const PRIORITY_CONFIG: Record<
-  string,
-  { label: string; style: React.CSSProperties; dotStyle: React.CSSProperties }
-> = {
-  must_have: {
-    label: "Must Have",
-    style: {
-      background: "var(--color-error-light)",
-      color: "var(--color-error)",
-      border: "1px solid var(--color-error-border)",
-    },
-    dotStyle: { background: "var(--color-error)" },
-  },
-  should_have: {
-    label: "Should Have",
-    style: {
-      background: "var(--color-accent-light)",
-      color: "var(--color-accent-text)",
-      border: "1px solid var(--color-accent-border)",
-    },
-    dotStyle: { background: "var(--color-accent)" },
-  },
-  could_have: {
-    label: "Could Have",
-    style: {
-      background: "var(--color-primary-light)",
-      color: "var(--color-primary)",
-      border: "1px solid var(--color-primary-border)",
-    },
-    dotStyle: { background: "var(--color-primary)" },
-  },
-  wont_have: {
-    label: "Won't Have",
-    style: {
-      background: "color-mix(in srgb, var(--color-muted) 12%, transparent)",
-      color: "var(--color-muted)",
-      border:
-        "1px solid color-mix(in srgb, var(--color-muted) 25%, transparent)",
-    },
-    dotStyle: { background: "var(--color-muted)" },
-  },
+const PRIORITY_CONFIG: Record<string, { label: string; pill: string; dot: string }> = {
+  must_have:   { label: "Must Have",   pill: "bg-error-light text-error border border-error-border",         dot: "bg-error" },
+  should_have: { label: "Should Have", pill: "bg-accent-light text-accent-text border border-accent-border", dot: "bg-accent" },
+  could_have:  { label: "Could Have",  pill: "bg-primary-light text-primary border border-primary-border",   dot: "bg-primary" },
+  wont_have:   { label: "Won't Have",  pill: "bg-background text-muted border border-border",                dot: "bg-subtle" },
 };
 
-const STATUS_CONFIG: Record<
-  string,
-  { label: string; style: React.CSSProperties; order: number }
-> = {
-  backlog: {
-    label: "Backlog",
-    style: {
-      background: "color-mix(in srgb, var(--color-muted) 12%, transparent)",
-      color: "var(--color-muted)",
-      border:
-        "1px solid color-mix(in srgb, var(--color-muted) 25%, transparent)",
-    },
-    order: 0,
-  },
-  ready: {
-    label: "Ready",
-    style: {
-      background: "var(--color-primary-light)",
-      color: "var(--color-primary)",
-      border: "1px solid var(--color-primary-border)",
-    },
-    order: 1,
-  },
-  in_progress: {
-    label: "In Progress",
-    style: {
-      background: "var(--color-accent-light)",
-      color: "var(--color-accent-text)",
-      border: "1px solid var(--color-accent-border)",
-    },
-    order: 2,
-  },
-  done: {
-    label: "Done",
-    style: {
-      background: "color-mix(in srgb, #34D399 12%, transparent)",
-      color: "#34D399",
-      border: "1px solid color-mix(in srgb, #34D399 25%, transparent)",
-    },
-    order: 3,
-  },
+const STATUS_CONFIG: Record<string, { label: string; pill: string; order: number }> = {
+  backlog:     { label: "Backlog",     pill: "bg-background text-muted border border-border",                order: 0 },
+  ready:       { label: "Ready",       pill: "bg-primary-light text-primary border border-primary-border",   order: 1 },
+  in_progress: { label: "In Progress", pill: "bg-accent-light text-accent-text border border-accent-border", order: 2 },
+  done:        { label: "Done",        pill: "bg-[rgba(52,211,153,0.12)] text-[#34D399] border border-[rgba(52,211,153,0.25)]", order: 3 },
 };
 
-const PRIORITY_ORDER: Record<string, number> = {
-  must_have: 0,
-  should_have: 1,
-  could_have: 2,
-  wont_have: 3,
-};
+const PRIORITY_ORDER: Record<string, number> = { must_have: 0, should_have: 1, could_have: 2, wont_have: 3 };
 
-function getTaskCategory(task: TaskWithAssignee): "unassigned" | "assigned" | "active" | "done" {
+type TaskCategory = "unassigned" | "assigned" | "active" | "done";
+
+function getTaskCategory(task: TaskWithAssignee): TaskCategory {
   if (task.status === "completed") return "done";
   if (task.status === "in_progress") return "active";
   if (task.is_accepted && task.assignee_id) return "assigned";
   return "unassigned";
 }
 
-const TASK_CATEGORY_CONFIG: Record<
-  "unassigned" | "assigned" | "active" | "done",
-  {
-    label: string;
-    dotStyle: React.CSSProperties;
-    containerStyle: React.CSSProperties;
-  }
-> = {
-  unassigned: {
-    label: "Unassigned",
-    dotStyle: { background: "var(--color-subtle)" },
-    containerStyle: {
-      background: "var(--color-background)",
-      border: "1px solid var(--color-border)",
-    },
-  },
-  assigned: {
-    label: "Assigned",
-    dotStyle: { background: "var(--color-primary)" },
-    containerStyle: {
-      background: "var(--color-primary-light)",
-      border: "1px solid var(--color-primary-border)",
-    },
-  },
-  active: {
-    label: "Active",
-    dotStyle: { background: "var(--color-accent)" },
-    containerStyle: {
-      background: "var(--color-accent-light)",
-      border: "1px solid var(--color-accent-border)",
-    },
-  },
-  done: {
-    label: "Done",
-    dotStyle: { background: "#34D399" },
-    containerStyle: {
-      background: "color-mix(in srgb, #34D399 10%, var(--color-surface))",
-      border: "1px solid color-mix(in srgb, #34D399 25%, transparent)",
-    },
-  },
+const TASK_CATEGORY_CONFIG: Record<TaskCategory, { label: string; dot: string; border: string; bg: string }> = {
+  active:     { label: "Active",     dot: "bg-accent",    border: "border-accent-border",           bg: "bg-accent-light" },
+  assigned:   { label: "Assigned",   dot: "bg-primary",   border: "border-primary-border",          bg: "bg-primary-light" },
+  unassigned: { label: "Unassigned", dot: "bg-subtle",    border: "border-border",                  bg: "bg-background" },
+  done:       { label: "Done",       dot: "bg-[#34D399]", border: "border-[rgba(52,211,153,0.25)]", bg: "bg-[rgba(52,211,153,0.08)]" },
 };
+
+const CATEGORY_ORDER: TaskCategory[] = ["active", "assigned", "unassigned", "done"];
 
 export default function SprintBoardPage() {
   const params = useParams();
@@ -195,26 +79,17 @@ export default function SprintBoardPage() {
   const [loading, setLoading] = useState(true);
   const [activeSprint, setActiveSprint] = useState<Sprint | null>(null);
   const [stories, setStories] = useState<Story[]>([]);
-  const [tasksByStory, setTasksByStory] = useState<
-    Record<string, TaskWithAssignee[]>
-  >({});
+  const [tasksByStory, setTasksByStory] = useState<Record<string, TaskWithAssignee[]>>({});
   const [userRole, setUserRole] = useState<string | null>(null);
   const [selectedStory, setSelectedStory] = useState<Story | null>(null);
-  const [expandedStories, setExpandedStories] = useState<Set<string>>(
-    new Set(),
-  );
+  const [expandedStories, setExpandedStories] = useState<Set<string>>(new Set());
 
+  // Edit task state
   const [editingTask, setEditingTask] = useState<TaskWithAssignee | null>(null);
   const [editDescription, setEditDescription] = useState("");
   const [editHours, setEditHours] = useState("");
   const [editAssigneeId, setEditAssigneeId] = useState("");
-  const [editDevelopers, setEditDevelopers] = useState<
-    {
-      user_id: string;
-      role: string;
-      user: { first_name: string; last_name: string; email: string } | null;
-    }[]
-  >([]);
+  const [editDevelopers, setEditDevelopers] = useState<{ user_id: string; role: string; user: { first_name: string; last_name: string; email: string } | null }[]>([]);
   const [editLoadingMembers, setEditLoadingMembers] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
@@ -224,14 +99,10 @@ export default function SprintBoardPage() {
     await Promise.all(
       storyIds.map(async (storyId) => {
         try {
-          const res = await fetch(`/api/stories/${storyId}/tasks`, {
-            credentials: "include",
-          });
+          const res = await fetch(`/api/stories/${storyId}/tasks`, { credentials: "include" });
           if (res.ok) tasksMap[storyId] = await res.json();
-        } catch {
-          console.error(`Error fetching tasks for story ${storyId}`);
-        }
-      }),
+        } catch { /* ignore */ }
+      })
     );
     setTasksByStory(tasksMap);
   };
@@ -240,29 +111,22 @@ export default function SprintBoardPage() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const backlogRes = await fetch(`/api/projects/${projectId}/backlog`, {
-          credentials: "include",
-        });
+        const [backlogRes, memberRes] = await Promise.all([
+          fetch(`/api/projects/${projectId}/backlog`, { credentials: "include" }),
+          fetch(`/api/projects/${projectId}/members/me`, { credentials: "include" }),
+        ]);
         if (backlogRes.ok) {
           const data = await backlogRes.json();
           setActiveSprint(data.activeSprint);
-          const assignedStories = data.assigned ?? [];
-          setStories(assignedStories);
-          if (assignedStories.length > 0) {
-            await fetchTasks(assignedStories.map((s: Story) => s.id));
-          }
+          const assigned = data.assigned ?? [];
+          setStories(assigned);
+          if (assigned.length > 0) await fetchTasks(assigned.map((s: Story) => s.id));
         }
-
-        const memberRes = await fetch(`/api/projects/${projectId}/members/me`, {
-          credentials: "include",
-        });
         if (memberRes.ok) {
-          const memberData: ProjectMember = await memberRes.json();
-          setUserRole(memberData.role);
+          const d = await memberRes.json();
+          if (d.role) setUserRole(d.role);
         }
-      } catch {
-        console.error("Error loading sprint board");
-      } finally {
+      } catch { /* ignore */ } finally {
         setLoading(false);
       }
     };
@@ -272,35 +136,23 @@ export default function SprintBoardPage() {
   const toggleExpanded = (storyId: string) => {
     setExpandedStories((prev) => {
       const next = new Set(prev);
-      if (next.has(storyId)) next.delete(storyId);
-      else next.add(storyId);
+      next.has(storyId) ? next.delete(storyId) : next.add(storyId);
       return next;
     });
   };
 
   const openEdit = async (task: TaskWithAssignee) => {
     setEditDescription(task.description ?? "");
-    setEditHours(
-      task.estimated_hours != null ? String(task.estimated_hours) : "",
-    );
+    setEditHours(task.estimated_hours != null ? String(task.estimated_hours) : "");
     setEditError(null);
-    // ✅ Najprej naloži developers, šele nato nastavi task in assigneeId
+    setEditLoadingMembers(true);
     try {
-      setEditLoadingMembers(true);
-      const res = await fetch(`/api/projects/${projectId}/members`, {
-        credentials: "include",
-      });
+      const res = await fetch(`/api/projects/${projectId}/members`, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
-        const assignable = data.filter(
-          (m: { role: string }) =>
-            m.role === "developer" || m.role === "scrum_master",
-        );
-        setEditDevelopers(assignable);
+        setEditDevelopers(data.filter((m: { role: string }) => m.role === "developer" || m.role === "scrum_master"));
       }
-    } catch {
-      /* nič */
-    } finally {
+    } catch { /* ignore */ } finally {
       setEditLoadingMembers(false);
     }
     setEditAssigneeId(task.assignee_id ?? "");
@@ -311,7 +163,7 @@ export default function SprintBoardPage() {
     if (!editingTask) return;
     const hours = editHours !== "" ? Number(editHours) : null;
     if (hours !== null && (isNaN(hours) || hours <= 0)) {
-      setEditError("Ocena časa mora biti pozitivno število.");
+      setEditError("Estimated hours must be a positive number.");
       return;
     }
     setEditSaving(true);
@@ -329,84 +181,56 @@ export default function SprintBoardPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setEditError(data.error ?? "Napaka pri shranjevanju.");
-        return;
-      }
+      if (!res.ok) { setEditError(data.error ?? "Error saving task."); return; }
       setEditingTask(null);
       await fetchTasks(stories.map((s) => s.id));
     } catch {
-      setEditError("Napaka pri shranjevanju.");
+      setEditError("A server error occurred.");
     } finally {
       setEditSaving(false);
     }
   };
 
   const deleteTask = async (taskId: string) => {
-    if (!confirm("Ali ste prepričani, da želite izbrisati to nalogo?")) return;
+    if (!confirm("Are you sure you want to delete this task?")) return;
     try {
-      const res = await fetch(`/api/tasks/${taskId}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
+      const res = await fetch(`/api/tasks/${taskId}`, { method: "DELETE", credentials: "include" });
       if (res.ok) {
         await fetchTasks(stories.map((s) => s.id));
       } else {
         const data = await res.json();
-        alert(data.error || "Napaka pri brisanju naloge.");
+        alert(data.error || "Error deleting task.");
       }
     } catch {
-      alert("Napaka pri brisanju naloge.");
+      alert("Error deleting task.");
     }
   };
 
   const sorted = [...stories].sort((a, b) => {
-    const statusDiff =
-      (STATUS_CONFIG[a.status]?.order ?? 99) -
-      (STATUS_CONFIG[b.status]?.order ?? 99);
-    if (statusDiff !== 0) return statusDiff;
-    return (
-      (PRIORITY_ORDER[a.priority] ?? 99) - (PRIORITY_ORDER[b.priority] ?? 99)
-    );
+    const sd = (STATUS_CONFIG[a.status]?.order ?? 99) - (STATUS_CONFIG[b.status]?.order ?? 99);
+    if (sd !== 0) return sd;
+    return (PRIORITY_ORDER[a.priority] ?? 99) - (PRIORITY_ORDER[b.priority] ?? 99);
   });
 
-  const totalPoints = stories.reduce(
-    (sum, s) => sum + (s.story_points ?? 0),
-    0,
-  );
-  const donePoints = stories
-    .filter((s) => s.status === "done")
-    .reduce((sum, s) => sum + (s.story_points ?? 0), 0);
-  const doneCount = stories.filter((s) => s.status === "done").length;
-
+  const totalPoints = stories.reduce((sum, s) => sum + (s.story_points ?? 0), 0);
+  const donePoints  = stories.filter((s) => s.status === "done").reduce((sum, s) => sum + (s.story_points ?? 0), 0);
+  const doneCount   = stories.filter((s) => s.status === "done").length;
   const canAddTasks = userRole === "scrum_master" || userRole === "developer";
 
   const allTasks = Object.values(tasksByStory).flat();
   const taskStats = {
-    unassigned: allTasks.filter((t) => getTaskCategory(t) === "unassigned")
-      .length,
-    assigned: allTasks.filter((t) => getTaskCategory(t) === "assigned").length,
-    active: allTasks.filter((t) => getTaskCategory(t) === "active").length,
-    done: allTasks.filter((t) => getTaskCategory(t) === "done").length,
+    active:     allTasks.filter((t) => getTaskCategory(t) === "active").length,
+    assigned:   allTasks.filter((t) => getTaskCategory(t) === "assigned").length,
+    unassigned: allTasks.filter((t) => getTaskCategory(t) === "unassigned").length,
+    done:       allTasks.filter((t) => getTaskCategory(t) === "done").length,
   };
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 p-6 text-[var(--color-muted)]">
-        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-          />
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8v8H4z"
-          />
+      <div className="flex items-center gap-2 p-6 text-muted">
+        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
         </svg>
         <span className="text-sm">Loading Sprint Board...</span>
       </div>
@@ -414,449 +238,208 @@ export default function SprintBoardPage() {
   }
 
   return (
-    <div className="p-6 text-[var(--color-foreground)]">
+    <div className="p-6">
+      {/* Header */}
       <div className="mb-6">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-[var(--color-primary)]">
-          Project
-        </p>
-        <h1 className="text-3xl font-bold leading-tight">Sprint Board</h1>
+        <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Project</p>
+        <h1 className="text-3xl font-bold text-foreground leading-tight">Sprint Board</h1>
       </div>
 
       {activeSprint ? (
         <>
-          <div
-            className="mb-6 flex flex-wrap items-center gap-4 rounded-xl p-4"
-            style={{
-              border: "1px solid var(--color-primary-border)",
-              background: "var(--color-primary-light)",
-            }}
-          >
+          {/* Sprint info bar */}
+          <div className="flex items-center gap-4 p-4 rounded-xl border border-primary-border bg-primary-light mb-6 flex-wrap">
             <div className="flex items-center gap-2">
-              <svg
-                className="h-4 w-4"
-                style={{ color: "var(--color-primary)" }}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M13 10V3L4 14h7v7l9-11h-7z"
-                />
+              <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              <span className="text-sm font-semibold text-[var(--color-foreground)]">
-                {activeSprint.name}
-              </span>
+              <span className="text-sm font-semibold text-foreground">{activeSprint.name}</span>
             </div>
-
-            <span className="text-xs text-[var(--color-muted)]">
-              {new Date(activeSprint.start_date).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-              })}
+            <span className="text-xs text-muted">
+              {new Date(activeSprint.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
               {" – "}
-              {new Date(activeSprint.end_date).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })}
+              {new Date(activeSprint.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
             </span>
-
-            <div className="ml-auto flex items-center gap-4 text-xs text-[var(--color-muted)]">
-              <span>
-                <span className="font-semibold text-[var(--color-foreground)]">
-                  {doneCount}/{stories.length}
-                </span>{" "}
-                stories done
-              </span>
-              <span>
-                <span className="font-semibold text-[var(--color-foreground)]">
-                  {donePoints}/{totalPoints}
-                </span>{" "}
-                pts completed
-              </span>
+            <div className="ml-auto flex items-center gap-4 text-xs text-muted">
+              <span><span className="font-semibold text-foreground">{doneCount}/{stories.length}</span> stories done</span>
+              <span><span className="font-semibold text-foreground">{donePoints}/{totalPoints}</span> pts completed</span>
               {activeSprint.velocity && (
-                <span>
-                  Velocity:{" "}
-                  <span className="font-semibold text-[var(--color-foreground)]">
-                    {activeSprint.velocity}
-                  </span>
-                </span>
+                <span>Velocity: <span className="font-semibold text-foreground">{activeSprint.velocity}</span></span>
               )}
             </div>
           </div>
 
+          {/* Progress bar */}
           {totalPoints > 0 && (
             <div className="mb-6">
-              <div className="mb-1.5 flex justify-between text-xs text-[var(--color-muted)]">
+              <div className="flex justify-between text-xs text-muted mb-1.5">
                 <span>Progress</span>
                 <span>{Math.round((donePoints / totalPoints) * 100)}%</span>
               </div>
-              <div
-                className="h-2 w-full overflow-hidden rounded-full"
-                style={{ background: "var(--color-border)" }}
-              >
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${Math.round((donePoints / totalPoints) * 100)}%`,
-                    background: "#34D399",
-                  }}
-                />
+              <div className="w-full h-2 rounded-full bg-border overflow-hidden">
+                <div className="h-full rounded-full bg-[#34D399] transition-all" style={{ width: `${Math.round((donePoints / totalPoints) * 100)}%` }} />
               </div>
             </div>
           )}
 
+          {/* Task summary */}
           {allTasks.length > 0 && (
-            <div
-              className="mb-6 flex items-center gap-3 rounded-lg p-3"
-              style={{
-                background: "var(--color-surface)",
-                border: "1px solid var(--color-border)",
-              }}
-            >
-              <span className="text-xs text-[var(--color-muted)]">Tasks:</span>
-              <div className="flex items-center gap-2">
-                {(["unassigned", "assigned", "active", "done"] as const).map(
-                  (cat) => (
-                    <span
-                      key={cat}
-                      className="flex items-center gap-1.5 text-xs"
-                    >
-                      <span
-                        className="h-2 w-2 rounded-full"
-                        style={TASK_CATEGORY_CONFIG[cat].dotStyle}
-                      />
-                      <span className="text-[var(--color-muted)]">
-                        {TASK_CATEGORY_CONFIG[cat].label}
-                      </span>
-                      <span className="font-semibold text-[var(--color-foreground)]">
-                        {taskStats[cat]}
-                      </span>
-                    </span>
-                  ),
-                )}
-              </div>
+            <div className="flex items-center gap-4 mb-6 p-3 rounded-lg bg-surface border border-border flex-wrap">
+              <span className="text-xs text-muted">Tasks:</span>
+              {CATEGORY_ORDER.map((cat) => (
+                <span key={cat} className="flex items-center gap-1.5 text-xs">
+                  <span className={`w-2 h-2 rounded-full ${TASK_CATEGORY_CONFIG[cat].dot}`} />
+                  <span className="text-muted">{TASK_CATEGORY_CONFIG[cat].label}</span>
+                  <span className="font-semibold text-foreground">{taskStats[cat]}</span>
+                </span>
+              ))}
             </div>
           )}
 
+          {/* Story list */}
           {sorted.length > 0 ? (
             <div className="space-y-3">
               {sorted.map((story) => {
-                const priority =
-                  PRIORITY_CONFIG[story.priority] ?? PRIORITY_CONFIG.wont_have;
-                const status =
-                  STATUS_CONFIG[story.status] ?? STATUS_CONFIG.backlog;
+                const priority   = PRIORITY_CONFIG[story.priority] ?? PRIORITY_CONFIG.wont_have;
+                const status     = STATUS_CONFIG[story.status]     ?? STATUS_CONFIG.backlog;
                 const storyTasks = tasksByStory[story.id] ?? [];
                 const isExpanded = expandedStories.has(story.id);
 
-                const groupedTasks = {
-                  unassigned: storyTasks.filter(
-                    (t) => getTaskCategory(t) === "unassigned",
-                  ),
-                  assigned: storyTasks.filter(
-                    (t) => getTaskCategory(t) === "assigned",
-                  ),
-                  active: storyTasks.filter(
-                    (t) => getTaskCategory(t) === "active",
-                  ),
-                  done: storyTasks.filter((t) => getTaskCategory(t) === "done"),
+                const groupedTasks: Record<TaskCategory, TaskWithAssignee[]> = {
+                  active:     storyTasks.filter((t) => getTaskCategory(t) === "active"),
+                  assigned:   storyTasks.filter((t) => getTaskCategory(t) === "assigned"),
+                  unassigned: storyTasks.filter((t) => getTaskCategory(t) === "unassigned"),
+                  done:       storyTasks.filter((t) => getTaskCategory(t) === "done"),
                 };
 
                 return (
-                  <div
-                    key={story.id}
-                    className="overflow-hidden rounded-xl"
-                    style={{
-                      border: "1px solid var(--color-border)",
-                      background: "var(--color-surface)",
-                    }}
-                  >
+                  <div key={story.id} className="rounded-xl border border-border bg-surface overflow-hidden">
+                    {/* Story header */}
                     <div
-                      className="flex cursor-pointer items-start gap-3 p-4 transition hover:opacity-95"
+                      className="flex items-start gap-3 p-4 cursor-pointer hover:bg-background transition-colors"
                       onClick={() => toggleExpanded(story.id)}
                     >
                       <svg
-                        className={`mt-1 h-4 w-4 flex-shrink-0 transition-transform ${isExpanded ? "rotate-90" : ""}`}
-                        style={{ color: "var(--color-muted)" }}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
+                        className={`w-4 h-4 text-muted mt-1 flex-shrink-0 transition-transform ${isExpanded ? "rotate-90" : ""}`}
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M9 5l7 7-7 7"
-                        />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                       </svg>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-2 flex items-start justify-between gap-2">
-                          <p className="text-sm font-semibold leading-snug text-[var(--color-foreground)]">
-                            {story.title}
-                          </p>
-                          <div className="flex flex-shrink-0 items-center gap-1.5">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <p className="text-sm font-semibold text-foreground leading-snug">{story.title}</p>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
                             {storyTasks.length > 0 && (
-                              <span
-                                className="rounded-lg px-2 py-0.5 text-xs"
-                                style={{
-                                  color: "var(--color-muted)",
-                                  background: "var(--color-background)",
-                                  border: "1px solid var(--color-border)",
-                                }}
-                              >
+                              <span className="text-xs text-muted bg-background border border-border px-2 py-0.5 rounded-lg">
                                 {storyTasks.length} tasks
                               </span>
                             )}
                             {story.story_points != null && (
-                              <span
-                                className="rounded-lg px-2 py-0.5 text-xs"
-                                style={{
-                                  color: "var(--color-muted)",
-                                  background: "var(--color-background)",
-                                  border: "1px solid var(--color-border)",
-                                }}
-                              >
+                              <span className="text-xs text-muted bg-background border border-border px-2 py-0.5 rounded-lg">
                                 {story.story_points} pts
                               </span>
                             )}
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
-                            style={priority.style}
-                          >
-                            <span
-                              className="h-1.5 w-1.5 rounded-full"
-                              style={priority.dotStyle}
-                            />
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${priority.pill}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${priority.dot}`} />
                             {priority.label}
                           </span>
-                          <span
-                            className="rounded-full px-2 py-0.5 text-xs font-medium"
-                            style={status.style}
-                          >
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.pill}`}>
                             {status.label}
                           </span>
                           {storyTasks.length > 0 && (
-                            <div className="ml-2 flex items-center gap-1">
-                              {groupedTasks.active.length > 0 && (
-                                <span
-                                  className="h-2 w-2 rounded-full"
-                                  style={TASK_CATEGORY_CONFIG.active.dotStyle}
-                                  title={`${groupedTasks.active.length} active`}
-                                />
-                              )}
-                              {groupedTasks.assigned.length > 0 && (
-                                <span
-                                  className="h-2 w-2 rounded-full"
-                                  style={TASK_CATEGORY_CONFIG.assigned.dotStyle}
-                                  title={`${groupedTasks.assigned.length} assigned`}
-                                />
-                              )}
-                              {groupedTasks.unassigned.length > 0 && (
-                                <span
-                                  className="h-2 w-2 rounded-full"
-                                  style={
-                                    TASK_CATEGORY_CONFIG.unassigned.dotStyle
-                                  }
-                                  title={`${groupedTasks.unassigned.length} unassigned`}
-                                />
-                              )}
+                            <div className="flex items-center gap-1 ml-1">
+                              {groupedTasks.active.length > 0 && <span className="w-2 h-2 rounded-full bg-accent" title={`${groupedTasks.active.length} active`} />}
+                              {groupedTasks.assigned.length > 0 && <span className="w-2 h-2 rounded-full bg-primary" title={`${groupedTasks.assigned.length} assigned`} />}
+                              {groupedTasks.unassigned.length > 0 && <span className="w-2 h-2 rounded-full bg-subtle" title={`${groupedTasks.unassigned.length} unassigned`} />}
                             </div>
                           )}
                         </div>
                       </div>
 
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedStory(story);
-                        }}
-                        className="rounded px-2 py-1 text-xs transition hover:opacity-80"
-                        style={{ color: "var(--color-primary)" }}
+                        onClick={(e) => { e.stopPropagation(); setSelectedStory(story); }}
+                        className="px-2.5 py-1 text-xs font-semibold text-primary bg-primary-light border border-primary-border rounded-lg hover:bg-primary/20 transition-colors flex-shrink-0"
                       >
                         Open
                       </button>
                     </div>
 
+                    {/* Expanded tasks */}
                     {isExpanded && (
-                      <div
-                        className="border-t p-4"
-                        style={{
-                          borderColor: "var(--color-border)",
-                          background: "var(--color-background)",
-                        }}
-                      >
+                      <div className="border-t border-border p-4 bg-background">
                         {storyTasks.length > 0 ? (
                           <div className="space-y-4">
-                            {(
-                              [
-                                "active",
-                                "assigned",
-                                "unassigned",
-                                "done",
-                              ] as const
-                            ).map((category) => {
+                            {CATEGORY_ORDER.map((category) => {
                               const tasks = groupedTasks[category];
                               if (tasks.length === 0) return null;
-                              const config = TASK_CATEGORY_CONFIG[category];
-
+                              const cfg = TASK_CATEGORY_CONFIG[category];
                               return (
                                 <div key={category}>
-                                  <div className="mb-2 flex items-center gap-2">
-                                    <span
-                                      className="h-2 w-2 rounded-full"
-                                      style={config.dotStyle}
-                                    />
-                                    <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">
-                                      {config.label} ({tasks.length})
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                                    <span className="text-[10px] font-bold tracking-widest uppercase text-muted">
+                                      {cfg.label} ({tasks.length})
                                     </span>
                                   </div>
-
-                                  <div className="space-y-2 pl-4">
+                                  <div className="space-y-1.5 pl-3">
                                     {tasks.map((task) => (
-                                      <div
-                                        key={task.id}
-                                        className="rounded-lg p-3"
-                                        style={config.containerStyle}
-                                      >
-                                        <div className="flex items-start justify-between gap-2">
-                                          <div className="flex-1">
-                                            <div className="flex items-center gap-2">
-                                              {category === "done" && (
-                                                <svg
-                                                  className="h-4 w-4 flex-shrink-0"
-                                                  style={{ color: "#34D399" }}
-                                                  fill="none"
-                                                  viewBox="0 0 24 24"
-                                                  stroke="currentColor"
-                                                  strokeWidth={2}
-                                                >
-                                                  <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    d="M5 13l4 4L19 7"
-                                                  />
+                                      <div key={task.id} className={`flex items-start gap-3 p-3 rounded-xl border ${cfg.border} ${cfg.bg}`}>
+                                        {category === "done" && (
+                                          <svg className="w-4 h-4 text-[#34D399] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                          </svg>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                          <p className={`text-sm font-medium leading-snug ${category === "done" ? "line-through text-muted" : "text-foreground"}`}>
+                                            {task.description || task.title}
+                                          </p>
+                                          <div className="flex items-center gap-3 mt-1.5 text-xs text-muted flex-wrap">
+                                            {task.estimated_hours != null && (
+                                              <span className="flex items-center gap-1">
+                                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                  <circle cx="12" cy="12" r="9"/><path strokeLinecap="round" d="M12 7v5l3 3"/>
                                                 </svg>
-                                              )}
-                                              <p className="text-sm font-medium text-[var(--color-foreground)]">
-                                                {task.description || task.title}
-                                              </p>
-                                            </div>
-
-                                            <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-[var(--color-muted)]">
-                                              {task.estimated_hours && (
-                                                <span>
-                                                  ⏱️ {task.logged_hours ?? 0}h /{" "}
-                                                  {task.estimated_hours}h
+                                                {task.logged_hours ?? 0}h / {task.estimated_hours}h
+                                              </span>
+                                            )}
+                                            {task.assignee ? (
+                                              <span className="flex items-center gap-1.5">
+                                                <span className="w-5 h-5 rounded-full bg-primary-light text-primary border border-primary-border flex items-center justify-center text-[9px] font-bold">
+                                                  {task.assignee.first_name?.[0]}{task.assignee.last_name?.[0]}
                                                 </span>
-                                              )}
-
-                                              {task.assignee ? (
-                                                <span className="flex items-center gap-1">
-                                                  <span
-                                                    className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium"
-                                                    style={{
-                                                      background:
-                                                        "var(--color-primary-light)",
-                                                      color:
-                                                        "var(--color-primary)",
-                                                      border:
-                                                        "1px solid var(--color-primary-border)",
-                                                    }}
-                                                  >
-                                                    {
-                                                      task.assignee
-                                                        .first_name?.[0]
-                                                    }
-                                                    {
-                                                      task.assignee
-                                                        .last_name?.[0]
-                                                    }
-                                                  </span>
-                                                  {task.assignee.first_name}{" "}
-                                                  {task.assignee.last_name}
+                                                {task.assignee.first_name} {task.assignee.last_name}
+                                              </span>
+                                            ) : (
+                                              <span className="flex items-center gap-1.5 text-subtle">
+                                                <span className="w-5 h-5 rounded-full bg-surface border border-border flex items-center justify-center">
+                                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                                  </svg>
                                                 </span>
-                                              ) : (
-                                                <span className="flex items-center gap-1 text-[var(--color-subtle)]">
-                                                  <span
-                                                    className="flex h-5 w-5 items-center justify-center rounded-full"
-                                                    style={{
-                                                      background:
-                                                        "var(--color-surface)",
-                                                      border:
-                                                        "1px solid var(--color-border)",
-                                                    }}
-                                                  >
-                                                    <svg
-                                                      className="h-3 w-3"
-                                                      style={{
-                                                        color:
-                                                          "var(--color-subtle)",
-                                                      }}
-                                                      fill="none"
-                                                      viewBox="0 0 24 24"
-                                                      stroke="currentColor"
-                                                      strokeWidth={2}
-                                                    >
-                                                      <path
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                                                      />
-                                                    </svg>
-                                                  </span>
-                                                  Unassigned
-                                                </span>
-                                              )}
-
-                                              {/* ✅ Edit/Delete: samo za !is_accepted in ne completed */}
-                                              {canAddTasks &&
-                                                !task.is_accepted &&
-                                                task.status !== "completed" && (
-                                                  <>
-                                                    <button
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        openEdit(task);
-                                                      }}
-                                                      className="rounded px-2 py-0.5 text-xs font-medium transition hover:opacity-90"
-                                                      style={{
-                                                        background:
-                                                          "var(--color-primary-light)",
-                                                        color:
-                                                          "var(--color-primary)",
-                                                        border:
-                                                          "1px solid var(--color-primary-border)",
-                                                      }}
-                                                    >
-                                                      Uredi
-                                                    </button>
-                                                    <button
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        deleteTask(task.id);
-                                                      }}
-                                                      className="rounded px-2 py-0.5 text-xs font-medium transition hover:opacity-90"
-                                                      style={{
-                                                        background:
-                                                          "color-mix(in srgb, #EF4444 10%, transparent)",
-                                                        color: "#EF4444",
-                                                        border:
-                                                          "1px solid color-mix(in srgb, #EF4444 25%, transparent)",
-                                                      }}
-                                                    >
-                                                      Izbriši
-                                                    </button>
-                                                  </>
-                                                )}
-                                            </div>
+                                                Unassigned
+                                              </span>
+                                            )}
+                                            {/* Edit / Delete — only for unaccepted, non-completed tasks */}
+                                            {canAddTasks && !task.is_accepted && task.status !== "completed" && (
+                                              <>
+                                                <button
+                                                  onClick={(e) => { e.stopPropagation(); openEdit(task); }}
+                                                  className="px-2 py-0.5 text-xs font-semibold rounded-lg transition-colors bg-primary-light text-primary border border-primary-border hover:bg-primary/20"
+                                                >
+                                                  Edit
+                                                </button>
+                                                <button
+                                                  onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
+                                                  className="px-2 py-0.5 text-xs font-semibold rounded-lg transition-colors bg-error-light text-error border border-error-border hover:bg-error/20"
+                                                >
+                                                  Delete
+                                                </button>
+                                              </>
+                                            )}
                                           </div>
                                         </div>
                                       </div>
@@ -867,13 +450,12 @@ export default function SprintBoardPage() {
                             })}
                           </div>
                         ) : (
-                          <div className="py-4 text-center text-sm text-[var(--color-muted)]">
+                          <div className="text-center py-4 text-muted text-sm">
                             No tasks yet.
                             {canAddTasks && story.status !== "done" && (
                               <button
                                 onClick={() => setSelectedStory(story)}
-                                className="ml-2 hover:underline"
-                                style={{ color: "var(--color-primary)" }}
+                                className="ml-2 text-primary hover:text-primary-hover transition-colors font-medium"
                               >
                                 Add task →
                               </button>
@@ -888,206 +470,115 @@ export default function SprintBoardPage() {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div
-                className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
-                style={{
-                  border: "1px solid var(--color-border)",
-                  background: "var(--color-surface)",
-                }}
-              >
-                <svg
-                  className="h-6 w-6"
-                  style={{ color: "var(--color-primary)" }}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M13 10V3L4 14h7v7l9-11h-7z"
-                  />
+              <div className="w-14 h-14 rounded-2xl border border-border bg-surface flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
-              <p className="mb-1 font-semibold text-[var(--color-foreground)]">
-                No stories in this sprint
-              </p>
-              <p className="text-sm text-[var(--color-muted)]">
-                Add stories from the Product Backlog.
-              </p>
+              <p className="font-semibold text-foreground mb-1">No stories in this sprint</p>
+              <p className="text-sm text-muted">Add stories from the Product Backlog.</p>
             </div>
           )}
         </>
       ) : (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div
-            className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
-            style={{
-              border: "1px solid var(--color-border)",
-              background: "var(--color-surface)",
-            }}
-          >
-            <svg
-              className="h-6 w-6"
-              style={{ color: "var(--color-primary)" }}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-              />
+          <div className="w-14 h-14 rounded-2xl border border-border bg-surface flex items-center justify-center mb-4">
+            <svg className="w-6 h-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
-          <p className="mb-1 font-semibold text-[var(--color-foreground)]">
-            No active sprint
-          </p>
-          <p className="text-sm text-[var(--color-muted)]">
-            Start a sprint from the Sprints page to see stories here.
-          </p>
+          <p className="font-semibold text-foreground mb-1">No active sprint</p>
+          <p className="text-sm text-muted">Start a sprint from the Sprints page to see stories here.</p>
         </div>
       )}
 
-      {/* Edit modal */}
+      {/* Edit task modal */}
       {editingTask && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setEditingTask(null)}
-          />
-          <div
-            className="relative m-4 w-full max-w-md overflow-hidden rounded-xl shadow-2xl"
-            style={{
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              color: "var(--color-foreground)",
-            }}
-          >
-            <div
-              className="flex items-center justify-between p-5"
-              style={{ borderBottom: "1px solid var(--color-border)" }}
-            >
-              <h2 className="text-base font-semibold">Uredi nalogo</h2>
-              <button
-                onClick={() => setEditingTask(null)}
-                style={{ color: "var(--color-muted)" }}
-              >
-                ✕
-              </button>
-            </div>
+          <div className="absolute inset-0 backdrop-blur-sm bg-foreground/20" onClick={() => setEditingTask(null)} />
+          <div className="relative w-full max-w-md mx-4 rounded-2xl shadow-2xl bg-surface border border-border">
+            <div className="h-1 w-full bg-gradient-to-r from-primary to-accent rounded-t-2xl" />
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-0.5">Task</p>
+                  <h2 className="text-xl font-bold text-foreground">Edit task</h2>
+                </div>
+                <button onClick={() => setEditingTask(null)} className="w-8 h-8 flex items-center justify-center rounded-full text-lg leading-none bg-background hover:bg-border text-muted transition-colors">×</button>
+              </div>
 
-            <div className="space-y-4 p-5">
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold">
-                  Opis naloge
-                </label>
-                <textarea
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  rows={3}
-                  className="w-full resize-none rounded-lg px-3 py-2 text-sm outline-none"
-                  style={{
-                    background: "var(--color-background)",
-                    border: "1px solid var(--color-border)",
-                    color: "var(--color-foreground)",
-                  }}
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold">
-                  Ocena časa (ur)
-                </label>
-                <input
-                  type="number"
-                  min="0.1"
-                  step="0.5"
-                  value={editHours}
-                  onChange={(e) => setEditHours(e.target.value)}
-                  className="w-full rounded-lg px-3 py-2 text-sm outline-none"
-                  style={{
-                    background: "var(--color-background)",
-                    border: "1px solid var(--color-border)",
-                    color: "var(--color-foreground)",
-                  }}
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold">
-                  Predlagani član (opcijsko)
-                </label>
-                <select
-                  value={editAssigneeId}
-                  onChange={(e) => setEditAssigneeId(e.target.value)}
-                  className="w-full rounded-lg px-3 py-2 text-sm outline-none"
-                  style={{
-                    background: "var(--color-background)",
-                    border: "1px solid var(--color-border)",
-                    color: "var(--color-foreground)",
-                  }}
-                >
-                  <option value="">— Brez dodelitve —</option>
-                  {editLoadingMembers ? (
-                    <option disabled>Nalagam...</option>
-                  ) : (
-                    editDevelopers.map((m) => (
-                      <option key={m.user_id} value={m.user_id}>
-                        {m.user?.first_name} {m.user?.last_name} (
-                        {m.user?.email})
-                      </option>
-                    ))
-                  )}
-                </select>
-                <p
-                  className="mt-1 text-xs"
-                  style={{ color: "var(--color-muted)" }}
-                >
-                  Član mora nalogo še sprejeti, preden postane dodeljena.
-                </p>
-              </div>
-              {editError && (
-                <p
-                  className="rounded-lg px-3 py-2 text-xs"
-                  style={{
-                    background: "var(--color-error-light)",
-                    color: "var(--color-error)",
-                    border: "1px solid var(--color-error-border)",
-                  }}
-                >
-                  {editError}
-                </p>
-              )}
-            </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold tracking-widest uppercase text-primary mb-1">Description</label>
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    rows={3}
+                    className="mt-1 block w-full px-3 py-2.5 rounded-lg text-sm bg-background border border-border text-foreground placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold tracking-widest uppercase text-primary mb-1">Estimated hours</label>
+                  <input
+                    type="number" min="0.1" step="0.5"
+                    value={editHours}
+                    onChange={(e) => setEditHours(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2.5 rounded-lg text-sm bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold tracking-widest uppercase text-primary mb-1">Suggested assignee <span className="normal-case font-normal tracking-normal text-muted">(optional)</span></label>
+                  <select
+                    value={editAssigneeId}
+                    onChange={(e) => setEditAssigneeId(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2.5 rounded-lg text-sm bg-background border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  >
+                    <option value="">— No assignment —</option>
+                    {editLoadingMembers ? (
+                      <option disabled>Loading...</option>
+                    ) : (
+                      editDevelopers.map((m) => (
+                        <option key={m.user_id} value={m.user_id}>
+                          {m.user?.first_name} {m.user?.last_name} ({m.user?.email})
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
 
-            <div
-              className="flex gap-2 p-4"
-              style={{
-                borderTop: "1px solid var(--color-border)",
-                background: "var(--color-background)",
-              }}
-            >
-              <button
-                onClick={() => setEditingTask(null)}
-                className="flex-1 rounded-lg px-4 py-2 text-sm font-medium"
-                style={{
-                  background: "var(--color-surface)",
-                  color: "var(--color-muted)",
-                  border: "1px solid var(--color-border)",
-                }}
-              >
-                Prekliči
-              </button>
-              <button
-                onClick={saveEdit}
-                disabled={editSaving}
-                className="flex-1 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
-                style={{ background: "var(--color-primary)", color: "#ffffff" }}
-              >
-                {editSaving ? "Shranjujem..." : "Shrani"}
-              </button>
+                {editError && (
+                  <div className="flex items-start gap-2.5 p-3.5 rounded-xl border border-error-border bg-error-light">
+                    <svg className="w-4 h-4 text-error mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                    </svg>
+                    <p className="text-sm text-error">{editError}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-border pt-4 mt-4 flex justify-end gap-3">
+                <button
+                  onClick={() => setEditingTask(null)}
+                  className="px-5 py-2.5 text-sm font-medium rounded-lg transition-colors bg-background hover:bg-border text-muted"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveEdit}
+                  disabled={editSaving}
+                  className="px-5 py-2.5 text-sm font-semibold text-white rounded-lg transition-colors shadow-sm disabled:opacity-50 bg-primary hover:bg-primary-hover"
+                >
+                  {editSaving ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      Saving...
+                    </span>
+                  ) : "Save changes →"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

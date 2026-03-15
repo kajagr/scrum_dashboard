@@ -85,6 +85,7 @@ export async function POST(req: Request) {
     const username = body.username?.trim();
     const firstName = body.first_name?.trim() || null;
     const lastName = body.last_name?.trim() || null;
+    const systemRole = body.system_role === "admin" ? "admin" : "user";
 
     // Preveri obvezna polja
     if (!email || !password || !username) {
@@ -152,7 +153,7 @@ export async function POST(req: Request) {
       username,
       first_name: firstName,
       last_name: lastName,
-      system_role: "user",
+      system_role: systemRole,
     });
 
     // Če profil ne uspe, izbriši auth userja
@@ -172,7 +173,8 @@ export async function POST(req: Request) {
           id: authData.user.id,
           email,
           username,
-        },
+          system_role: systemRole,
+        }
       },
       { status: 201 },
     );
