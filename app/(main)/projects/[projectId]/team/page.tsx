@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import AddMemberModal from "@/components/features/team/AddMemberModal";
+import { ProjectRole } from "@/lib/types";
 
 interface MemberWithUser {
   id: string;
@@ -62,6 +63,9 @@ export default function TeamPage() {
   const handleModalClose = () => { setIsModalOpen(false); fetchMembers(); };
 
   const existingMemberIds = members.map((m) => m.user_id);
+  const existingRoles = Object.fromEntries(
+    members.map((m) => [m.user_id, m.role as ProjectRole])
+  );
 
   if (loading) {
     return (
@@ -155,6 +159,7 @@ export default function TeamPage() {
         onClose={handleModalClose}
         projectId={projectId}
         existingMemberIds={existingMemberIds}
+        existingRoles={existingRoles}
       />
     </div>
   );
