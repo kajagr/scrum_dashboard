@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import CreateTaskModal from "@/components/features/stories/CreateTaskModal";
-import type { Task } from "@/lib/types";
+import TaskRow, { type TaskWithAssignee } from "@/components/features/board/TaskRow";
 
 interface StoryDetailModalProps {
   isOpen: boolean;
@@ -20,14 +20,7 @@ interface StoryDetailModalProps {
   canAddTasks: boolean;
 }
 
-interface TaskWithAssignee extends Task {
-  assignee?: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    email: string;
-  } | null;
-}
+type TaskCategory = "unassigned" | "assigned" | "active" | "done";
 
 const PRIORITY_CONFIG: Record<string, { label: string; pill: string; dot: string }> = {
   must_have:   { label: "Must Have",   pill: "bg-error-light text-error border border-error-border",         dot: "bg-error" },
@@ -43,15 +36,6 @@ const STATUS_CONFIG: Record<string, { label: string; pill: string }> = {
   done:        { label: "Done",        pill: "bg-[rgba(52,211,153,0.12)] text-[#34D399] border border-[rgba(52,211,153,0.25)]" },
 };
 
-type TaskCategory = "unassigned" | "assigned" | "active" | "done";
-
-function getTaskCategory(task: TaskWithAssignee): TaskCategory {
-  if (task.status === "completed") return "done";
-  if (task.status === "in_progress") return "active";
-  if (task.is_accepted && task.assignee_id) return "assigned";
-  return "unassigned";
-}
-
 const TASK_CATEGORY_CONFIG: Record<TaskCategory, { label: string; dot: string }> = {
   active:     { label: "Active",     dot: "bg-accent" },
   assigned:   { label: "Assigned",   dot: "bg-primary" },
@@ -61,13 +45,11 @@ const TASK_CATEGORY_CONFIG: Record<TaskCategory, { label: string; dot: string }>
 
 const categoryOrder: TaskCategory[] = ["active", "assigned", "unassigned", "done"];
 
-function UserAvatar({ firstName, lastName }: { firstName?: string; lastName?: string }) {
-  const initials = `${firstName?.[0] ?? ""}${lastName?.[0] ?? ""}`.toUpperCase() || "?";
-  return (
-    <span className="w-5 h-5 rounded-full bg-primary-light text-primary border border-primary-border flex items-center justify-center text-[9px] font-bold flex-shrink-0">
-      {initials}
-    </span>
-  );
+function getTaskCategory(task: TaskWithAssignee): TaskCategory {
+  if (task.status === "completed") return "done";
+  if (task.status === "in_progress") return "active";
+  if (task.is_accepted && task.assignee_id) return "assigned";
+  return "unassigned";
 }
 
 export default function StoryDetailModal({
@@ -83,7 +65,6 @@ export default function StoryDetailModal({
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
-  const [resignConfirmId, setResignConfirmId] = useState<string | null>(null);
 
   const priority = PRIORITY_CONFIG[story.priority] ?? PRIORITY_CONFIG.should_have;
   const status = STATUS_CONFIG[story.status] ?? STATUS_CONFIG.backlog;
@@ -125,6 +106,7 @@ export default function StoryDetailModal({
         body: JSON.stringify({ status: newStatus }),
       });
       if (res.ok) await fetchTasks();
+      else alert((await res.json()).error || "Error updating task.");
     } finally {
       setUpdatingTaskId(null);
     }
@@ -140,6 +122,7 @@ export default function StoryDetailModal({
         body: JSON.stringify({ action: "accept" }),
       });
       if (res.ok) await fetchTasks();
+      else alert((await res.json()).error || "Napaka pri sprejemanju naloge.");
     } finally {
       setUpdatingTaskId(null);
     }
@@ -147,7 +130,6 @@ export default function StoryDetailModal({
 
   const resignTask = async (taskId: string) => {
     setUpdatingTaskId(taskId);
-    setResignConfirmId(null);
     try {
       const res = await fetch(`/api/tasks/${taskId}`, {
         method: "PATCH",
@@ -156,6 +138,7 @@ export default function StoryDetailModal({
         body: JSON.stringify({ action: "resign" }),
       });
       if (res.ok) await fetchTasks();
+      else alert((await res.json()).error || "Napaka pri odpovedovanju naloge.");
     } finally {
       setUpdatingTaskId(null);
     }
@@ -165,6 +148,7 @@ export default function StoryDetailModal({
 
   const totalEstimated = tasks.reduce((sum, t) => sum + (t.estimated_hours ?? 0), 0);
   const totalLogged = tasks.reduce((sum, t) => sum + (t.logged_hours ?? 0), 0);
+  const canAccept = currentUserRole === "developer" || currentUserRole === "scrum_master";
 
   const groupedTasks: Record<TaskCategory, TaskWithAssignee[]> = {
     unassigned: tasks.filter((t) => getTaskCategory(t) === "unassigned"),
@@ -173,15 +157,12 @@ export default function StoryDetailModal({
     done:       tasks.filter((t) => getTaskCategory(t) === "done"),
   };
 
-  const canAccept = currentUserRole === "developer" || currentUserRole === "scrum_master";
-
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div className="absolute inset-0 backdrop-blur-sm bg-foreground/20" onClick={onClose} />
 
         <div className="relative w-full max-w-2xl mx-4 rounded-2xl overflow-hidden shadow-2xl bg-surface border border-border max-h-[90vh] flex flex-col">
-          {/* Top accent bar */}
           <div className="h-1 w-full bg-gradient-to-r from-primary to-accent flex-shrink-0" />
 
           {/* Header */}
@@ -229,7 +210,6 @@ export default function StoryDetailModal({
               </div>
             )}
 
-            {/* Tasks section */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <div>
@@ -251,20 +231,15 @@ export default function StoryDetailModal({
                 )}
               </div>
 
-              {/* Category legend */}
               {tasks.length > 0 && (
                 <div className="flex items-center gap-4 mb-4 flex-wrap">
-                  {categoryOrder.map((cat) => {
-                    const config = TASK_CATEGORY_CONFIG[cat];
-                    const count = groupedTasks[cat].length;
-                    return (
-                      <span key={cat} className="flex items-center gap-1.5 text-xs">
-                        <span className={`w-2 h-2 rounded-full ${config.dot}`} />
-                        <span className="text-muted">{config.label}</span>
-                        <span className="font-semibold text-foreground">{count}</span>
-                      </span>
-                    );
-                  })}
+                  {categoryOrder.map((cat) => (
+                    <span key={cat} className="flex items-center gap-1.5 text-xs">
+                      <span className={`w-2 h-2 rounded-full ${TASK_CATEGORY_CONFIG[cat].dot}`} />
+                      <span className="text-muted">{TASK_CATEGORY_CONFIG[cat].label}</span>
+                      <span className="font-semibold text-foreground">{groupedTasks[cat].length}</span>
+                    </span>
+                  ))}
                 </div>
               )}
 
@@ -285,155 +260,26 @@ export default function StoryDetailModal({
 
                     return (
                       <div key={category}>
-                        {/* Section header */}
                         <div className="flex items-center gap-2 mb-2">
                           <span className={`w-1.5 h-1.5 rounded-full ${config.dot}`} />
                           <span className="text-[10px] font-bold tracking-widest uppercase text-muted">
                             {config.label} ({categoryTasks.length})
                           </span>
                         </div>
-
                         <div className="space-y-1.5">
-                          {categoryTasks.map((task) => {
-                            const isUpdating = updatingTaskId === task.id;
-                            const isMyTask = task.assignee_id === currentUserId && task.is_accepted;
-                            const isProposedToMe = task.assignee_id === currentUserId && !task.is_accepted;
-                            const isUnassigned = !task.assignee_id && !task.is_accepted;
-                            const isDone = task.status === "completed";
-                            const isResignConfirm = resignConfirmId === task.id;
-
-                            return (
-                              <div
-                                key={task.id}
-                                className={`group flex items-start gap-3 p-3 rounded-xl border transition-all
-                                  ${isUpdating ? "opacity-50" : ""}
-                                  ${isDone
-                                    ? "bg-background border-border"
-                                    : isMyTask
-                                      ? "bg-primary-light border-primary-border"
-                                      : "bg-background border-border hover:border-subtle"
-                                  }`}
-                              >
-                                {/* Checkbox */}
-                                <button
-                                  onClick={() => updateTaskStatus(task.id, isDone ? "assigned" : "completed")}
-                                  disabled={isUpdating || !isMyTask}
-                                  className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors
-                                    ${isDone
-                                      ? "bg-[#34D399] border-[#34D399] text-white"
-                                      : isMyTask
-                                        ? "border-primary hover:border-[#34D399]"
-                                        : "border-subtle opacity-40 cursor-not-allowed"
-                                    }`}
-                                >
-                                  {isDone && (
-                                    <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                    </svg>
-                                  )}
-                                </button>
-
-                                {/* Content */}
-                                <div className="flex-1 min-w-0">
-                                  <p className={`text-sm font-medium leading-snug ${isDone ? "text-muted line-through" : "text-foreground"}`}>
-                                    {task.description || task.title}
-                                  </p>
-                                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                                    {task.estimated_hours != null && (
-                                      <span className="flex items-center gap-1 text-xs text-muted">
-                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                          <circle cx="12" cy="12" r="9" /><path strokeLinecap="round" d="M12 7v5l3 3" />
-                                        </svg>
-                                        {task.logged_hours ?? 0}h / {task.estimated_hours}h
-                                      </span>
-                                    )}
-                                    {task.assignee ? (
-                                      <span className="flex items-center gap-1.5 text-xs text-muted">
-                                        <UserAvatar firstName={task.assignee.first_name} lastName={task.assignee.last_name} />
-                                        {task.assignee.first_name} {task.assignee.last_name}
-                                        {!task.is_accepted && (
-                                          <span className="text-[10px] text-accent-text font-medium">(proposed)</span>
-                                        )}
-                                      </span>
-                                    ) : (
-                                      <span className="flex items-center gap-1.5 text-xs text-muted">
-                                        <span className="w-5 h-5 rounded-full bg-background border border-border flex items-center justify-center">
-                                          <svg className="w-3 h-3 text-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                          </svg>
-                                        </span>
-                                        Unassigned
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Action buttons */}
-                                <div className="flex items-center gap-1.5 flex-shrink-0">
-                                  {/* Accept */}
-                                  {canAccept && !task.is_accepted && (isUnassigned || isProposedToMe) && !isDone && (
-                                    <button
-                                      onClick={() => acceptTask(task.id)}
-                                      disabled={isUpdating}
-                                      className="px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors bg-[rgba(52,211,153,0.12)] text-[#34D399] border border-[rgba(52,211,153,0.25)] hover:bg-[rgba(52,211,153,0.2)] disabled:opacity-50"
-                                    >
-                                      Accept
-                                    </button>
-                                  )}
-
-                                  {/* Start */}
-                                  {isMyTask && task.status === "assigned" && (
-                                    <button
-                                      onClick={() => updateTaskStatus(task.id, "in_progress")}
-                                      disabled={isUpdating}
-                                      className="px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors bg-accent-light text-accent-text border border-accent-border hover:bg-accent/20 disabled:opacity-50"
-                                    >
-                                      Start
-                                    </button>
-                                  )}
-
-                                  {/* Pause */}
-                                  {isMyTask && task.status === "in_progress" && (
-                                    <button
-                                      onClick={() => updateTaskStatus(task.id, "assigned")}
-                                      disabled={isUpdating}
-                                      className="px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors bg-background text-muted border border-border hover:border-subtle hover:text-foreground disabled:opacity-50"
-                                    >
-                                      Pause
-                                    </button>
-                                  )}
-
-                                  {/* Resign — with inline confirm */}
-                                  {isMyTask && !isDone && (
-                                    isResignConfirm ? (
-                                      <div className="flex items-center gap-1">
-                                        <button
-                                          onClick={() => resignTask(task.id)}
-                                          disabled={isUpdating}
-                                          className="px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors bg-error-light text-error border border-error-border hover:bg-error/20 disabled:opacity-50"
-                                        >
-                                          Confirm
-                                        </button>
-                                        <button
-                                          onClick={() => setResignConfirmId(null)}
-                                          className="px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors bg-background text-muted border border-border hover:border-subtle"
-                                        >
-                                          Cancel
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      <button
-                                        onClick={() => setResignConfirmId(task.id)}
-                                        className="px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors bg-background text-muted border border-border hover:border-error-border hover:text-error disabled:opacity-50"
-                                      >
-                                        Resign
-                                      </button>
-                                    )
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
+                          {categoryTasks.map((task) => (
+                            <TaskRow
+                              key={task.id}
+                              task={task}
+                              currentUserId={currentUserId}
+                              canAccept={canAccept}
+                              isUpdating={updatingTaskId === task.id}
+                              onAccept={acceptTask}
+                              onResign={resignTask}
+                              onUpdateStatus={updateTaskStatus}
+                              onRefresh={fetchTasks}
+                            />
+                          ))}
                         </div>
                       </div>
                     );
