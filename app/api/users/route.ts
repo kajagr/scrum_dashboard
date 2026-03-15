@@ -174,7 +174,7 @@ export async function POST(req: Request) {
           email,
           username,
           system_role: systemRole,
-        }
+        },
       },
       { status: 201 },
     );
