@@ -16,12 +16,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. prijava prek Supabase Auth
+    // 1. Prijava
     const { data: signInData, error: signInError } =
-      await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      await supabase.auth.signInWithPassword({ email, password });
 
     if (signInError || !signInData.user) {
       return NextResponse.json(
@@ -32,42 +29,44 @@ export async function POST(request: NextRequest) {
 
     const userId = signInData.user.id;
 
-    // 2. preberi trenutno current_login_at iz users tabele
-    const { data: existingUser, error: existingUserError } = await supabase
+    // 2. Posodobi login čase
+    const { data: existingUser } = await supabase
       .from("users")
       .select("current_login_at")
       .eq("id", userId)
       .maybeSingle();
 
-    if (existingUserError) {
-      return NextResponse.json(
-        { error: existingUserError.message },
-        { status: 500 },
-      );
-    }
-
-    const previousCurrentLogin = existingUser?.current_login_at ?? null;
-
-    // 3. posodobi login čase
-    const { error: updateError } = await supabase
+    await supabase
       .from("users")
       .update({
-        last_login_at: previousCurrentLogin,
+        last_login_at: existingUser?.current_login_at ?? null,
         current_login_at: new Date().toISOString(),
       })
       .eq("id", userId);
 
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    // 3. Preveri MFA
+    const { data: aalData } =
+      await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+    if (
+      aalData?.nextLevel === "aal2" &&
+      aalData.nextLevel !== aalData.currentLevel
+    ) {
+      const { data: factors } = await supabase.auth.mfa.listFactors();
+      const totpFactor = factors?.totp?.[0];
+      if (totpFactor) {
+        return NextResponse.json(
+          { requiresMfa: true, factorId: totpFactor.id },
+          { status: 200 },
+        );
+      }
     }
 
+    // 4. Vrni uspeh
     return NextResponse.json(
       {
         message: "Prijava uspešna.",
-        user: {
-          id: signInData.user.id,
-          email: signInData.user.email,
-        },
+        user: { id: signInData.user.id, email: signInData.user.email },
       },
       { status: 200 },
     );

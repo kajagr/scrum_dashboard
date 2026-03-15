@@ -17,6 +17,12 @@ export default function LoginPage() {
   const [revealIndex, setRevealIndex] = useState<number | null>(null);
   const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // MFA state
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [mfaLoading, setMfaLoading] = useState(false);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -37,7 +43,41 @@ export default function LoginPage() {
       return;
     }
 
+    // Server pove ali je MFA potreben
+    if (data.requiresMfa && data.factorId) {
+      setMfaFactorId(data.factorId);
+      setMfaRequired(true);
+      setLoading(false);
+      return;
+    }
+
     router.push("/projects");
+  };
+
+  // MFA verifikacija
+  const handleMfaVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mfaFactorId) return;
+    setMfaLoading(true);
+    setError(null);
+
+    try {
+      const { error: mfaError } = await supabase.auth.mfa.challengeAndVerify({
+        factorId: mfaFactorId,
+        code: mfaCode,
+      });
+
+      if (mfaError) {
+        setError("Napačna koda. Poskusite znova.");
+        setMfaLoading(false);
+        return;
+      }
+
+      router.push("/projects");
+    } catch {
+      setError("Napaka pri preverjanju kode.");
+      setMfaLoading(false);
+    }
   };
 
   const EyeIcon = ({ show }: { show: boolean }) => (
@@ -77,92 +117,149 @@ export default function LoginPage() {
         <h1 className="mb-2 text-center font-[var(--font-display)] text-3xl font-bold">
           ScrumBoard
         </h1>
-        <h2 className="mb-6 text-center text-lg text-[var(--color-muted)]">
-          Sign in to your account
-        </h2>
 
-        <form onSubmit={handleLogin} className="space-y-5">
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--color-foreground)]">
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-light)]"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-[var(--color-foreground)]">
-              Password
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                value={
-                  showPassword
-                    ? password
-                    : password
-                        .split("")
-                        .map((char, i) => (i === revealIndex ? char : "•"))
-                        .join("")
-                }
-                onChange={(e) => {
-                  const val = e.target.value;
-                  let realValue: string;
-                  if (showPassword) {
-                    realValue = val;
-                  } else {
-                    if (val.length > password.length) {
-                      realValue = password + val.slice(password.length);
-                    } else {
-                      realValue = password.slice(0, val.length);
-                    }
+        {/* MFA korak */}
+        {mfaRequired ? (
+          <>
+            <h2 className="mb-2 text-center text-lg text-[var(--color-muted)]">
+              Two-factor authentication
+            </h2>
+            <p className="mb-6 text-center text-sm text-[var(--color-muted)]">
+              Enter the 6-digit code from your authenticator app.
+            </p>
+            <form onSubmit={handleMfaVerify} className="space-y-5">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--color-foreground)]">
+                  Authentication code
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={mfaCode}
+                  onChange={(e) =>
+                    setMfaCode(e.target.value.replace(/\D/g, ""))
                   }
-                  setPassword(realValue);
-                  if (!showPassword && realValue.length > 0) {
-                    setRevealIndex(realValue.length - 1);
-                    if (revealTimer.current) clearTimeout(revealTimer.current);
-                    revealTimer.current = setTimeout(
-                      () => setRevealIndex(null),
-                      1000,
-                    );
-                  } else {
-                    setRevealIndex(null);
-                  }
-                }}
-                onCopy={(e) => e.preventDefault()}
-                onCut={(e) => e.preventDefault()}
-                required
-                className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 pr-10 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-light)]"
-              />
+                  placeholder="000000"
+                  autoFocus
+                  className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-center text-2xl tracking-widest text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-light)]"
+                />
+              </div>
+              {error && (
+                <p className="rounded-lg border border-[var(--color-error-border)] bg-[var(--color-error-light)] px-3 py-2 text-sm text-[var(--color-error)]">
+                  {error}
+                </p>
+              )}
+              <button
+                type="submit"
+                disabled={mfaLoading || mfaCode.length !== 6}
+                className="w-full rounded-lg px-4 py-2 font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]"
+              >
+                {mfaLoading ? "Verifying..." : "Verify"}
+              </button>
               <button
                 type="button"
-                onClick={() => setShowPassword((s) => !s)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-muted)] hover:text-[var(--color-foreground)] transition-colors"
+                onClick={() => {
+                  setMfaRequired(false);
+                  setMfaCode("");
+                  setError(null);
+                }}
+                className="w-full text-sm text-[var(--color-muted)] hover:text-[var(--color-foreground)] transition"
               >
-                <EyeIcon show={showPassword} />
+                ← Back to login
               </button>
-            </div>
-          </div>
+            </form>
+          </>
+        ) : (
+          <>
+            <h2 className="mb-6 text-center text-lg text-[var(--color-muted)]">
+              Sign in to your account
+            </h2>
+            <form onSubmit={handleLogin} className="space-y-5">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--color-foreground)]">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-light)]"
+                />
+              </div>
 
-          {error && (
-            <p className="rounded-lg border border-[var(--color-error-border)] bg-[var(--color-error-light)] px-3 py-2 text-sm text-[var(--color-error)]">
-              {error}
-            </p>
-          )}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[var(--color-foreground)]">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={
+                      showPassword
+                        ? password
+                        : password
+                            .split("")
+                            .map((char, i) => (i === revealIndex ? char : "•"))
+                            .join("")
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      let realValue: string;
+                      if (showPassword) {
+                        realValue = val;
+                      } else {
+                        if (val.length > password.length) {
+                          realValue = password + val.slice(password.length);
+                        } else {
+                          realValue = password.slice(0, val.length);
+                        }
+                      }
+                      setPassword(realValue);
+                      if (!showPassword && realValue.length > 0) {
+                        setRevealIndex(realValue.length - 1);
+                        if (revealTimer.current)
+                          clearTimeout(revealTimer.current);
+                        revealTimer.current = setTimeout(
+                          () => setRevealIndex(null),
+                          1000,
+                        );
+                      } else {
+                        setRevealIndex(null);
+                      }
+                    }}
+                    onCopy={(e) => e.preventDefault()}
+                    onCut={(e) => e.preventDefault()}
+                    required
+                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 pr-10 text-[var(--color-foreground)] outline-none transition focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary-light)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((s) => !s)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-muted)] hover:text-[var(--color-foreground)] transition-colors"
+                  >
+                    <EyeIcon show={showPassword} />
+                  </button>
+                </div>
+              </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg px-4 py-2 font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]"
-          >
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
+              {error && (
+                <p className="rounded-lg border border-[var(--color-error-border)] bg-[var(--color-error-light)] px-3 py-2 text-sm text-[var(--color-error)]">
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-lg px-4 py-2 font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]"
+              >
+                {loading ? "Signing in..." : "Sign in"}
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );
