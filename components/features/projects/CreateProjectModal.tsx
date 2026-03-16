@@ -191,10 +191,10 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 backdrop-blur-sm bg-foreground/30" onClick={handleClose} />
 
-      <div className="relative w-full max-w-lg mx-4 rounded-2xl overflow-hidden shadow-2xl bg-surface max-h-[90vh] flex flex-col">
-        <div className="h-1 w-full bg-gradient-to-r from-primary to-accent flex-shrink-0" />
+      <div className="relative w-full max-w-lg mx-4 rounded-2xl shadow-2xl bg-surface max-h-[90vh] flex flex-col">
+        <div className="h-1 w-full bg-gradient-to-r from-primary to-accent rounded-t-2xl flex-shrink-0" />
 
-        <div className="p-7 flex flex-col overflow-hidden flex-1">
+        <div className="p-7 flex flex-col overflow-visible flex-1">
           {/* Header */}
           <div className="flex items-center justify-between mb-5 flex-shrink-0">
             <div>
@@ -248,7 +248,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
 
           {/* ── STEP 2 ── */}
           {step === 2 && (
-            <div className="flex flex-col gap-4 overflow-hidden flex-1">
+            <div className="flex flex-col gap-4 overflow-visible flex-1">
               {/* Role coverage summary */}
               <div className="flex gap-2 flex-shrink-0">
                 {(["product_owner", "scrum_master"] as ProjectRole[]).map((role) => {
@@ -317,7 +317,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
 
               {/* Selected members */}
               {selectedMembers.length > 0 && (
-                <div className="flex-1 overflow-hidden flex flex-col">
+                <div className="flex-1 flex flex-col">
                   <p className={labelClass + " mb-2 flex-shrink-0"}>
                     Selected <span className="ml-2 normal-case font-normal tracking-normal text-subtle">({selectedMembers.length})</span>
                   </p>
