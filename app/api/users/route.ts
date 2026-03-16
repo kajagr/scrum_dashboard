@@ -7,7 +7,82 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-// GET /api/users - Fetch all users (admin only)
+/**
+ * @swagger
+ * /api/users:
+ *   get:
+ *     summary: Get all users
+ *     description: Returns all users in the system. Only administrators can access this endpoint.
+ *     tags:
+ *       - Users
+ *     responses:
+ *       200:
+ *         description: List of all users
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: string
+ *                     format: uuid
+ *                     example: "d5e8f1a2-3b4c-5d6e-7f8a-9b0c1d2e3f4a"
+ *                   email:
+ *                     type: string
+ *                     format: email
+ *                     example: "janez.novak@example.com"
+ *                   username:
+ *                     type: string
+ *                     example: "janez.novak"
+ *                   first_name:
+ *                     type: string
+ *                     nullable: true
+ *                     example: "Janez"
+ *                   last_name:
+ *                     type: string
+ *                     nullable: true
+ *                     example: "Novak"
+ *                   system_role:
+ *                     type: string
+ *                     enum: [admin, user]
+ *                     example: "user"
+ *                   created_at:
+ *                     type: string
+ *                     format: date-time
+ *                     example: "2024-01-15T10:30:00Z"
+ *       401:
+ *         description: User not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Unauthorized"
+ *       403:
+ *         description: User is not an administrator
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Samo administrator lahko vidi vse uporabnike."
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Napaka pri pridobivanju uporabnikov."
+ */
 export async function GET() {
   try {
     const supabase = await createServerClient();
@@ -19,7 +94,6 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Preveri ali je admin
     const { data: currentUserData } = await supabaseAdmin
       .from("users")
       .select("system_role")
@@ -51,10 +125,148 @@ export async function GET() {
   }
 }
 
-// POST /api/users - Create new user (admin only)
+/**
+ * @swagger
+ * /api/users:
+ *   post:
+ *     summary: Create a new user
+ *     description: >
+ *       Creates a new user in both Supabase Auth and the users table.
+ *       Only administrators can create users.
+ *       Username and email must be unique (case-insensitive).
+ *       Password must be between 12 and 64 characters.
+ *       If profile creation fails after auth user is created, the auth user is automatically deleted.
+ *     tags:
+ *       - Users
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *               - username
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "janez.novak@example.com"
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 description: Min 12, max 64 characters
+ *                 example: "mocno_geslo_123"
+ *               username:
+ *                 type: string
+ *                 description: Must be unique (case-insensitive)
+ *                 example: "janez.novak"
+ *               first_name:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "Janez"
+ *               last_name:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "Novak"
+ *               system_role:
+ *                 type: string
+ *                 enum: [admin, user]
+ *                 description: Defaults to "user" if not provided or not "admin"
+ *                 example: "user"
+ *     responses:
+ *       201:
+ *         description: User created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Uporabnik uspešno ustvarjen."
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                       example: "d5e8f1a2-3b4c-5d6e-7f8a-9b0c1d2e3f4a"
+ *                     email:
+ *                       type: string
+ *                       format: email
+ *                       example: "janez.novak@example.com"
+ *                     username:
+ *                       type: string
+ *                       example: "janez.novak"
+ *                     system_role:
+ *                       type: string
+ *                       enum: [admin, user]
+ *                       example: "user"
+ *       400:
+ *         description: Validation failed or auth error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   examples:
+ *                     missingFields:
+ *                       value: "Email, geslo in uporabniško ime so obvezni."
+ *                     passwordTooShort:
+ *                       value: "Geslo mora imeti vsaj 12 znakov."
+ *                     passwordTooLong:
+ *                       value: "Geslo ima lahko največ 64 znakov."
+ *       401:
+ *         description: User not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Unauthorized"
+ *       403:
+ *         description: User is not an administrator
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Samo administrator lahko ustvarja uporabnike."
+ *       409:
+ *         description: Username or email already exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   examples:
+ *                     duplicateUsername:
+ *                       value: "Uporabniško ime že obstaja."
+ *                     duplicateEmail:
+ *                       value: "E-pošta že obstaja."
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Napaka pri ustvarjanju profila: ..."
+ */
 export async function POST(req: Request) {
   try {
-    // Preveri ali je klicatelj prijavljen
     const supabase = await createServerClient();
     const {
       data: { user: currentUser },
@@ -64,7 +276,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Preveri ali je admin
     const { data: currentUserData } = await supabaseAdmin
       .from("users")
       .select("system_role")
@@ -87,7 +298,6 @@ export async function POST(req: Request) {
     const lastName = body.last_name?.trim() || null;
     const systemRole = body.system_role === "admin" ? "admin" : "user";
 
-    // Preveri obvezna polja
     if (!email || !password || !username) {
       return NextResponse.json(
         { error: "Email, geslo in uporabniško ime so obvezni." },
@@ -95,7 +305,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Preveri dolžino gesla
     if (password.length < 12) {
       return NextResponse.json(
         { error: "Geslo mora imeti vsaj 12 znakov." },
@@ -110,7 +319,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Preveri ali username obstaja
     const { data: existingUsername } = await supabaseAdmin
       .from("users")
       .select("id")
@@ -124,7 +332,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Preveri ali email obstaja
     const { data: existingEmail } = await supabaseAdmin
       .from("users")
       .select("id")
@@ -138,7 +345,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Ustvari auth user
     const { data: authData, error: authError } =
       await supabaseAdmin.auth.admin.createUser({
         email,
@@ -153,7 +359,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Ustvari profil v users tabeli (vedno kot "user")
     const { error: profileError } = await supabaseAdmin.from("users").insert({
       id: authData.user.id,
       email,
@@ -163,7 +368,6 @@ export async function POST(req: Request) {
       system_role: systemRole,
     });
 
-    // Če profil ne uspe, izbriši auth userja
     if (profileError) {
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
 

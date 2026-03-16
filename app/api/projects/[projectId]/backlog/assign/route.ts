@@ -9,6 +9,134 @@ function getTodayDateString() {
   return new Date().toISOString().split("T")[0];
 }
 
+/**
+ * @swagger
+ * /api/projects/{projectId}/backlog/assign:
+ *   post:
+ *     summary: Assign stories to active sprint
+ *     description: >
+ *       Assigns one or more user stories from the backlog to the currently active sprint.
+ *       Validates that stories exist, belong to the project, have story points set,
+ *       are not already done, are not already in the active sprint,
+ *       and that the sprint velocity would not be exceeded.
+ *     tags:
+ *       - Backlog
+ *     parameters:
+ *       - in: path
+ *         name: projectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the project
+ *         example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - storyIds
+ *             properties:
+ *               storyIds:
+ *                 type: array
+ *                 description: List of user story IDs to assign to the active sprint
+ *                 minItems: 1
+ *                 items:
+ *                   type: string
+ *                   format: uuid
+ *                 example: ["c3d4e5f6-a7b8-9012-cdef-123456789012", "d4e5f6a7-b8c9-0123-defa-234567890123"]
+ *     responses:
+ *       200:
+ *         description: Stories successfully assigned to the active sprint
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Successfully assigned 2 stories to sprint \"Sprint 1\"."
+ *                 sprint:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       format: uuid
+ *                       example: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+ *                     name:
+ *                       type: string
+ *                       example: "Sprint 1"
+ *                     start_date:
+ *                       type: string
+ *                       format: date
+ *                       example: "2024-01-01"
+ *                     end_date:
+ *                       type: string
+ *                       format: date
+ *                       example: "2024-01-14"
+ *                     velocity:
+ *                       type: integer
+ *                       example: 21
+ *                 assignedCount:
+ *                   type: integer
+ *                   example: 2
+ *       400:
+ *         description: Validation failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   examples:
+ *                     emptyArray:
+ *                       value: "storyIds must be a non-empty array."
+ *                     noActiveSprint:
+ *                       value: "No active sprint exists for this project."
+ *                     notFound:
+ *                       value: "Some stories do not exist or do not belong to this project."
+ *                     velocityExceeded:
+ *                       value: "Adding these stories (8 pts) would exceed the sprint velocity of 21 pts. Currently 15 pts are assigned."
+ *                     missingPoints:
+ *                       value: "All stories must have story points set before being assigned to a sprint."
+ *                     alreadyDone:
+ *                       value: "Completed stories cannot be assigned to a sprint."
+ *                     alreadyAssigned:
+ *                       value: "Some stories are already assigned to the active sprint."
+ *       401:
+ *         description: User not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Unauthorized"
+ *       403:
+ *         description: User does not have permission to assign stories to a sprint
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "You don't have permission to assign stories to a sprint."
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "An error occurred while assigning stories to the sprint."
+ */
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const supabase = await createClient();
@@ -31,7 +159,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const today = getTodayDateString();
 
-    // Find active sprint
     const { data: activeSprint, error: sprintError } = await supabase
       .from("sprints")
       .select("id, name, start_date, end_date, velocity")
@@ -51,7 +178,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // Fetch selected stories
     const { data: stories, error: storiesError } = await supabase
       .from("user_stories")
       .select("id, project_id, status, sprint_id, story_points")
@@ -69,7 +195,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // Validate: velocity not exceeded
     if (activeSprint.velocity != null) {
       const { data: alreadyInSprint } = await supabase
         .from("user_stories")
@@ -90,7 +215,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
     }
 
-    // Validate: no story points missing
     const missingPoints = stories.find((s) => s.story_points == null);
     if (missingPoints) {
       return NextResponse.json(
@@ -99,7 +223,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // Validate: none are done
     const invalidDone = stories.find((s) => s.status === "done");
     if (invalidDone) {
       return NextResponse.json(
@@ -108,7 +231,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // Validate: none already in the active sprint
     const alreadyAssigned = stories.find((s) => s.sprint_id === activeSprint.id);
     if (alreadyAssigned) {
       return NextResponse.json(
@@ -117,7 +239,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // Assign all selected stories to the active sprint
     const { error: updateError } = await supabase
       .from("user_stories")
       .update({ sprint_id: activeSprint.id })

@@ -3,9 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import fs from "fs";
 import path from "path";
 
-// Naloži seznam pogostih gesel (500 namesto 100) enkrat ob zagonu serverja - iz rockyyou:
-// https://github.com/gsuberland/CommonPasswordsByPolicy/blob/main/from-rockyou/pwlist_cc_len12_cls1.txt
-// shranjeno v public/common-passwords
 let commonPasswords: Set<string> | null = null;
 
 function getCommonPasswords(): Set<string> {
@@ -20,7 +17,6 @@ function getCommonPasswords(): Set<string> {
         .filter(Boolean),
     );
   } catch {
-    // Če datoteka ne obstaja, vrni prazen set
     commonPasswords = new Set();
   }
   return commonPasswords;
@@ -35,22 +31,103 @@ function validatePassword(password: string) {
     return "Password cannot be longer than 128 characters.";
   }
 
-  // Preveri pogosta gesla
   const common = getCommonPasswords();
   if (common.has(password.toLowerCase())) {
     return "This password is too common. Please choose a stronger one.";
   }
 
-  // no trimming, no changing whitespace
-
   return null;
 }
 
+/**
+ * @swagger
+ * /api/auth/change-password:
+ *   post:
+ *     summary: Change password
+ *     description: >
+ *       Changes the password of the currently authenticated user.
+ *       Requires the old password for re-authentication.
+ *       New password must be at least 12 characters, at most 64 characters,
+ *       and must not be a commonly used password.
+ *     tags:
+ *       - Auth
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - oldPassword
+ *               - newPassword
+ *             properties:
+ *               oldPassword:
+ *                 type: string
+ *                 format: password
+ *                 example: "staro_geslo123"
+ *               newPassword:
+ *                 type: string
+ *                 format: password
+ *                 description: Min 12, max 64 characters. Must not be a common password.
+ *                 example: "novo_mocno_geslo456"
+ *     responses:
+ *       200:
+ *         description: Password changed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Password changed successfully."
+ *       400:
+ *         description: Missing fields or password validation failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   examples:
+ *                     missing:
+ *                       value: "Old and new password are required."
+ *                     tooShort:
+ *                       value: "Password must be at least 12 characters."
+ *                     tooLong:
+ *                       value: "Password cannot be longer than 128 characters."
+ *                     tooCommon:
+ *                       value: "This password is too common. Please choose a stronger one."
+ *       401:
+ *         description: User not authenticated or old password incorrect
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   examples:
+ *                     notAuthenticated:
+ *                       value: "User is not authenticated."
+ *                     wrongPassword:
+ *                       value: "Incorrect old password."
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "An error occurred while changing the password."
+ */
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
 
-    // check if user is logged in
     const {
       data: { user },
       error: userError,
@@ -73,13 +150,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // validate new password
     const passwordError = validatePassword(newPassword);
     if (passwordError) {
       return NextResponse.json({ error: passwordError }, { status: 400 });
     }
 
-    // verify old password (re-authenticate)
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email: user.email,
       password: oldPassword,
@@ -92,7 +167,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // change password
     const { error: updateError } = await supabase.auth.updateUser({
       password: newPassword,
     });

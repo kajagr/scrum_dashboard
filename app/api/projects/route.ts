@@ -2,7 +2,63 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { canCreateProject, projectNameExists } from "@/lib/permissions";
 
-// GET /api/projects - Fetch all projects for current user
+/**
+ * @swagger
+ * /api/projects:
+ *   get:
+ *     summary: Get all projects
+ *     description: Returns all projects for the currently authenticated user, ordered by creation date descending.
+ *     tags:
+ *       - Projects
+ *     responses:
+ *       200:
+ *         description: List of projects
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: string
+ *                     format: uuid
+ *                     example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+ *                   name:
+ *                     type: string
+ *                     example: "Scrum App"
+ *                   description:
+ *                     type: string
+ *                     example: "A project management application."
+ *                   owner_id:
+ *                     type: string
+ *                     format: uuid
+ *                     example: "d5e8f1a2-3b4c-5d6e-7f8a-9b0c1d2e3f4a"
+ *                   created_at:
+ *                     type: string
+ *                     format: date-time
+ *                     example: "2024-01-15T10:30:00Z"
+ *       401:
+ *         description: User not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Unauthorized"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Unexpected error occurred."
+ */
 export async function GET() {
   const supabase = await createClient();
 
@@ -24,7 +80,117 @@ export async function GET() {
   return NextResponse.json(data);
 }
 
-// POST /api/projects - Create a new project (ADMIN ONLY)
+/**
+ * @swagger
+ * /api/projects:
+ *   post:
+ *     summary: Create a new project
+ *     description: Creates a new project. Only administrators can create projects. The creator is automatically added as product_owner.
+ *     tags:
+ *       - Projects
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Scrum App"
+ *               description:
+ *                 type: string
+ *                 example: "A project management application."
+ *               members:
+ *                 type: array
+ *                 description: Optional list of members to add to the project
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - user_id
+ *                     - role
+ *                   properties:
+ *                     user_id:
+ *                       type: string
+ *                       format: uuid
+ *                       example: "d5e8f1a2-3b4c-5d6e-7f8a-9b0c1d2e3f4a"
+ *                     role:
+ *                       type: string
+ *                       enum: [product_owner, scrum_master, dev]
+ *                       example: "dev"
+ *     responses:
+ *       201:
+ *         description: Project created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                   format: uuid
+ *                   example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+ *                 name:
+ *                   type: string
+ *                   example: "Scrum App"
+ *                 description:
+ *                   type: string
+ *                   example: "A project management application."
+ *                 owner_id:
+ *                   type: string
+ *                   format: uuid
+ *                   example: "d5e8f1a2-3b4c-5d6e-7f8a-9b0c1d2e3f4a"
+ *                 created_at:
+ *                   type: string
+ *                   format: date-time
+ *                   example: "2024-01-15T10:30:00Z"
+ *       400:
+ *         description: Missing project name or duplicate name
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   examples:
+ *                     missingName:
+ *                       value: "Project name is required"
+ *                     duplicateName:
+ *                       value: "A project with this name already exists"
+ *       401:
+ *         description: User not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Unauthorized"
+ *       403:
+ *         description: User is not an administrator
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Only an administrator can create a project"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Unexpected error occurred."
+ */
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
 
@@ -34,11 +200,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Check if user is admin
   const canCreate = await canCreateProject(user.id);
   if (!canCreate) {
     return NextResponse.json(
-      { error: "Only an administrator can create a project" }, 
+      { error: "Only an administrator can create a project" },
       { status: 403 }
     );
   }
@@ -50,16 +215,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Project name is required" }, { status: 400 });
   }
 
-  // Check for duplicate project name
   const nameExists = await projectNameExists(name);
   if (nameExists) {
     return NextResponse.json(
-      { error: "A project with this name already exists" }, 
+      { error: "A project with this name already exists" },
       { status: 400 }
     );
   }
 
-  // Create project
   const { data: project, error: projectError } = await supabase
     .from("projects")
     .insert({
@@ -74,7 +237,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: projectError.message }, { status: 500 });
   }
 
-  // Add members if provided
   if (members && Array.isArray(members) && members.length > 0) {
     const memberInserts = members.map((member: { user_id: string; role: string }) => ({
       project_id: project.id,
@@ -91,7 +253,6 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Add creator as a member (product_owner)
   await supabase.from("project_members").insert({
     project_id: project.id,
     user_id: user.id,

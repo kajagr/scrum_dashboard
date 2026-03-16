@@ -14,8 +14,10 @@
     "@supabase/supabase-js": "^2.98.0",
     "lucide-react": "^0.577.0",
     "next": "16.1.6",
+    "next-swagger-doc": "^0.4.1",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "swagger-ui-react": "^5.32.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -23,6 +25,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/swagger-ui-react": "^5.18.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "jest": "^30.3.0",

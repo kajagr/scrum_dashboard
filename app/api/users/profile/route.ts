@@ -7,7 +7,77 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-// GET /api/users/profile - current logged-in user profile
+/**
+ * @swagger
+ * /api/users/profile:
+ *   get:
+ *     summary: Get current user's profile
+ *     description: Returns the profile of the currently authenticated user.
+ *     tags:
+ *       - Users
+ *     responses:
+ *       200:
+ *         description: Profile retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 username:
+ *                   type: string
+ *                   example: "janez.novak"
+ *                 email:
+ *                   type: string
+ *                   format: email
+ *                   example: "janez.novak@example.com"
+ *                 first_name:
+ *                   type: string
+ *                   nullable: true
+ *                   example: "Janez"
+ *                 last_name:
+ *                   type: string
+ *                   nullable: true
+ *                   example: "Novak"
+ *                 role:
+ *                   type: string
+ *                   enum: [admin, user]
+ *                   example: "user"
+ *                 last_login_at:
+ *                   type: string
+ *                   format: date-time
+ *                   nullable: true
+ *                   example: "2024-01-15T10:30:00Z"
+ *       401:
+ *         description: User not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Unauthorized"
+ *       404:
+ *         description: Profile not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Failed to fetch profile."
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "A server error occurred while fetching the profile."
+ */
 export async function GET() {
   try {
     const supabase = await createServerClient();
@@ -50,7 +120,110 @@ export async function GET() {
   }
 }
 
-// PUT /api/users/profile - update current logged-in user profile
+/**
+ * @swagger
+ * /api/users/profile:
+ *   put:
+ *     summary: Update current user's profile
+ *     description: >
+ *       Updates the profile of the currently authenticated user.
+ *       Username and email must remain unique across all users (case-insensitive).
+ *       Optionally updates the password (min 6 characters) and/or email in Supabase Auth.
+ *     tags:
+ *       - Users
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - username
+ *               - email
+ *             properties:
+ *               username:
+ *                 type: string
+ *                 description: Must be unique (case-insensitive), excluding the current user
+ *                 example: "janez.novak"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Must be unique (case-insensitive), excluding the current user
+ *                 example: "janez.novak@example.com"
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 nullable: true
+ *                 description: Optional. If provided, must be at least 6 characters.
+ *                 example: "novo_geslo_123"
+ *               first_name:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "Janez"
+ *               last_name:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "Novak"
+ *     responses:
+ *       200:
+ *         description: Profile updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Profile updated successfully."
+ *       400:
+ *         description: Validation failed or auth update error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   examples:
+ *                     missingFields:
+ *                       value: "Username and email are required."
+ *                     passwordTooShort:
+ *                       value: "Password must be at least 6 characters long."
+ *       401:
+ *         description: User not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Unauthorized"
+ *       409:
+ *         description: Username or email already in use by another user
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   examples:
+ *                     duplicateUsername:
+ *                       value: "Username already exists."
+ *                     duplicateEmail:
+ *                       value: "Email already exists."
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "A server error occurred while updating the profile."
+ */
 export async function PUT(req: Request) {
   try {
     const supabase = await createServerClient();
@@ -77,7 +250,6 @@ export async function PUT(req: Request) {
       );
     }
 
-    // Check if username is used by another user
     const { data: existingUsername } = await supabaseAdmin
       .from("users")
       .select("id")
@@ -92,7 +264,6 @@ export async function PUT(req: Request) {
       );
     }
 
-    // Check if email is used by another user
     const { data: existingEmail } = await supabaseAdmin
       .from("users")
       .select("id")
@@ -107,7 +278,6 @@ export async function PUT(req: Request) {
       );
     }
 
-    // Update auth email / password if needed
     const updateAuthPayload: { email?: string; password?: string } = {};
 
     if (email) {
@@ -137,7 +307,6 @@ export async function PUT(req: Request) {
       }
     }
 
-    // Update profile table
     const { error: profileError } = await supabaseAdmin
       .from("users")
       .update({
