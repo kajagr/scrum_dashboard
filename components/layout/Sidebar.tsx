@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard,
@@ -49,24 +49,50 @@ export default function Sidebar() {
   const router = useRouter();
   const supabase = createClient();
 
-  const projectId = params?.projectId as string | undefined;
+  const routeProjectId = params?.projectId as string | undefined;
+
   const [isAdmin, setIsAdmin] = useState(false);
+  const [lastProjectId, setLastProjectId] = useState<string | undefined>(
+    undefined
+  );
 
   useEffect(() => {
     const checkAdmin = async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+
       if (!user) return;
+
       const { data } = await supabase
         .from("users")
         .select("system_role")
         .eq("id", user.id)
         .single();
+
       setIsAdmin(data?.system_role === "admin");
     };
+
     checkAdmin();
   }, [supabase]);
+
+  useEffect(() => {
+    if (routeProjectId) {
+      setLastProjectId(routeProjectId);
+      localStorage.setItem("lastProjectId", routeProjectId);
+      return;
+    }
+
+    const storedProjectId = localStorage.getItem("lastProjectId");
+    if (storedProjectId) {
+      setLastProjectId(storedProjectId);
+    }
+  }, [routeProjectId]);
+
+  const currentProjectId = useMemo(
+    () => routeProjectId ?? lastProjectId,
+    [routeProjectId, lastProjectId]
+  );
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -75,7 +101,6 @@ export default function Sidebar() {
 
   return (
     <aside className="flex w-64 flex-col bg-surface border-r border-border">
-      {/* Navigation */}
       <nav className="flex-1 px-3 py-5 space-y-0.5">
         {navigation.map((item) => {
           const Icon = item.icon;
@@ -90,13 +115,13 @@ export default function Sidebar() {
           }
 
           if (item.type === "project") {
-            if (!projectId) {
+            if (!currentProjectId) {
               isDisabled = true;
             } else {
-              href = `/projects/${projectId}${item.href}`;
+              href = `/projects/${currentProjectId}${item.href}`;
               isActive =
                 item.href === ""
-                  ? pathname === `/projects/${projectId}`
+                  ? pathname === `/projects/${currentProjectId}`
                   : pathname.startsWith(href);
             }
           }
@@ -139,7 +164,6 @@ export default function Sidebar() {
           );
         })}
 
-        {/* Admin only */}
         {isAdmin && (
           <>
             <div className="border-t border-border my-3" />
@@ -168,7 +192,6 @@ export default function Sidebar() {
         )}
       </nav>
 
-      {/* Bottom */}
       <div className="border-t border-border p-3">
         <button
           onClick={handleLogout}

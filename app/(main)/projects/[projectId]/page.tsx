@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
+import DashboardHelpTooltip from "@/components/features/dashboard/DashboardHelpTooltip";
 
 interface Props {
   params: Promise<{ projectId: string }>;
@@ -32,9 +33,20 @@ export default async function ProjectDashboardPage({ params }: Props) {
   return (
     <div className="p-6 text-foreground">
       <div className="mb-8">
-        <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Project</p>
-        <h1 className="text-3xl font-bold text-foreground leading-tight">{project.name}</h1>
-        <p className="text-sm text-muted mt-1">{project.description || "No description"}</p>
+        <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">
+          Project
+        </p>
+
+        <div className="flex items-center gap-2">
+          <h1 className="text-3xl font-bold text-foreground leading-tight">
+            {project.name}
+          </h1>
+          <DashboardHelpTooltip />
+        </div>
+
+        <p className="text-sm text-muted mt-1">
+          {project.description || "No description"}
+        </p>
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
@@ -100,7 +112,8 @@ export default async function ProjectDashboardPage({ params }: Props) {
       </div>
 
       <p className="text-sm text-[var(--color-muted)]">
-        This is the project dashboard. You can add more statistics and charts here.
+        This is the project dashboard. You can add more statistics and charts
+        here.
       </p>
     </div>
   );
