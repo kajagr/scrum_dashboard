@@ -283,6 +283,43 @@ Prilagam vse tri datoteke s conflict markerji <<<<<< / ======= / >>>>>>>
 AI je pravilno rešil večino konfliktov. V `SprintBoardPage` je ohranil `config` namesto `cfg` — sami smo popravili. Edit modal je bil generiran z inline styles kljub navodilu — ročno smo ga prepisali v Tailwind classes po vzoru ostalih modalov.
 
 ---
+ 
+## Prompt 10 — Testiranje: Unit testi za API route-e (#1, #4, #6, #8, #9, #13, #14, #15, #16, #17, #18, #20, #27, #28, #30)
+ 
+### Kontekst
+ 
+Za vsako kartico smo pisali ločeno testno datoteko (`1-users.test.ts`, `4-projects.test.ts`, ..., `18-timelog.test.ts` itd.). Ker Next.js route-i direktno kličejo Supabase, smo potrebovali enoten vzorec za mockanje baze brez dejanske povezave. Isti prompt smo z manjšimi prilagoditvami uporabili za vse kartice.
+ 
+### Prompt (splošni vzorec)
+ 
+```
+Napiši Jest unit teste v TypeScript za Next.js 15 API route 
+[ime route-a] ki pokrijejo vse testne primere iz use kartice #[številka].
+ 
+Splošna navodila:
+- Supabase mockaj z jest.mock("@/lib/supabase/server")
+- mockFrom implementiraj s counter vzorcem: vsak zaporedni klic 
+  supabase.from() vrne drugačen mock glede na vrstni red v route-u
+- Helper funkcije: makeRequest(url, method, body?) in makeContext(params)
+- beforeEach: jest.clearAllMocks() + mockGetUser za prijavljenega userja
+- setupMocks() helper ki sprejme overrides za edge case-e
+ 
+Testiraj te primere:
+1. 200/201 — regularen potek (happy path)
+2. 400 — [specifična validacija iz kartice]
+3. 400 — [druga validacija]
+4. 401 — neprijavljen uporabnik
+5. [dodatni edge case-i specifični za kartico]
+ 
+Prilagam route implementacijo: [route.ts]
+```
+ 
+### Kako smo uporabili odgovor
+ 
+AI je za vsako kartico generiral osnovno strukturo testov. Najpogostejša težava je bila **vrstni red `from()` klicev** — counter v `mockFrom` se zamakne ko dodaš novo DB operacijo v route, kar poruši vse nadaljnje teste. To smo vedno preverili ročno s preštevanjem `from()` klicev v dejanskem route-u. Za kartice z bolj kompleksno logiko (npr. #18 agregacija časa po dnevu, #13 velocity preverjanje) AI ni pokrival vseh edge case-ov v prvem poskusu — testne primere smo dopolnili sami. Za React komponente (28-task-list.test.tsx) smo uporabili React Testing Library namesto Jest, kar je zahtevalo drugačen pristop ki ga AI ni predlagal samodejno.
+ 
+---
+
 
 ## Zaključek
 
