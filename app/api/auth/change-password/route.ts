@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import fs from "fs";
 import path from "path";
 
+// nasli smo 500 najpogostejših gesel dolžine >= 12 na povezavi:
+// https://github.com/gsuberland/CommonPasswordsByPolicy/blob/main/from-rockyou/pwlist_cc_len12_cls1.txt
+
 let commonPasswords: Set<string> | null = null;
 
 function getCommonPasswords(): Set<string> {
