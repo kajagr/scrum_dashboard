@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
+import SettingsHelpTooltip from "@/components/features/settings/SettingsHelpTooltip";
 
 interface Props {
   params: Promise<{ projectId: string }>;
@@ -22,8 +23,15 @@ export default async function SettingsPage({ params }: Props) {
   return (
     <div className="p-6 text-foreground">
       <div className="mb-6">
-        <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Project</p>
-        <h1 className="text-3xl font-bold text-foreground leading-tight">Settings</h1>
+        <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">
+          Project
+        </p>
+        <div className="flex items-center gap-2">
+          <h1 className="text-3xl font-bold text-foreground leading-tight">
+            Settings
+          </h1>
+          <SettingsHelpTooltip />
+        </div>
         <p className="text-sm text-muted mt-1">Manage project settings</p>
       </div>
 
