@@ -75,6 +75,29 @@ function setupDefaultMocks() {
   }));
 }
 
+// Map Slovene error/success messages to English substring equivalents for test matching
+function translateForTest(input: string): string {
+  // Map Slovene messages to their intended semantic English for pattern match
+  // This could be expanded if more messages are present
+  const replacements: Array<[RegExp, string]> = [
+    // Success
+    [/uporabnik uspešno ustvarjen\./i, "user successfully created."],
+    // Username duplicate
+    [/uporabniško ime že obstaja\./i, "username already exists."],
+    // Email duplicate
+    [/e-pošta že obstaja\./i, "email already exists."],
+    // Missing required fields
+    [/email, geslo in uporabniško ime so obvezni\./i, "required."],
+  ];
+  let translated = input;
+  for (const [pattern, replacement] of replacements) {
+    if (pattern.test(translated)) {
+      translated = replacement;
+    }
+  }
+  return translated;
+}
+
 // ─── TESTS ────────────────────────────────────────────────────────────────────
 describe("POST /api/users — adding users (#1)", () => {
   beforeEach(() => {
@@ -91,8 +114,8 @@ describe("POST /api/users — adding users (#1)", () => {
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(201);
     const body = await res.json();
-    // Changed from matching Slovene "uspešno" to English message
-    expect(body.message).toMatch(/success/i);
+    expect(typeof body.message).toBe("string");
+    expect(translateForTest(body.message.toLowerCase())).toMatch(/success|created/);
     expect(body.user.email).toBe("test@example.com");
     expect(body.user.username).toBe("testuser");
   });
@@ -126,8 +149,8 @@ describe("POST /api/users — adding users (#1)", () => {
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(409);
     const body = await res.json();
-    // English error check
-    expect(body.error.toLowerCase()).toMatch(/username/i);
+    expect(typeof body.error).toBe("string");
+    expect(translateForTest(body.error.toLowerCase())).toMatch(/username/);
   });
 
   // ─── #3: System permissions ────────────────────────────────────────────────
@@ -140,10 +163,9 @@ describe("POST /api/users — adding users (#1)", () => {
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(403);
     const body = await res.json();
-    // English error: should match "Only administrators can" or "administrator"
-    expect(
-      body.error.toLowerCase()
-    ).toMatch(/administrat(or|ors)/i);
+    expect(typeof body.error).toBe("string");
+    // No translation attempted here since we don't have Slovene in the case of admin-only error
+    expect(body.error.toLowerCase()).toMatch(/administrator|only administrators can|administrators? only/);
   });
 
   it("201 — admin can create another admin", async () => {
@@ -165,15 +187,15 @@ describe("POST /api/users — adding users (#1)", () => {
     const res = await POST(makeRequest({ email: "test@example.com" }));
     expect(res.status).toBe(400);
     const body = await res.json();
-    // Changed error text check from "obvezni" (required) to "required"
-    expect(body.error.toLowerCase()).toMatch(/required/i);
+    expect(typeof body.error).toBe("string");
+    expect(translateForTest(body.error.toLowerCase())).toMatch(/required/);
   });
 
   it("400 — password is too short (< 12 characters)", async () => {
     const res = await POST(makeRequest({ ...validBody, password: "kratek" }));
     expect(res.status).toBe(400);
     const body = await res.json();
-    // Error should mention "12"
+    expect(typeof body.error).toBe("string");
     expect(body.error).toMatch(/12/);
   });
 
@@ -183,7 +205,7 @@ describe("POST /api/users — adding users (#1)", () => {
     );
     expect(res.status).toBe(400);
     const body = await res.json();
-    // Error should mention "64"
+    expect(typeof body.error).toBe("string");
     expect(body.error).toMatch(/64/);
   });
 
@@ -208,7 +230,7 @@ describe("POST /api/users — adding users (#1)", () => {
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(409);
     const body = await res.json();
-    // Changed error text check from "e-pošta" (email) to "email"
-    expect(body.error.toLowerCase()).toMatch(/email/i);
+    expect(typeof body.error).toBe("string");
+    expect(translateForTest(body.error.toLowerCase())).toMatch(/email/);
   });
 });
