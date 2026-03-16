@@ -48,7 +48,7 @@ const validBody = {
   system_role: "user",
 };
 
-// ─── Setup default mockov ─────────────────────────────────────────────────────
+// ─── Setup default mocks ──────────────────────────────────────────────────────
 function setupDefaultMocks() {
   // Admin user check
   mockAdminSingle.mockResolvedValue({
@@ -56,10 +56,10 @@ function setupDefaultMocks() {
     error: null,
   });
 
-  // Username in email ne obstajata
+  // Username and email do not exist
   mockAdminMaybeSingle.mockResolvedValue({ data: null, error: null });
 
-  // Auth user uspešno ustvarjen
+  // Auth user successfully created
   mockAdminCreateUser.mockResolvedValue({
     data: { user: { id: "new-user-1" } },
     error: null,
@@ -75,8 +75,8 @@ function setupDefaultMocks() {
   }));
 }
 
-// ─── TESTI ────────────────────────────────────────────────────────────────────
-describe("POST /api/users — dodajanje uporabnikov (#1)", () => {
+// ─── TESTS ────────────────────────────────────────────────────────────────────
+describe("POST /api/users — adding users (#1)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetUser.mockResolvedValue({
@@ -86,25 +86,26 @@ describe("POST /api/users — dodajanje uporabnikov (#1)", () => {
     setupDefaultMocks();
   });
 
-  // ─── #1: Uspešno dodajanje uporabnika ────────────────────────────────────
-  it("201 — uspešno ustvari novega uporabnika s vsemi podatki", async () => {
+  // ─── #1: Successful user creation ──────────────────────────────────────────
+  it("201 — successfully creates new user with all data", async () => {
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.message).toMatch(/uspešno/i);
+    // Changed from matching Slovene "uspešno" to English message
+    expect(body.message).toMatch(/success/i);
     expect(body.user.email).toBe("test@example.com");
     expect(body.user.username).toBe("testuser");
   });
 
-  it("201 — ustvari uporabnika z vlogo 'user' (privzeto)", async () => {
+  it("201 — creates user with role 'user' (default)", async () => {
     const res = await POST(makeRequest({ ...validBody, system_role: "user" }));
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.user.system_role).toBe("user");
   });
 
-  // ─── #2: Podvajanje uporabniškega imena ──────────────────────────────────
-  it("409 — zavrne uporabnika z obstoječim uporabniškim imenom", async () => {
+  // ─── #2: Duplicate username ────────────────────────────────────────────────
+  it("409 — rejects user with existing username", async () => {
     let ilikeCall = 0;
     mockAdminFrom.mockImplementation(() => ({
       select: jest.fn().mockReturnThis(),
@@ -112,7 +113,7 @@ describe("POST /api/users — dodajanje uporabnikov (#1)", () => {
       ilike: jest.fn().mockReturnValue({
         maybeSingle: jest.fn().mockImplementation(() => {
           ilikeCall++;
-          // Prvi klic = username check → obstaja
+          // First call = username check → exists
           if (ilikeCall === 1)
             return Promise.resolve({ data: { id: "existing" }, error: null });
           return Promise.resolve({ data: null, error: null });
@@ -125,11 +126,12 @@ describe("POST /api/users — dodajanje uporabnikov (#1)", () => {
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(409);
     const body = await res.json();
-    expect(body.error).toMatch(/uporabniško ime/i);
+    // English error check
+    expect(body.error.toLowerCase()).toMatch(/username/i);
   });
 
-  // ─── #3: Sistemske pravice ────────────────────────────────────────────────
-  it("403 — navaden uporabnik ne more ustvariti novega uporabnika", async () => {
+  // ─── #3: System permissions ────────────────────────────────────────────────
+  it("403 — normal user cannot create a new user", async () => {
     mockAdminSingle.mockResolvedValue({
       data: { system_role: "user" },
       error: null,
@@ -138,48 +140,54 @@ describe("POST /api/users — dodajanje uporabnikov (#1)", () => {
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(403);
     const body = await res.json();
-    expect(body.error).toMatch(/administrator/i);
+    // English error: should match "Only administrators can" or "administrator"
+    expect(
+      body.error.toLowerCase()
+    ).toMatch(/administrat(or|ors)/i);
   });
 
-  it("201 — admin lahko ustvari drugega admina", async () => {
+  it("201 — admin can create another admin", async () => {
     const res = await POST(makeRequest({ ...validBody, system_role: "admin" }));
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.user.system_role).toBe("admin");
   });
 
-  // ─── Dodatni testi ────────────────────────────────────────────────────────
-  it("401 — neprijavljen uporabnik", async () => {
+  // ─── Additional tests ──────────────────────────────────────────────────────
+  it("401 — unauthenticated user", async () => {
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
 
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(401);
   });
 
-  it("400 — manjkajoča obvezna polja", async () => {
+  it("400 — missing required fields", async () => {
     const res = await POST(makeRequest({ email: "test@example.com" }));
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/obvezni/i);
+    // Changed error text check from "obvezni" (required) to "required"
+    expect(body.error.toLowerCase()).toMatch(/required/i);
   });
 
-  it("400 — geslo je prekratko (< 12 znakov)", async () => {
+  it("400 — password is too short (< 12 characters)", async () => {
     const res = await POST(makeRequest({ ...validBody, password: "kratek" }));
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/12/i);
+    // Error should mention "12"
+    expect(body.error).toMatch(/12/);
   });
 
-  it("400 — geslo je predolgo (> 64 znakov)", async () => {
+  it("400 — password is too long (> 64 characters)", async () => {
     const res = await POST(
       makeRequest({ ...validBody, password: "a".repeat(65) }),
     );
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/64/i);
+    // Error should mention "64"
+    expect(body.error).toMatch(/64/);
   });
 
-  it("409 — zavrne uporabnika z obstoječim emailom", async () => {
+  it("409 — rejects user with existing email", async () => {
     let ilikeCall = 0;
     mockAdminFrom.mockImplementation(() => ({
       select: jest.fn().mockReturnThis(),
@@ -187,7 +195,7 @@ describe("POST /api/users — dodajanje uporabnikov (#1)", () => {
       ilike: jest.fn().mockReturnValue({
         maybeSingle: jest.fn().mockImplementation(() => {
           ilikeCall++;
-          // Prvi klic = username → ok, drugi klic = email → obstaja
+          // First call = username → ok, second call = email → exists
           if (ilikeCall === 2)
             return Promise.resolve({ data: { id: "existing" }, error: null });
           return Promise.resolve({ data: null, error: null });
@@ -200,6 +208,7 @@ describe("POST /api/users — dodajanje uporabnikov (#1)", () => {
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(409);
     const body = await res.json();
-    expect(body.error).toMatch(/e-pošta/i);
+    // Changed error text check from "e-pošta" (email) to "email"
+    expect(body.error.toLowerCase()).toMatch(/email/i);
   });
 });

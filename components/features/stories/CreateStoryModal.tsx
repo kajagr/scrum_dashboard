@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import type { Priority } from "@/lib/types";
 
 interface CreateStoryModalProps {
@@ -11,10 +10,10 @@ interface CreateStoryModalProps {
 }
 
 const PRIORITIES: { value: Priority; label: string; desc: string; color: string }[] = [
-  { value: "must_have",   label: "Must Have",    desc: "Crucial for success",           color: "text-error border-error-border bg-error-light" },
-  { value: "should_have", label: "Should Have",  desc: "Important, not critical",       color: "text-accent-text border-accent-border bg-accent-light" },
-  { value: "could_have",  label: "Could Have",   desc: "Nice to have, not crucial",     color: "text-primary border-primary-border bg-primary-light" },
-  { value: "wont_have",   label: "Won't Have",   desc: "For the future",                color: "text-muted border-border bg-surface" },
+  { value: "must_have",   label: "Must Have",   desc: "Crucial for success",      color: "text-error border-error-border bg-error-light" },
+  { value: "should_have", label: "Should Have", desc: "Important, not critical",  color: "text-accent-text border-accent-border bg-accent-light" },
+  { value: "could_have",  label: "Could Have",  desc: "Nice to have, not crucial", color: "text-primary border-primary-border bg-primary-light" },
+  { value: "wont_have",   label: "Won't Have",  desc: "For the future",            color: "text-muted border-border bg-surface" },
 ];
 
 const priorityDot: Record<Priority, string> = {
@@ -27,19 +26,15 @@ const priorityDot: Record<Priority, string> = {
 interface FieldError {
   title?: string;
   businessValue?: string;
-  storyPoints?: string;
   priority?: string;
   duplicate?: string;
 }
 
 export default function CreateStoryModal({ isOpen, onClose, projectId }: CreateStoryModalProps) {
-  const router = useRouter();
-
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [acceptanceCriteria, setAcceptanceCriteria] = useState("");
   const [priority, setPriority] = useState<Priority>("should_have");
-  const [storyPoints, setStoryPoints] = useState<number | "">("");
   const [businessValue, setBusinessValue] = useState<number | "">("");
   const [fieldErrors, setFieldErrors] = useState<FieldError>({});
   const [serverError, setServerError] = useState<string | null>(null);
@@ -47,7 +42,6 @@ export default function CreateStoryModal({ isOpen, onClose, projectId }: CreateS
 
   const validate = (): boolean => {
     const errors: FieldError = {};
-
     if (!title.trim()) {
       errors.title = "Title is required.";
     } else if (title.trim().length < 3) {
@@ -55,31 +49,21 @@ export default function CreateStoryModal({ isOpen, onClose, projectId }: CreateS
     } else if (title.trim().length > 200) {
       errors.title = "Title is too long (max 200 characters).";
     }
-
     if (businessValue === "") {
       errors.businessValue = "Business value is required.";
     } else if (!Number.isInteger(Number(businessValue)) || Number(businessValue) < 1 || Number(businessValue) > 100) {
       errors.businessValue = "Business value must be an integer between 1 and 100.";
     }
-
-    if (storyPoints !== "") {
-      const sp = Number(storyPoints);
-      if (!Number.isInteger(sp) || sp < 0) {
-        errors.storyPoints = "Story points must be an integer ≥ 0.";
-      }
-    }
-
     if (!["must_have", "should_have", "could_have", "wont_have"].includes(priority)) {
       errors.priority = "Invalid priority.";
     }
-
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   const handleClose = () => {
     setTitle(""); setDescription(""); setAcceptanceCriteria("");
-    setPriority("should_have"); setStoryPoints(""); setBusinessValue("");
+    setPriority("should_have"); setBusinessValue("");
     setFieldErrors({}); setServerError(null);
     onClose();
   };
@@ -88,7 +72,6 @@ export default function CreateStoryModal({ isOpen, onClose, projectId }: CreateS
     e.preventDefault();
     setServerError(null);
     if (!validate()) return;
-
     setLoading(true);
     try {
       const res = await fetch(`/api/projects/${projectId}/stories`, {
@@ -100,12 +83,11 @@ export default function CreateStoryModal({ isOpen, onClose, projectId }: CreateS
           description: description.trim() || null,
           acceptance_criteria: acceptanceCriteria.trim() || null,
           priority,
-          story_points: storyPoints === "" ? null : storyPoints,
+          story_points: 3,
           business_value: businessValue,
         }),
       });
       const data = await res.json();
-
       if (!res.ok) {
         if (res.status === 409) {
           setFieldErrors({ duplicate: `A story with the title "${title.trim()}" already exists in this project.` });
@@ -119,9 +101,7 @@ export default function CreateStoryModal({ isOpen, onClose, projectId }: CreateS
         setLoading(false);
         return;
       }
-
       handleClose();
-      router.refresh();
     } catch {
       setServerError("A server error occurred.");
       setLoading(false);
@@ -142,11 +122,9 @@ export default function CreateStoryModal({ isOpen, onClose, projectId }: CreateS
       <div className="absolute inset-0 backdrop-blur-sm bg-foreground/30" onClick={handleClose} />
 
       <div className="relative w-full max-w-xl mx-4 rounded-2xl overflow-hidden shadow-2xl bg-surface max-h-[92vh] flex flex-col">
-        {/* Top accent bar */}
         <div className="h-1 w-full bg-gradient-to-r from-primary to-accent flex-shrink-0" />
 
         <div className="p-7 flex flex-col overflow-hidden flex-1">
-          {/* Header */}
           <div className="flex items-center justify-between mb-6 flex-shrink-0">
             <div>
               <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-0.5">Backlog</p>
@@ -233,37 +211,22 @@ export default function CreateStoryModal({ isOpen, onClose, projectId }: CreateS
               {fieldErrors.priority && <p className="text-xs text-error mt-1">{fieldErrors.priority}</p>}
             </div>
 
-            {/* Story Points + Business Value */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className={labelClass}>Story Points</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={storyPoints}
-                  onChange={(e) => { setStoryPoints(e.target.value === "" ? "" : Number(e.target.value)); setFieldErrors((f) => ({ ...f, storyPoints: undefined })); }}
-                  placeholder="e.g. 5"
-                  className={inputClass(!!fieldErrors.storyPoints)}
-                />
-                {fieldErrors.storyPoints && <p className="text-xs text-error mt-1">{fieldErrors.storyPoints}</p>}
-              </div>
-              <div>
-                <label className={labelClass}>
-                  Business Value <span className="text-error normal-case font-normal tracking-normal">*</span>
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="100"
-                  step="1"
-                  value={businessValue}
-                  onChange={(e) => { setBusinessValue(e.target.value === "" ? "" : Number(e.target.value)); setFieldErrors((f) => ({ ...f, businessValue: undefined })); }}
-                  placeholder="1 – 100"
-                  className={inputClass(!!fieldErrors.businessValue)}
-                />
-                {fieldErrors.businessValue && <p className="text-xs text-error mt-1">{fieldErrors.businessValue}</p>}
-              </div>
+            {/* Business Value */}
+            <div>
+              <label className={labelClass}>
+                Business Value <span className="text-error normal-case font-normal tracking-normal">*</span>
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="100"
+                step="1"
+                value={businessValue}
+                onChange={(e) => { setBusinessValue(e.target.value === "" ? "" : Number(e.target.value)); setFieldErrors((f) => ({ ...f, businessValue: undefined })); }}
+                placeholder="1 – 100"
+                className={inputClass(!!fieldErrors.businessValue)}
+              />
+              {fieldErrors.businessValue && <p className="text-xs text-error mt-1">{fieldErrors.businessValue}</p>}
             </div>
 
             {/* Server error */}
