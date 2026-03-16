@@ -14,6 +14,143 @@ const ALLOWED_PRIORITIES = [
   "wont_have",
 ] as const;
 
+/**
+ * @swagger
+ * /api/stories/{storyId}:
+ *   patch:
+ *     summary: Update a user story
+ *     description: >
+ *       Updates an existing user story. Only Product Owners and Scrum Masters can edit stories.
+ *       Stories assigned to a sprint or with status "done" cannot be edited.
+ *       Story titles must remain unique within the project.
+ *     tags:
+ *       - Stories
+ *     parameters:
+ *       - in: path
+ *         name: storyId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the user story to update
+ *         example: "c3d4e5f6-a7b8-9012-cdef-123456789012"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - priority
+ *               - business_value
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 description: Must be unique within the project
+ *                 example: "As a user, I want to log in"
+ *               description:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "User should be able to log in with email and password."
+ *               acceptance_criteria:
+ *                 type: string
+ *                 nullable: true
+ *                 example: "Login form is visible. Error shown on wrong credentials."
+ *               priority:
+ *                 type: string
+ *                 enum: [must_have, should_have, could_have, wont_have]
+ *                 example: "must_have"
+ *               business_value:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 100
+ *                 example: 10
+ *               story_points:
+ *                 type: integer
+ *                 nullable: true
+ *                 minimum: 0
+ *                 example: 3
+ *     responses:
+ *       200:
+ *         description: User story updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserStory'
+ *       400:
+ *         description: Validation failed or story cannot be edited
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   examples:
+ *                     inSprint:
+ *                       value: "Zgodbe, ki je dodeljena sprintu, ni mogoče urejati."
+ *                     isDone:
+ *                       value: "Realizirane zgodbe ni mogoče urejati."
+ *                     missingFields:
+ *                       value: "title, priority in business_value so obvezni."
+ *                     invalidPriority:
+ *                       value: "Neveljavna prioriteta."
+ *                     invalidBusinessValue:
+ *                       value: "business_value mora biti med 1 in 100."
+ *                     invalidStoryPoints:
+ *                       value: "story_points mora biti 0 ali več."
+ *       401:
+ *         description: User not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Unauthorized"
+ *       403:
+ *         description: User does not have permission to edit the story
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Nimaš pravic za urejanje zgodbe."
+ *       404:
+ *         description: User story not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Zgodba ne obstaja."
+ *       409:
+ *         description: A user story with this title already exists in the project
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "User story s tem naslovom že obstaja."
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Napaka pri urejanju zgodbe."
+ */
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     const supabase = await createClient();
@@ -28,7 +165,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 1. preberi obstoječo zgodbo
     const { data: story, error: storyError } = await supabase
       .from("user_stories")
       .select("id, project_id, title, status, sprint_id")
@@ -46,7 +182,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // 2. preveri role na projektu
     const { data: membership, error: membershipError } = await supabase
       .from("project_members")
       .select("role")
@@ -71,7 +206,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // 3. zgodba ne sme biti v sprintu
     if (story.sprint_id) {
       return NextResponse.json(
         { error: "Zgodbe, ki je dodeljena sprintu, ni mogoče urejati." },
@@ -79,7 +213,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // 4. zgodba ne sme biti realizirana
     if (story.status === "done") {
       return NextResponse.json(
         { error: "Realizirane zgodbe ni mogoče urejati." },
@@ -87,7 +220,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // 5. preberi body
     const body = await request.json();
 
     const title = body.title?.trim();
@@ -142,7 +274,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // 6. preveri podvajanje naslova v istem projektu
     const { data: duplicateStory, error: duplicateError } = await supabase
       .from("user_stories")
       .select("id")
@@ -165,7 +296,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // 7. update
     const { data: updatedStory, error: updateError } = await supabase
       .from("user_stories")
       .update({
@@ -203,6 +333,91 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 }
 
+/**
+ * @swagger
+ * /api/stories/{storyId}:
+ *   delete:
+ *     summary: Delete a user story
+ *     description: >
+ *       Deletes a user story. Only Product Owners and Scrum Masters can delete stories.
+ *       Stories assigned to a sprint or with status "done" cannot be deleted.
+ *     tags:
+ *       - Stories
+ *     parameters:
+ *       - in: path
+ *         name: storyId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the user story to delete
+ *         example: "c3d4e5f6-a7b8-9012-cdef-123456789012"
+ *     responses:
+ *       200:
+ *         description: User story deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Zgodba uspešno izbrisana."
+ *       400:
+ *         description: Story cannot be deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   examples:
+ *                     inSprint:
+ *                       value: "Zgodbe, ki je dodeljena sprintu, ni mogoče izbrisati."
+ *                     isDone:
+ *                       value: "Realizirane zgodbe ni mogoče izbrisati."
+ *       401:
+ *         description: User not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Unauthorized"
+ *       403:
+ *         description: User does not have permission to delete the story
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Nimaš pravic za brisanje zgodbe."
+ *       404:
+ *         description: User story not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Zgodba ne obstaja."
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Napaka pri brisanju zgodbe."
+ */
 export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
     const supabase = await createClient();
@@ -217,7 +432,6 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 1. preberi zgodbo
     const { data: story, error: storyError } = await supabase
       .from("user_stories")
       .select("id, project_id, status, sprint_id")
@@ -235,7 +449,6 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // 2. preveri role
     const { data: membership, error: membershipError } = await supabase
       .from("project_members")
       .select("role")
@@ -260,7 +473,6 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // 3. ne dovoli brisanja, če je v sprintu
     if (story.sprint_id) {
       return NextResponse.json(
         { error: "Zgodbe, ki je dodeljena sprintu, ni mogoče izbrisati." },
@@ -268,7 +480,6 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // 4. ne dovoli brisanja, če je realizirana
     if (story.status === "done") {
       return NextResponse.json(
         { error: "Realizirane zgodbe ni mogoče izbrisati." },
@@ -276,7 +487,6 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // 5. izbriši
     const { error: deleteError } = await supabase
       .from("user_stories")
       .delete()

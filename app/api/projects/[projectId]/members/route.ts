@@ -10,7 +10,105 @@ interface MemberInput {
   role: ProjectRole;
 }
 
-// GET /api/projects/[id]/members - Fetch all members of a project
+/**
+ * @swagger
+ * /api/projects/{projectId}/members:
+ *   get:
+ *     summary: Get all project members
+ *     description: Returns all members of a project along with their user details and project role.
+ *     tags:
+ *       - Members
+ *     parameters:
+ *       - in: path
+ *         name: projectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the project
+ *         example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+ *     responses:
+ *       200:
+ *         description: List of project members
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: string
+ *                     format: uuid
+ *                     example: "e5f6a7b8-c9d0-1234-efab-567890123456"
+ *                   project_id:
+ *                     type: string
+ *                     format: uuid
+ *                     example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+ *                   user_id:
+ *                     type: string
+ *                     format: uuid
+ *                     example: "d5e8f1a2-3b4c-5d6e-7f8a-9b0c1d2e3f4a"
+ *                   role:
+ *                     type: string
+ *                     enum: [product_owner, scrum_master, developer]
+ *                     example: "developer"
+ *                   user:
+ *                     $ref: '#/components/schemas/UserSummary'
+ *       401:
+ *         description: User not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Unauthorized"
+ *       404:
+ *         description: Project not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Projekt ne obstaja."
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Napaka pri pridobivanju članov."
+ *
+ * components:
+ *   schemas:
+ *     UserSummary:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *           example: "d5e8f1a2-3b4c-5d6e-7f8a-9b0c1d2e3f4a"
+ *         email:
+ *           type: string
+ *           format: email
+ *           example: "janez.novak@example.com"
+ *         username:
+ *           type: string
+ *           example: "janez.novak"
+ *         first_name:
+ *           type: string
+ *           example: "Janez"
+ *         last_name:
+ *           type: string
+ *           example: "Novak"
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
@@ -25,7 +123,6 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Preveri ali projekt obstaja
     const { data: project } = await supabase
       .from("projects")
       .select("id")
@@ -36,7 +133,6 @@ export async function GET(
       return NextResponse.json({ error: "Projekt ne obstaja." }, { status: 404 });
     }
 
-    // Fetch members with user details
     const { data: members, error } = await supabase
       .from("project_members")
       .select(`
@@ -58,7 +154,147 @@ export async function GET(
   }
 }
 
-// POST /api/projects/[id]/members - Add members to project (bulk)
+/**
+ * @swagger
+ * /api/projects/{projectId}/members:
+ *   post:
+ *     summary: Add members to project
+ *     description: >
+ *       Bulk-adds one or more users to a project with specified roles.
+ *       Only users with member management permissions can perform this action.
+ *       All inserts are atomic — if any fail, none are added.
+ *     tags:
+ *       - Members
+ *     parameters:
+ *       - in: path
+ *         name: projectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the project
+ *         example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - members
+ *             properties:
+ *               members:
+ *                 type: array
+ *                 minItems: 1
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - user_id
+ *                     - role
+ *                   properties:
+ *                     user_id:
+ *                       type: string
+ *                       format: uuid
+ *                       example: "d5e8f1a2-3b4c-5d6e-7f8a-9b0c1d2e3f4a"
+ *                     role:
+ *                       type: string
+ *                       enum: [product_owner, scrum_master, developer]
+ *                       example: "developer"
+ *     responses:
+ *       201:
+ *         description: Members successfully added
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Uspešno dodanih 2 članov."
+ *                 members:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         format: uuid
+ *                         example: "e5f6a7b8-c9d0-1234-efab-567890123456"
+ *                       project_id:
+ *                         type: string
+ *                         format: uuid
+ *                         example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+ *                       user_id:
+ *                         type: string
+ *                         format: uuid
+ *                         example: "d5e8f1a2-3b4c-5d6e-7f8a-9b0c1d2e3f4a"
+ *                       role:
+ *                         type: string
+ *                         enum: [product_owner, scrum_master, developer]
+ *                         example: "developer"
+ *                       user:
+ *                         $ref: '#/components/schemas/UserSummary'
+ *       400:
+ *         description: Validation failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   examples:
+ *                     emptyList:
+ *                       value: "Seznam članov je obvezen."
+ *                     duplicates:
+ *                       value: "Seznam vsebuje podvojene uporabnike."
+ *                     invalidRole:
+ *                       value: "Neveljavna vloga: manager. Veljavne vloge so: product_owner, scrum_master, developer"
+ *                     missingUsers:
+ *                       value: "Naslednji uporabniki ne obstajajo: d5e8f1a2-3b4c-5d6e-7f8a-9b0c1d2e3f4a"
+ *                     alreadyMembers:
+ *                       value: "Naslednji uporabniki so že člani projekta: janez.novak"
+ *       401:
+ *         description: User not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Unauthorized"
+ *       403:
+ *         description: User does not have permission to manage members
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Nimaš pravic za upravljanje članov tega projekta."
+ *       404:
+ *         description: Project not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Projekt ne obstaja."
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Napaka pri obdelavi zahteve."
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
@@ -73,7 +309,6 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Preveri ali lahko uporabnik upravlja člane
     const canManage = await canManageProjectMembers(user.id, projectId);
     if (!canManage) {
       return NextResponse.json(
@@ -82,7 +317,6 @@ export async function POST(
       );
     }
 
-    // Preveri ali projekt obstaja
     const { data: project } = await supabase
       .from("projects")
       .select("id")
@@ -96,7 +330,6 @@ export async function POST(
     const body = await request.json();
     const { members } = body as { members: MemberInput[] };
 
-    // Validacija: members array obstaja in ni prazen
     if (!members || !Array.isArray(members) || members.length === 0) {
       return NextResponse.json(
         { error: "Seznam članov je obvezen." },
@@ -104,7 +337,6 @@ export async function POST(
       );
     }
 
-    // Validacija: preveri duplikate v requestu
     const userIds = members.map((m) => m.user_id);
     const uniqueUserIds = new Set(userIds);
     if (uniqueUserIds.size !== userIds.length) {
@@ -114,7 +346,6 @@ export async function POST(
       );
     }
 
-    // Validacija: vse vloge so veljavne
     for (const member of members) {
       if (!VALID_ROLES.includes(member.role)) {
         return NextResponse.json(
@@ -124,7 +355,6 @@ export async function POST(
       }
     }
 
-    // Validacija: vsi uporabniki obstajajo
     const { data: existingUsers } = await supabase
       .from("users")
       .select("id")
@@ -140,7 +370,6 @@ export async function POST(
       );
     }
 
-    // Validacija: uporabniki še niso člani projekta
     const { data: existingMembers } = await supabase
       .from("project_members")
       .select("user_id")
@@ -149,7 +378,6 @@ export async function POST(
 
     const alreadyMembers = existingMembers?.map((m) => m.user_id) || [];
     if (alreadyMembers.length > 0) {
-      // Pridobi usernames za boljše sporočilo
       const { data: alreadyMemberUsers } = await supabase
         .from("users")
         .select("username")
@@ -162,14 +390,12 @@ export async function POST(
       );
     }
 
-    // Pripravi podatke za insert
     const memberInserts = members.map((member) => ({
       project_id: projectId,
       user_id: member.user_id,
       role: member.role,
     }));
 
-    // Insert vseh članov (atomic operacija - Supabase insert je transactional)
     const { data: insertedMembers, error: insertError } = await supabase
       .from("project_members")
       .insert(memberInserts)
