@@ -52,7 +52,7 @@ type RouteContext = {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Napaka pri pridobivanju nalog."
+ *                   example: "Error creating task."
  *
  * components:
  *   schemas:
@@ -98,7 +98,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const supabase = await createClient();
     const { storyId } = await context.params;
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -106,10 +108,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const { data, error } = await supabase
       .from("tasks")
-      .select(`
+      .select(
+        `
         *,
         assignee:users(id, first_name, last_name, email)
-      `)
+      `,
+      )
       .eq("user_story_id", storyId)
       .order("position", { ascending: true });
 
@@ -120,8 +124,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return NextResponse.json(data);
   } catch {
     return NextResponse.json(
-      { error: "Napaka pri pridobivanju nalog." },
-      { status: 500 }
+      { error: "Error creating task." },
+      { status: 500 },
     );
   }
 }
@@ -190,21 +194,21 @@ export async function GET(request: NextRequest, context: RouteContext) {
  *                   type: string
  *                   examples:
  *                     storyDone:
- *                       value: "Naloge ni mogoče dodati k že realizirani zgodbi."
+ *                       value: "Cannot add a task to a completed story."
  *                     notInSprint:
- *                       value: "Naloge je mogoče dodati samo zgodbam v aktivnem sprintu."
+ *                       value: "Tasks can only be added to stories in an active sprint."
  *                     sprintNotActive:
- *                       value: "Naloge je mogoče dodati samo zgodbam v aktivnem sprintu."
+ *                       value: "Tasks can only be added to stories in an active sprint."
  *                     missingDescription:
- *                       value: "Opis naloge je obvezen."
+ *                       value: "Task description is required."
  *                     missingHours:
- *                       value: "Ocena časa je obvezna."
+ *                       value: "Estimated hours are required."
  *                     invalidHours:
- *                       value: "Ocena časa mora biti pozitivna številka."
+ *                       value: "Estimated hours must be a positive number."
  *                     assigneeNotMember:
- *                       value: "Izbrani član ni del tega projekta."
+ *                       value: "The selected user is not a member of this project."
  *                     assigneeWrongRole:
- *                       value: "Naloge lahko prevzamejo samo razvijalci in skrbniki metodologije."
+ *                       value: "Only developers and Scrum Masters can be assigned tasks."
  *       401:
  *         description: User not authenticated
  *         content:
@@ -226,9 +230,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
  *                   type: string
  *                   examples:
  *                     notMember:
- *                       value: "Nisi član tega projekta."
+ *                       value: "You are not a member of this project."
  *                     wrongRole:
- *                       value: "Samo skrbnik metodologije in razvijalci lahko dodajajo naloge."
+ *                       value: "Only Scrum Masters and developers can add tasks."
  *       404:
  *         description: User story not found
  *         content:
@@ -238,7 +242,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Uporabniška zgodba ne obstaja."
+ *                   example: "User story not found."
  *       500:
  *         description: Internal server error
  *         content:
@@ -248,14 +252,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Napaka pri ustvarjanju naloge."
+ *                   example: "Error creating task."
  */
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const supabase = await createClient();
     const { storyId } = await context.params;
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -273,22 +279,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     if (!story) {
       return NextResponse.json(
-        { error: "Uporabniška zgodba ne obstaja." },
-        { status: 404 }
+        { error: "User story not found." },
+        { status: 404 },
       );
     }
 
     if (story.status === "done") {
       return NextResponse.json(
-        { error: "Naloge ni mogoče dodati k že realizirani zgodbi." },
-        { status: 400 }
+        { error: "Cannot add a task to a completed story." },
+        { status: 400 },
       );
     }
 
     if (!story.sprint_id) {
       return NextResponse.json(
-        { error: "Naloge je mogoče dodati samo zgodbam v aktivnem sprintu." },
-        { status: 400 }
+        { error: "Tasks can only be added to stories in an active sprint." },
+        { status: 400 },
       );
     }
 
@@ -299,21 +305,21 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .maybeSingle();
 
     if (sprintError || !sprint) {
-      return NextResponse.json(
-        { error: "Sprint ne obstaja." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Sprint not found." }, { status: 400 });
     }
 
     const today = new Date().toISOString().split("T")[0];
     const sprintStatus =
-      today < sprint.start_date ? "planned" :
-      today > sprint.end_date ? "completed" : "active";
+      today < sprint.start_date
+        ? "planned"
+        : today > sprint.end_date
+          ? "completed"
+          : "active";
 
     if (sprintStatus !== "active") {
       return NextResponse.json(
-        { error: "Naloge je mogoče dodati samo zgodbam v aktivnem sprintu." },
-        { status: 400 }
+        { error: "Tasks can only be added to stories in an active sprint." },
+        { status: 400 },
       );
     }
 
@@ -330,15 +336,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     if (!membership) {
       return NextResponse.json(
-        { error: "Nisi član tega projekta." },
-        { status: 403 }
+        { error: "You are not a member of this project." },
+        { status: 403 },
       );
     }
 
     if (membership.role !== "scrum_master" && membership.role !== "developer") {
       return NextResponse.json(
-        { error: "Samo skrbnik metodologije in razvijalci lahko dodajajo naloge." },
-        { status: 403 }
+        {
+          error: "Only Scrum Masters and developers can add tasks.",
+        },
+        { status: 403 },
       );
     }
 
@@ -349,23 +357,27 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     if (!description) {
       return NextResponse.json(
-        { error: "Opis naloge je obvezen." },
-        { status: 400 }
+        { error: "Task description is required." },
+        { status: 400 },
       );
     }
 
-    if (estimatedHours === undefined || estimatedHours === null || estimatedHours === "") {
+    if (
+      estimatedHours === undefined ||
+      estimatedHours === null ||
+      estimatedHours === ""
+    ) {
       return NextResponse.json(
-        { error: "Ocena časa je obvezna." },
-        { status: 400 }
+        { error: "Estimated hours are required." },
+        { status: 400 },
       );
     }
 
     const hours = Number(estimatedHours);
     if (!Number.isFinite(hours) || hours <= 0) {
       return NextResponse.json(
-        { error: "Ocena časa mora biti pozitivna številka." },
-        { status: 400 }
+        { error: "Estimated hours must be a positive number." },
+        { status: 400 },
       );
     }
 
@@ -378,20 +390,28 @@ export async function POST(request: NextRequest, context: RouteContext) {
         .maybeSingle();
 
       if (assigneeError) {
-        return NextResponse.json({ error: assigneeError.message }, { status: 500 });
+        return NextResponse.json(
+          { error: assigneeError.message },
+          { status: 500 },
+        );
       }
 
       if (!assigneeMembership) {
         return NextResponse.json(
-          { error: "Izbrani član ni del tega projekta." },
-          { status: 400 }
+          { error: "The selected user is not a member of this project." },
+          { status: 400 },
         );
       }
 
-      if (assigneeMembership.role !== "developer" && assigneeMembership.role !== "scrum_master") {
+      if (
+        assigneeMembership.role !== "developer" &&
+        assigneeMembership.role !== "scrum_master"
+      ) {
         return NextResponse.json(
-          { error: "Naloge lahko prevzamejo samo razvijalci in skrbniki metodologije." },
-          { status: 400 }
+          {
+            error: "Only developers and Scrum Masters can be assigned tasks.",
+          },
+          { status: 400 },
         );
       }
     }
@@ -416,10 +436,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
         status: "unassigned",
         position: nextPosition,
       })
-      .select(`
+      .select(
+        `
         *,
         assignee:users(id, first_name, last_name, email)
-      `)
+      `,
+      )
       .single();
 
     if (insertError) {
@@ -429,8 +451,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json(task, { status: 201 });
   } catch {
     return NextResponse.json(
-      { error: "Napaka pri ustvarjanju naloge." },
-      { status: 500 }
+      { error: "Error creating task." },
+      { status: 500 },
     );
   }
 }

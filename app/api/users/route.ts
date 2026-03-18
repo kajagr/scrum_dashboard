@@ -71,7 +71,7 @@ const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Samo administrator lahko vidi vse uporabnike."
+ *                   example: "Only administrators can view all users."
  *       500:
  *         description: Internal server error
  *         content:
@@ -81,7 +81,7 @@ const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Napaka pri pridobivanju uporabnikov."
+ *                   example: "An error occurred while fetching users."
  */
 export async function GET() {
   try {
@@ -102,7 +102,7 @@ export async function GET() {
 
     if (currentUserData?.system_role !== "admin") {
       return NextResponse.json(
-        { error: "Samo administrator lahko vidi vse uporabnike." },
+        { error: "Only administrators can view all users." },
         { status: 403 },
       );
     }
@@ -119,7 +119,7 @@ export async function GET() {
     return NextResponse.json(data);
   } catch {
     return NextResponse.json(
-      { error: "Napaka pri pridobivanju uporabnikov." },
+      { error: "An error occurred while fetching users." },
       { status: 500 },
     );
   }
@@ -157,7 +157,7 @@ export async function GET() {
  *                 type: string
  *                 format: password
  *                 description: Min 12, max 64 characters
- *                 example: "mocno_geslo_123"
+ *                 example: "strong_password_123"
  *               username:
  *                 type: string
  *                 description: Must be unique (case-insensitive)
@@ -185,7 +185,7 @@ export async function GET() {
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "Uporabnik uspešno ustvarjen."
+ *                   example: "User created successfully."
  *                 user:
  *                   type: object
  *                   properties:
@@ -215,11 +215,11 @@ export async function GET() {
  *                   type: string
  *                   examples:
  *                     missingFields:
- *                       value: "Email, geslo in uporabniško ime so obvezni."
+ *                       value: "Email, password and username are required."
  *                     passwordTooShort:
- *                       value: "Geslo mora imeti vsaj 12 znakov."
+ *                       value: "Password must be at least 12 characters."
  *                     passwordTooLong:
- *                       value: "Geslo ima lahko največ 64 znakov."
+ *                       value: "Password cannot be longer than 64 characters."
  *       401:
  *         description: User not authenticated
  *         content:
@@ -239,7 +239,7 @@ export async function GET() {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Samo administrator lahko ustvarja uporabnike."
+ *                   example: "Only administrators can create users."
  *       409:
  *         description: Username or email already exists
  *         content:
@@ -251,9 +251,9 @@ export async function GET() {
  *                   type: string
  *                   examples:
  *                     duplicateUsername:
- *                       value: "Uporabniško ime že obstaja."
+ *                       value: "Username already exists."
  *                     duplicateEmail:
- *                       value: "E-pošta že obstaja."
+ *                       value: "Email already exists."
  *       500:
  *         description: Internal server error
  *         content:
@@ -263,7 +263,7 @@ export async function GET() {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Napaka pri ustvarjanju profila: ..."
+ *                   example: "Error creating user profile: ..."
  */
 export async function POST(req: Request) {
   try {
@@ -284,7 +284,7 @@ export async function POST(req: Request) {
 
     if (currentUserData?.system_role !== "admin") {
       return NextResponse.json(
-        { error: "Samo administrator lahko ustvarja uporabnike." },
+        { error: "Only administrators can create users." },
         { status: 403 },
       );
     }
@@ -300,21 +300,21 @@ export async function POST(req: Request) {
 
     if (!email || !password || !username) {
       return NextResponse.json(
-        { error: "Email, geslo in uporabniško ime so obvezni." },
+        { error: "Email, password and username are required." },
         { status: 400 },
       );
     }
 
     if (password.length < 12) {
       return NextResponse.json(
-        { error: "Geslo mora imeti vsaj 12 znakov." },
+        { error: "Password must be at least 12 characters." },
         { status: 400 },
       );
     }
 
     if (password.length > 64) {
       return NextResponse.json(
-        { error: "Geslo ima lahko največ 64 znakov." },
+        { error: "Password cannot be longer than 64 characters." },
         { status: 400 },
       );
     }
@@ -327,7 +327,7 @@ export async function POST(req: Request) {
 
     if (existingUsername) {
       return NextResponse.json(
-        { error: "Uporabniško ime že obstaja." },
+        { error: "Username already exists." },
         { status: 409 },
       );
     }
@@ -340,7 +340,7 @@ export async function POST(req: Request) {
 
     if (existingEmail) {
       return NextResponse.json(
-        { error: "E-pošta že obstaja." },
+        { error: "Email already exists." },
         { status: 409 },
       );
     }
@@ -354,7 +354,7 @@ export async function POST(req: Request) {
 
     if (authError || !authData.user) {
       return NextResponse.json(
-        { error: authError?.message || "Napaka pri ustvarjanju uporabnika." },
+        { error: authError?.message || "Error creating user." },
         { status: 400 },
       );
     }
@@ -372,14 +372,14 @@ export async function POST(req: Request) {
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
 
       return NextResponse.json(
-        { error: "Napaka pri ustvarjanju profila: " + profileError.message },
+        { error: "Error creating user profile: " + profileError.message },
         { status: 500 },
       );
     }
 
     return NextResponse.json(
       {
-        message: "Uporabnik uspešno ustvarjen.",
+        message: "User created successfully.",
         user: {
           id: authData.user.id,
           email,
@@ -391,7 +391,7 @@ export async function POST(req: Request) {
     );
   } catch {
     return NextResponse.json(
-      { error: "Napaka pri obdelavi zahteve." },
+      { error: "An error occurred while processing the request." },
       { status: 400 },
     );
   }

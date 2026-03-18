@@ -43,8 +43,8 @@ const validBody = {
   email: "test@example.com",
   password: "geslo12345678",
   username: "testuser",
-  first_name: "Janez",
-  last_name: "Novak",
+  first_name: "Jane",
+  last_name: "Doe",
   system_role: "user",
 };
 
@@ -75,29 +75,6 @@ function setupDefaultMocks() {
   }));
 }
 
-// Map Slovene error/success messages to English substring equivalents for test matching
-function translateForTest(input: string): string {
-  // Map Slovene messages to their intended semantic English for pattern match
-  // This could be expanded if more messages are present
-  const replacements: Array<[RegExp, string]> = [
-    // Success
-    [/uporabnik uspešno ustvarjen\./i, "user successfully created."],
-    // Username duplicate
-    [/uporabniško ime že obstaja\./i, "username already exists."],
-    // Email duplicate
-    [/e-pošta že obstaja\./i, "email already exists."],
-    // Missing required fields
-    [/email, geslo in uporabniško ime so obvezni\./i, "required."],
-  ];
-  let translated = input;
-  for (const [pattern, replacement] of replacements) {
-    if (pattern.test(translated)) {
-      translated = replacement;
-    }
-  }
-  return translated;
-}
-
 // ─── TESTS ────────────────────────────────────────────────────────────────────
 describe("POST /api/users — adding users (#1)", () => {
   beforeEach(() => {
@@ -109,13 +86,12 @@ describe("POST /api/users — adding users (#1)", () => {
     setupDefaultMocks();
   });
 
-  // ─── #1: Successful user creation ──────────────────────────────────────────
+  // ─── #1: Successful user creation ────────────────────────────────────────
   it("201 — successfully creates new user with all data", async () => {
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(typeof body.message).toBe("string");
-    expect(translateForTest(body.message.toLowerCase())).toMatch(/success|created/);
+    expect(body.message).toMatch(/user created successfully/i);
     expect(body.user.email).toBe("test@example.com");
     expect(body.user.username).toBe("testuser");
   });
@@ -127,7 +103,14 @@ describe("POST /api/users — adding users (#1)", () => {
     expect(body.user.system_role).toBe("user");
   });
 
-  // ─── #2: Duplicate username ────────────────────────────────────────────────
+  it("201 — admin can create another admin", async () => {
+    const res = await POST(makeRequest({ ...validBody, system_role: "admin" }));
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.user.system_role).toBe("admin");
+  });
+
+  // ─── #2: Duplicate username ───────────────────────────────────────────────
   it("409 — rejects user with existing username", async () => {
     let ilikeCall = 0;
     mockAdminFrom.mockImplementation(() => ({
@@ -149,66 +132,10 @@ describe("POST /api/users — adding users (#1)", () => {
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(409);
     const body = await res.json();
-    expect(typeof body.error).toBe("string");
-    expect(translateForTest(body.error.toLowerCase())).toMatch(/username/);
+    expect(body.error).toMatch(/username already exists/i);
   });
 
-  // ─── #3: System permissions ────────────────────────────────────────────────
-  it("403 — normal user cannot create a new user", async () => {
-    mockAdminSingle.mockResolvedValue({
-      data: { system_role: "user" },
-      error: null,
-    });
-
-    const res = await POST(makeRequest(validBody));
-    expect(res.status).toBe(403);
-    const body = await res.json();
-    expect(typeof body.error).toBe("string");
-    // No translation attempted here since we don't have Slovene in the case of admin-only error
-    expect(body.error.toLowerCase()).toMatch(/administrator|only administrators can|administrators? only/);
-  });
-
-  it("201 — admin can create another admin", async () => {
-    const res = await POST(makeRequest({ ...validBody, system_role: "admin" }));
-    expect(res.status).toBe(201);
-    const body = await res.json();
-    expect(body.user.system_role).toBe("admin");
-  });
-
-  // ─── Additional tests ──────────────────────────────────────────────────────
-  it("401 — unauthenticated user", async () => {
-    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
-
-    const res = await POST(makeRequest(validBody));
-    expect(res.status).toBe(401);
-  });
-
-  it("400 — missing required fields", async () => {
-    const res = await POST(makeRequest({ email: "test@example.com" }));
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(typeof body.error).toBe("string");
-    expect(translateForTest(body.error.toLowerCase())).toMatch(/required/);
-  });
-
-  it("400 — password is too short (< 12 characters)", async () => {
-    const res = await POST(makeRequest({ ...validBody, password: "kratek" }));
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(typeof body.error).toBe("string");
-    expect(body.error).toMatch(/12/);
-  });
-
-  it("400 — password is too long (> 64 characters)", async () => {
-    const res = await POST(
-      makeRequest({ ...validBody, password: "a".repeat(65) }),
-    );
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(typeof body.error).toBe("string");
-    expect(body.error).toMatch(/64/);
-  });
-
+  // ─── #3: Duplicate email ──────────────────────────────────────────────────
   it("409 — rejects user with existing email", async () => {
     let ilikeCall = 0;
     mockAdminFrom.mockImplementation(() => ({
@@ -230,7 +157,76 @@ describe("POST /api/users — adding users (#1)", () => {
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(409);
     const body = await res.json();
-    expect(typeof body.error).toBe("string");
-    expect(translateForTest(body.error.toLowerCase())).toMatch(/email/);
+    expect(body.error).toMatch(/email already exists/i);
+  });
+
+  // ─── #4: Permissions ─────────────────────────────────────────────────────
+  it("403 — non-admin user cannot create a new user", async () => {
+    mockAdminSingle.mockResolvedValue({
+      data: { system_role: "user" },
+      error: null,
+    });
+
+    const res = await POST(makeRequest(validBody));
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toMatch(/only administrators can create users/i);
+  });
+
+  // ─── #5: Authentication ───────────────────────────────────────────────────
+  it("401 — unauthenticated user cannot create a user", async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+
+    const res = await POST(makeRequest(validBody));
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toMatch(/unauthorized/i);
+  });
+
+  // ─── #6: Validation ───────────────────────────────────────────────────────
+  it("400 — missing required fields (email, password, username)", async () => {
+    const res = await POST(makeRequest({ email: "test@example.com" }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/email, password and username are required/i);
+  });
+
+  it("400 — password is too short (< 12 characters)", async () => {
+    const res = await POST(makeRequest({ ...validBody, password: "short" }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/at least 12 characters/i);
+  });
+
+  it("400 — password is too long (> 64 characters)", async () => {
+    const res = await POST(
+      makeRequest({ ...validBody, password: "a".repeat(65) }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/longer than 64 characters/i);
+  });
+
+  // ─── #7: Profile creation failure rolls back auth user ───────────────────
+  it("500 — deletes auth user if profile insert fails", async () => {
+    mockAdminDeleteUser.mockResolvedValue({ error: null });
+
+    mockAdminFrom.mockImplementation(() => ({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      ilike: jest.fn().mockReturnValue({
+        maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+      }),
+      insert: jest.fn().mockResolvedValue({
+        error: { message: "DB constraint violation" },
+      }),
+      single: mockAdminSingle,
+    }));
+
+    const res = await POST(makeRequest(validBody));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toMatch(/error creating user profile/i);
+    expect(mockAdminDeleteUser).toHaveBeenCalledWith("new-user-1");
   });
 });

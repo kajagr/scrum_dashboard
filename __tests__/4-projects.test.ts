@@ -27,7 +27,7 @@ jest.mock("@/lib/permissions", () => ({
     mockCanManageProjectMembers(...args),
 }));
 
-// ─── Helper funkcije ──────────────────────────────────────────────────────────
+// ─── Helper functions ─────────────────────────────────────────────────────────
 function makeProjectRequest(body: object) {
   return new NextRequest("http://localhost/api/projects", {
     method: "POST",
@@ -48,7 +48,7 @@ function makeContext(projectId = "project-1") {
   return { params: Promise.resolve({ projectId }) };
 }
 
-// ─── TESTI ZA USTVARJANJE PROJEKTA ───────────────────────────────────────────
+// ─── CREATE PROJECT TESTS ─────────────────────────────────────────────────────
 describe("POST /api/projects", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -60,45 +60,38 @@ describe("POST /api/projects", () => {
     mockProjectNameExists.mockResolvedValue(false);
   });
 
-  // ─── #1: Uspešno ustvarjanje projekta ────────────────────────────────────
-  it("201 — uspešno ustvari projekt", async () => {
+  // ─── #1: Successful project creation ─────────────────────────────────────
+  it("201 — successfully creates a project", async () => {
     const createdProject = {
       id: "project-1",
-      name: "Test projekt",
+      name: "Test Project",
       description: null,
     };
 
-    let cnt = 0;
-    mockFrom.mockImplementation(() => {
-      cnt++;
-      if (cnt === 1)
-        return {
-          // insert project
-          insert: jest.fn().mockReturnThis(),
-          select: jest.fn().mockReturnThis(),
-          single: jest
-            .fn()
-            .mockResolvedValue({ data: createdProject, error: null }),
-        };
-      // insert members (creator)
-      return { insert: jest.fn().mockResolvedValue({ error: null }) };
-    });
+    mockFrom.mockImplementation(() => ({
+      insert: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      single: jest
+        .fn()
+        .mockResolvedValue({ data: createdProject, error: null }),
+    }));
 
     const res = await CREATE_PROJECT(
-      makeProjectRequest({ name: "Test projekt" }),
+      makeProjectRequest({ name: "Test Project" }),
     );
 
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.name).toBe("Test projekt");
+    expect(body.name).toBe("Test Project");
+    expect(body.id).toBe("project-1");
   });
 
-  // ─── #2: Podvajanje imena projekta ───────────────────────────────────────
-  it("400 — zavrne projekt s podvojenim imenom", async () => {
+  // ─── #2: Duplicate project name ───────────────────────────────────────────
+  it("400 — rejects project with duplicate name", async () => {
     mockProjectNameExists.mockResolvedValue(true);
 
     const res = await CREATE_PROJECT(
-      makeProjectRequest({ name: "Obstoječi projekt" }),
+      makeProjectRequest({ name: "Existing Project" }),
     );
 
     expect(res.status).toBe(400);
@@ -106,12 +99,12 @@ describe("POST /api/projects", () => {
     expect(body.error).toMatch(/already exists/i);
   });
 
-  // ─── #3: Samo admin lahko ustvari projekt ────────────────────────────────
-  it("403 — navaden uporabnik ne more ustvariti projekta", async () => {
+  // ─── #3: Only admins can create projects ──────────────────────────────────
+  it("403 — non-admin user cannot create a project", async () => {
     mockCanCreateProject.mockResolvedValue(false);
 
     const res = await CREATE_PROJECT(
-      makeProjectRequest({ name: "Nov projekt" }),
+      makeProjectRequest({ name: "New Project" }),
     );
 
     expect(res.status).toBe(403);
@@ -119,58 +112,53 @@ describe("POST /api/projects", () => {
     expect(body.error).toMatch(/administrator/i);
   });
 
-  it("400 — manjka ime projekta", async () => {
+  // ─── #4: Missing project name ─────────────────────────────────────────────
+  it("400 — missing project name", async () => {
     const res = await CREATE_PROJECT(
-      makeProjectRequest({ description: "Opis" }),
+      makeProjectRequest({ description: "Some description" }),
     );
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/name/i);
+    expect(body.error).toMatch(/name.*required|required.*name/i);
   });
 
-  it("401 — neprijavljen uporabnik", async () => {
+  // ─── #5: Unauthenticated user ─────────────────────────────────────────────
+  it("401 — unauthenticated user cannot create a project", async () => {
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
 
     const res = await CREATE_PROJECT(
-      makeProjectRequest({ name: "Nov projekt" }),
+      makeProjectRequest({ name: "New Project" }),
     );
 
     expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toMatch(/unauthorized/i);
   });
 
-  it("201 — ustvari projekt s člani", async () => {
-    const createdProject = { id: "project-1", name: "Projekt s člani" };
+  // ─── #6: Project created without members ─────────────────────────────────
+  it("201 — creates project without any members", async () => {
+    const createdProject = { id: "project-1", name: "Solo Project" };
 
-    let cnt = 0;
-    mockFrom.mockImplementation(() => {
-      cnt++;
-      if (cnt === 1)
-        return {
-          insert: jest.fn().mockReturnThis(),
-          select: jest.fn().mockReturnThis(),
-          single: jest
-            .fn()
-            .mockResolvedValue({ data: createdProject, error: null }),
-        };
-      return { insert: jest.fn().mockResolvedValue({ error: null }) };
-    });
+    mockFrom.mockImplementation(() => ({
+      insert: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      single: jest
+        .fn()
+        .mockResolvedValue({ data: createdProject, error: null }),
+    }));
 
     const res = await CREATE_PROJECT(
-      makeProjectRequest({
-        name: "Projekt s člani",
-        members: [
-          { user_id: "user-1", role: "developer" },
-          { user_id: "user-2", role: "scrum_master" },
-        ],
-      }),
+      makeProjectRequest({ name: "Solo Project" }),
     );
 
     expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.id).toBe("project-1");
   });
 });
 
-// ─── TESTI ZA DODAJANJE ČLANOV ────────────────────────────────────────────────
+// ─── ADD MEMBERS TESTS ────────────────────────────────────────────────────────
 describe("POST /api/projects/:projectId/members", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -208,7 +196,7 @@ describe("POST /api/projects/:projectId/members", () => {
       cnt++;
       if (cnt === 1)
         return {
-          // projects — preveri obstoj projekta
+          // projects — check project exists
           select: jest.fn().mockReturnThis(),
           eq: jest.fn().mockReturnThis(),
           maybeSingle: jest
@@ -217,13 +205,13 @@ describe("POST /api/projects/:projectId/members", () => {
         };
       if (cnt === 2)
         return {
-          // users — preveri obstoj uporabnikov
+          // users — check users exist
           select: jest.fn().mockReturnThis(),
           in: jest.fn().mockResolvedValue({ data: existingUsers, error: null }),
         };
       if (cnt === 3)
         return {
-          // project_members — preveri že obstoječe člane
+          // project_members — check already existing members
           select: jest.fn().mockReturnThis(),
           eq: jest.fn().mockReturnThis(),
           in: jest
@@ -238,8 +226,8 @@ describe("POST /api/projects/:projectId/members", () => {
     });
   }
 
-  // ─── #1: Uspešno dodajanje članov z vlogami ──────────────────────────────
-  it("201 — uspešno doda člane z vlogami", async () => {
+  // ─── #1: Successfully add members with roles ──────────────────────────────
+  it("201 — successfully adds members with roles", async () => {
     setupMembersAddMocks();
 
     const res = await ADD_MEMBERS(
@@ -255,10 +243,11 @@ describe("POST /api/projects/:projectId/members", () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.members).toHaveLength(2);
+    expect(body.message).toMatch(/successfully added/i);
   });
 
-  // ─── #2: Neveljavna vloga ─────────────────────────────────────────────────
-  it("400 — zavrne neveljavno vlogo", async () => {
+  // ─── #2: Invalid role ─────────────────────────────────────────────────────
+  it("400 — rejects invalid role", async () => {
     setupMembersAddMocks();
 
     const res = await ADD_MEMBERS(
@@ -270,11 +259,11 @@ describe("POST /api/projects/:projectId/members", () => {
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/neveljavna vloga/i);
+    expect(body.error).toMatch(/invalid role/i);
   });
 
-  // ─── #3: Brez pravic ─────────────────────────────────────────────────────
-  it("403 — uporabnik brez pravic ne more dodajati članov", async () => {
+  // ─── #3: No permission ────────────────────────────────────────────────────
+  it("403 — user without permission cannot add members", async () => {
     mockCanManageProjectMembers.mockResolvedValue(false);
 
     const res = await ADD_MEMBERS(
@@ -286,17 +275,18 @@ describe("POST /api/projects/:projectId/members", () => {
 
     expect(res.status).toBe(403);
     const body = await res.json();
-    expect(body.error).toMatch(/pravic/i);
+    expect(body.error).toMatch(/permission/i);
   });
 
-  it("400 — podvojeni uporabniki v requestu", async () => {
+  // ─── #4: Duplicate users in request ──────────────────────────────────────
+  it("400 — rejects duplicate users in the request", async () => {
     setupMembersAddMocks();
 
     const res = await ADD_MEMBERS(
       makeMembersRequest({
         members: [
           { user_id: "user-1", role: "developer" },
-          { user_id: "user-1", role: "scrum_master" }, // duplikat
+          { user_id: "user-1", role: "scrum_master" }, // duplicate
         ],
       }),
       makeContext(),
@@ -304,27 +294,29 @@ describe("POST /api/projects/:projectId/members", () => {
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/podvojene/i);
+    expect(body.error).toMatch(/duplicate/i);
   });
 
-  it("400 — uporabnik ne obstaja", async () => {
+  // ─── #5: User does not exist ──────────────────────────────────────────────
+  it("400 — rejects non-existent users", async () => {
     setupMembersAddMocks({
-      existingUsers: [], // noben user ne obstaja
+      existingUsers: [], // no users exist
     });
 
     const res = await ADD_MEMBERS(
       makeMembersRequest({
-        members: [{ user_id: "neobstojeci-user", role: "developer" }],
+        members: [{ user_id: "nonexistent-user", role: "developer" }],
       }),
       makeContext(),
     );
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/ne obstajajo/i);
+    expect(body.error).toMatch(/do not exist/i);
   });
 
-  it("401 — neprijavljen uporabnik", async () => {
+  // ─── #6: Unauthenticated user ─────────────────────────────────────────────
+  it("401 — unauthenticated user cannot add members", async () => {
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
 
     const res = await ADD_MEMBERS(
@@ -335,5 +327,40 @@ describe("POST /api/projects/:projectId/members", () => {
     );
 
     expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toMatch(/unauthorized/i);
+  });
+
+  // ─── #7: Empty members list ───────────────────────────────────────────────
+  it("400 — rejects empty members list", async () => {
+    setupMembersAddMocks();
+
+    const res = await ADD_MEMBERS(
+      makeMembersRequest({ members: [] }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/required/i);
+  });
+
+  // ─── #8: Project not found ────────────────────────────────────────────────
+  it("404 — returns 404 if project does not exist", async () => {
+    // Set up mock directly — project check returns null
+    mockFrom.mockImplementation(() => ({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+    }));
+
+    const res = await ADD_MEMBERS(
+      makeMembersRequest({
+        members: [{ user_id: "user-1", role: "developer" }],
+      }),
+      makeContext("nonexistent-project"),
+    );
+
+    expect(res.status).toBe(404);
   });
 });

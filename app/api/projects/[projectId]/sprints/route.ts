@@ -63,7 +63,7 @@ function getSprintStatus(startDate: string, endDate: string) {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Napaka pri pridobivanju sprintov."
+ *                   example: "Error fetching sprints."
  *
  * components:
  *   schemas:
@@ -134,7 +134,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return NextResponse.json(sprintsWithUpdatedStatus, { status: 200 });
   } catch {
     return NextResponse.json(
-      { error: "Napaka pri pridobivanju sprintov." },
+      { error: "Error fetching sprints." },
       { status: 500 },
     );
   }
@@ -212,15 +212,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
  *                   type: string
  *                   examples:
  *                     missingFields:
- *                       value: "name, start_date in end_date so obvezni."
+ *                       value: "name, start_date and end_date are required."
  *                     pastStartDate:
- *                       value: "Začetni datum ne sme biti v preteklosti."
+ *                       value: "Start date cannot be in the past."
  *                     invalidEndDate:
- *                       value: "Končni datum mora biti po začetnem."
+ *                       value: "End date must be after start date."
  *                     invalidVelocity:
- *                       value: "Velocity mora biti pozitivna številka."
+ *                       value: "Velocity must be a positive number."
  *                     velocityTooHigh:
- *                       value: "Velocity je previsok."
+ *                       value: "Velocity is too high."
  *       401:
  *         description: User not authenticated
  *         content:
@@ -240,7 +240,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Nimaš pravic za ustvarjanje sprinta."
+ *                   example: "You don't have permission to create a sprint."
  *       409:
  *         description: Sprint overlaps with an existing sprint
  *         content:
@@ -250,7 +250,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Sprint se prekriva z obstoječim sprintom."
+ *                   example: "Sprint overlaps with an existing sprint."
  *       500:
  *         description: Internal server error
  *         content:
@@ -260,7 +260,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Napaka pri ustvarjanju sprinta."
+ *                   example: "Error creating sprint."
  */
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
@@ -281,7 +281,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     if (!name || !start_date || !end_date) {
       return NextResponse.json(
-        { error: "name, start_date in end_date so obvezni." },
+        { error: "name, start_date and end_date are required." },
         { status: 400 },
       );
     }
@@ -290,14 +290,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     if (start_date < today) {
       return NextResponse.json(
-        { error: "Začetni datum ne sme biti v preteklosti." },
+        { error: "Start date cannot be in the past." },
         { status: 400 },
       );
     }
 
     if (end_date <= start_date) {
       return NextResponse.json(
-        { error: "Končni datum mora biti po začetnem." },
+        { error: "End date must be after start date." },
         { status: 400 },
       );
     }
@@ -307,14 +307,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
       if (!Number.isFinite(velocityNumber) || velocityNumber <= 0) {
         return NextResponse.json(
-          { error: "Velocity mora biti pozitivna številka." },
+          { error: "Velocity must be a positive number." },
           { status: 400 },
         );
       }
 
       if (velocityNumber > 100) {
         return NextResponse.json(
-          { error: "Velocity je previsok." },
+          { error: "Velocity is too high." },
           { status: 400 },
         );
       }
@@ -336,7 +336,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     if (overlappingSprints && overlappingSprints.length > 0) {
       return NextResponse.json(
-        { error: "Sprint se prekriva z obstoječim sprintom." },
+        { error: "Sprint overlaps with an existing sprint." },
         { status: 409 },
       );
     }
@@ -361,7 +361,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         error.message.toLowerCase().includes("permission denied")
       ) {
         return NextResponse.json(
-          { error: "Nimaš pravic za ustvarjanje sprinta." },
+          { error: "You don't have permission to create a sprint." },
           { status: 403 },
         );
       }
@@ -372,7 +372,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json(data, { status: 201 });
   } catch {
     return NextResponse.json(
-      { error: "Napaka pri ustvarjanju sprinta." },
+      { error: "Error creating sprint." },
       { status: 500 },
     );
   }

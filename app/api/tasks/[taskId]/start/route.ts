@@ -44,13 +44,13 @@ type RouteContext = {
  *                   type: string
  *                   examples:
  *                     notYours:
- *                       value: "Naloga ni vaša."
+ *                       value: "This task is not yours."
  *                     alreadyActive:
- *                       value: "Naloga je že aktivna."
+ *                       value: "Task is already active."
  *                     storyDone:
- *                       value: "Zgodba je že zaključena."
+ *                       value: "The story is already completed."
  *                     hasActiveTask:
- *                       value: "Že imate aktivno nalogo."
+ *                       value: "You already have an active task."
  *       401:
  *         description: User not authenticated
  *         content:
@@ -91,8 +91,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const supabase = await createClient();
     const { taskId } = await context.params;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { data: task, error: taskError } = await supabase
       .from("tasks")
@@ -100,15 +103,23 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .eq("id", taskId)
       .maybeSingle();
 
-    if (taskError) return NextResponse.json({ error: taskError.message }, { status: 500 });
-    if (!task) return NextResponse.json({ error: "Task not found." }, { status: 404 });
+    if (taskError)
+      return NextResponse.json({ error: taskError.message }, { status: 500 });
+    if (!task)
+      return NextResponse.json({ error: "Task not found." }, { status: 404 });
 
     if (!task.is_accepted || task.assignee_id !== user.id) {
-      return NextResponse.json({ error: "Naloga ni vaša." }, { status: 400 });
+      return NextResponse.json(
+        { error: "This task is not yours." },
+        { status: 400 },
+      );
     }
 
     if (task.is_active) {
-      return NextResponse.json({ error: "Naloga je že aktivna." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Task is already active." },
+        { status: 400 },
+      );
     }
 
     const { data: story, error: storyError } = await supabase
@@ -117,10 +128,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .eq("id", task.user_story_id)
       .maybeSingle();
 
-    if (storyError || !story) return NextResponse.json({ error: "Story not found." }, { status: 404 });
+    if (storyError || !story)
+      return NextResponse.json({ error: "Story not found." }, { status: 404 });
 
     if (story.status === "done") {
-      return NextResponse.json({ error: "Zgodba je že zaključena." }, { status: 400 });
+      return NextResponse.json(
+        { error: "The story is already completed." },
+        { status: 400 },
+      );
     }
 
     const { data: activeTasks } = await supabase
@@ -130,7 +145,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .eq("is_active", true);
 
     if (activeTasks && activeTasks.length > 0) {
-      return NextResponse.json({ error: "Že imate aktivno nalogo." }, { status: 400 });
+      return NextResponse.json(
+        { error: "You already have an active task." },
+        { status: 400 },
+      );
     }
 
     const { data: updatedTask, error: updateError } = await supabase
@@ -145,10 +163,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .select("*, assignee:users(id, first_name, last_name, email)")
       .single();
 
-    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+    if (updateError)
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
     return NextResponse.json(updatedTask);
-
   } catch {
-    return NextResponse.json({ error: "Error starting task." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Error starting task." },
+      { status: 500 },
+    );
   }
 }

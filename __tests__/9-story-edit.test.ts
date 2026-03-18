@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { PATCH, DELETE } from "@/app/api/stories/[storyId]/route";
 
-// ─── Mock Supabase ────────────────────────────────────────────────────────────
+// ─── Mock Supabase (server client) ───────────────────────────────────────────
 const mockGetUser = jest.fn();
 const mockFrom = jest.fn<any, any>();
 
@@ -14,7 +14,16 @@ jest.mock("@/lib/supabase/server", () => ({
   ),
 }));
 
-// ─── Helper funkcije ──────────────────────────────────────────────────────────
+// ─── Mock supabaseAdmin (@supabase/supabase-js) ───────────────────────────────
+const mockAdminFrom = jest.fn<any, any>();
+
+jest.mock("@supabase/supabase-js", () => ({
+  createClient: jest.fn(() => ({
+    from: (...args: any[]) => mockAdminFrom(...args),
+  })),
+}));
+
+// ─── Helper functions ─────────────────────────────────────────────────────────
 function makePatchRequest(body: object) {
   return new NextRequest("http://localhost/api/stories/story-1", {
     method: "PATCH",
@@ -33,11 +42,11 @@ function makeContext(storyId = "story-1") {
   return { params: Promise.resolve({ storyId }) };
 }
 
-// ─── Default podatki ──────────────────────────────────────────────────────────
+// ─── Default data ─────────────────────────────────────────────────────────────
 const defaultStory = {
   id: "story-1",
   project_id: "project-1",
-  title: "Obstoječa zgodba",
+  title: "Existing story",
   status: "backlog",
   sprint_id: null,
 };
@@ -45,15 +54,15 @@ const defaultStory = {
 const defaultMembership = { role: "product_owner" };
 
 const validBody = {
-  title: "Posodobljena zgodba",
-  description: "Opis",
-  acceptance_criteria: "Kriteriji",
+  title: "Updated story",
+  description: "Description",
+  acceptance_criteria: "Criteria",
   priority: "must_have",
   business_value: 50,
   story_points: 5,
 };
 
-// ─── Setup mock ───────────────────────────────────────────────────────────────
+// ─── Setup mocks ──────────────────────────────────────────────────────────────
 function setupMocks(
   overrides: {
     story?: any;
@@ -78,38 +87,38 @@ function setupMocks(
     cnt++;
     if (cnt === 1)
       return {
-        // user_stories — pridobi zgodbo
+        // user_stories — fetch story
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
         maybeSingle: jest.fn().mockResolvedValue({ data: story, error: null }),
       };
     if (cnt === 2)
       return {
-        // project_members — preveri članstvo
+        // project_members — check membership
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
         maybeSingle: jest
           .fn()
           .mockResolvedValue({ data: membership, error: null }),
       };
-    if (cnt === 3)
-      return {
-        // user_stories — preveri duplikat
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        neq: jest.fn().mockReturnThis(),
-        maybeSingle: jest
-          .fn()
-          .mockResolvedValue({ data: duplicate, error: null }),
-      };
     return {
-      // user_stories — update
-      update: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
+      // user_stories — duplicate title check
       select: jest.fn().mockReturnThis(),
-      single: jest.fn().mockResolvedValue(updateResult),
+      eq: jest.fn().mockReturnThis(),
+      neq: jest.fn().mockReturnThis(),
+      maybeSingle: jest
+        .fn()
+        .mockResolvedValue({ data: duplicate, error: null }),
     };
   });
+
+  // Admin client — update
+  mockAdminFrom.mockImplementation(() => ({
+    update: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    maybeSingle: jest.fn().mockResolvedValue(updateResult),
+  }));
 }
 
 function setupDeleteMocks(
@@ -141,17 +150,18 @@ function setupDeleteMocks(
           .fn()
           .mockResolvedValue({ data: membership, error: null }),
       };
-    return {
-      // delete
-      delete: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      select: jest.fn().mockResolvedValue({ error: null }),
-    };
+    return {};
   });
+
+  // Admin client — delete
+  mockAdminFrom.mockImplementation(() => ({
+    delete: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockResolvedValue({ error: null }),
+  }));
 }
 
-// ─── TESTI ZA PATCH ───────────────────────────────────────────────────────────
-describe("PATCH /api/stories/:storyId — urejanje zgodbe (#9)", () => {
+// ─── PATCH TESTS ──────────────────────────────────────────────────────────────
+describe("PATCH /api/stories/:storyId — edit story (#9)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetUser.mockResolvedValue({
@@ -160,74 +170,82 @@ describe("PATCH /api/stories/:storyId — urejanje zgodbe (#9)", () => {
     });
   });
 
-  // ─── #1: Regularen potek ──────────────────────────────────────────────────
-  it("200 — uspešno uredi zgodbo", async () => {
+  // ─── #1: Successful edit ──────────────────────────────────────────────────
+  it("200 — successfully edits a story", async () => {
     setupMocks();
 
     const res = await PATCH(makePatchRequest(validBody), makeContext());
     expect(res.status).toBe(200);
   });
 
-  // ─── #2: Zgodba dodeljena sprintu ─────────────────────────────────────────
-  it("400 — zgodba je dodeljena sprintu", async () => {
+  // ─── #2: Story assigned to sprint ─────────────────────────────────────────
+  it("400 — story is assigned to a sprint", async () => {
     setupMocks({ story: { ...defaultStory, sprint_id: "sprint-1" } });
 
     const res = await PATCH(makePatchRequest(validBody), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/sprintu/i);
+    expect(body.error).toMatch(/sprint/i);
   });
 
-  // ─── #3: Zgodba je realizirana ────────────────────────────────────────────
-  it("400 — zgodba je realizirana", async () => {
+  // ─── #3: Story is completed ───────────────────────────────────────────────
+  it("400 — story is completed", async () => {
     setupMocks({ story: { ...defaultStory, status: "done" } });
 
     const res = await PATCH(makePatchRequest(validBody), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/realiziran/i);
+    expect(body.error).toMatch(/completed/i);
   });
 
-  // ─── #4: Podvajanje naslova ───────────────────────────────────────────────
-  it("409 — podvajanje naslova zgodbe", async () => {
+  // ─── #4: Duplicate title ──────────────────────────────────────────────────
+  it("409 — duplicate story title", async () => {
     setupMocks({ duplicate: { id: "story-2" } });
 
     const res = await PATCH(makePatchRequest(validBody), makeContext());
     expect(res.status).toBe(409);
     const body = await res.json();
-    expect(body.error).toMatch(/naslov/i);
+    expect(body.error).toMatch(/already exists/i);
   });
 
-  // ─── Dodatni testi ────────────────────────────────────────────────────────
-  it("403 — developer nima pravic za urejanje", async () => {
+  // ─── Additional tests ─────────────────────────────────────────────────────
+  it("403 — developer does not have permission to edit", async () => {
     setupMocks({ membership: { role: "developer" } });
 
     const res = await PATCH(makePatchRequest(validBody), makeContext());
     expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toMatch(/permission/i);
   });
 
-  it("403 — uporabnik ni član projekta", async () => {
+  it("403 — user is not a project member", async () => {
     setupMocks({ membership: null });
 
     const res = await PATCH(makePatchRequest(validBody), makeContext());
     expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toMatch(/permission/i);
   });
 
-  it("401 — neprijavljen uporabnik", async () => {
+  it("401 — unauthenticated user", async () => {
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
 
     const res = await PATCH(makePatchRequest(validBody), makeContext());
     expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toMatch(/unauthorized/i);
   });
 
-  it("400 — manjkajoča obvezna polja", async () => {
+  it("400 — missing required fields", async () => {
     setupMocks();
 
     const res = await PATCH(makePatchRequest({ title: "Test" }), makeContext());
     expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/required/i);
   });
 
-  it("400 — neveljavna prioriteta", async () => {
+  it("400 — invalid priority value", async () => {
     setupMocks();
 
     const res = await PATCH(
@@ -235,11 +253,37 @@ describe("PATCH /api/stories/:storyId — urejanje zgodbe (#9)", () => {
       makeContext(),
     );
     expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/invalid priority/i);
+  });
+
+  it("400 — business value out of range", async () => {
+    setupMocks();
+
+    const res = await PATCH(
+      makePatchRequest({ ...validBody, business_value: 200 }),
+      makeContext(),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/business value/i);
+  });
+
+  it("400 — negative story points", async () => {
+    setupMocks();
+
+    const res = await PATCH(
+      makePatchRequest({ ...validBody, story_points: -1 }),
+      makeContext(),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/story points/i);
   });
 });
 
-// ─── TESTI ZA DELETE ──────────────────────────────────────────────────────────
-describe("DELETE /api/stories/:storyId — brisanje zgodbe (#9)", () => {
+// ─── DELETE TESTS ─────────────────────────────────────────────────────────────
+describe("DELETE /api/stories/:storyId — delete story (#9)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetUser.mockResolvedValue({
@@ -248,48 +292,61 @@ describe("DELETE /api/stories/:storyId — brisanje zgodbe (#9)", () => {
     });
   });
 
-  // ─── #1: Regularen potek ──────────────────────────────────────────────────
-  it("200 — uspešno izbriše zgodbo", async () => {
+  // ─── #1: Successful delete ────────────────────────────────────────────────
+  it("200 — successfully deletes a story", async () => {
     setupDeleteMocks();
 
     const res = await DELETE(makeDeleteRequest(), makeContext());
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.message).toMatch(/izbrisana/i);
+    expect(body.message).toMatch(/deleted successfully/i);
   });
 
-  // ─── #2: Zgodba dodeljena sprintu ─────────────────────────────────────────
-  it("400 — zgodba je dodeljena sprintu", async () => {
+  // ─── #2: Story assigned to sprint ─────────────────────────────────────────
+  it("400 — story is assigned to a sprint", async () => {
     setupDeleteMocks({ story: { ...defaultStory, sprint_id: "sprint-1" } });
 
     const res = await DELETE(makeDeleteRequest(), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/sprintu/i);
+    expect(body.error).toMatch(/sprint/i);
   });
 
-  // ─── #3: Zgodba je realizirana ────────────────────────────────────────────
-  it("400 — zgodba je realizirana", async () => {
+  // ─── #3: Story is completed ───────────────────────────────────────────────
+  it("400 — story is completed", async () => {
     setupDeleteMocks({ story: { ...defaultStory, status: "done" } });
 
     const res = await DELETE(makeDeleteRequest(), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/realiziran/i);
+    expect(body.error).toMatch(/completed/i);
   });
 
-  // ─── Dodatni testi ────────────────────────────────────────────────────────
-  it("403 — developer nima pravic za brisanje", async () => {
+  // ─── Additional tests ─────────────────────────────────────────────────────
+  it("403 — developer does not have permission to delete", async () => {
     setupDeleteMocks({ membership: { role: "developer" } });
 
     const res = await DELETE(makeDeleteRequest(), makeContext());
     expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toMatch(/permission/i);
   });
 
-  it("401 — neprijavljen uporabnik", async () => {
+  it("401 — unauthenticated user", async () => {
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
 
     const res = await DELETE(makeDeleteRequest(), makeContext());
     expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toMatch(/unauthorized/i);
+  });
+
+  it("404 — story not found", async () => {
+    setupDeleteMocks({ story: null });
+
+    const res = await DELETE(makeDeleteRequest(), makeContext());
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toMatch(/not found/i);
   });
 });

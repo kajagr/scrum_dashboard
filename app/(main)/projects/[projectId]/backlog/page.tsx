@@ -434,7 +434,7 @@ export default function BacklogPage() {
 
   // If role fetch failed (null), show buttons — server will enforce permissions
   const canCreate = projectRole !== "developer";
-  const canAssign = projectRole !== "developer";
+  const canAssign = projectRole == "scrum_master";
 
   const selectedPoints = selectedIds.reduce((sum, id) => {
     const story = unassigned.find((s) => s.id === id);

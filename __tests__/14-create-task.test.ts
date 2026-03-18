@@ -14,7 +14,7 @@ jest.mock("@/lib/supabase/server", () => ({
   ),
 }));
 
-// ─── Helper funkcije ──────────────────────────────────────────────────────────
+// ─── Helper functions ─────────────────────────────────────────────────────────
 function makeRequest(body: object) {
   return new NextRequest("http://localhost/api/stories/story-1/tasks", {
     method: "POST",
@@ -27,7 +27,7 @@ function makeContext(storyId = "story-1") {
   return { params: Promise.resolve({ storyId }) };
 }
 
-// ─── Default podatki ──────────────────────────────────────────────────────────
+// ─── Default data ─────────────────────────────────────────────────────────────
 const today = new Date().toISOString().split("T")[0];
 const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
 const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
@@ -48,11 +48,11 @@ const activeSprint = {
 const defaultMembership = { role: "developer" };
 
 const validBody = {
-  description: "Implementiraj login",
+  description: "Implement login",
   estimated_hours: 4,
 };
 
-// ─── Setup mock ───────────────────────────────────────────────────────────────
+// ─── Setup mocks ──────────────────────────────────────────────────────────────
 function setupMocks(
   overrides: {
     story?: any;
@@ -109,7 +109,7 @@ function setupMocks(
           .fn()
           .mockResolvedValue({ data: assigneeMembership, error: null }),
       };
-    // position: cnt 4 brez assigneeja, cnt 5 z assigneejem
+    // position query: cnt 4 without assignee, cnt 5 with assignee
     const positionCnt = overrides.includeAssignee ? 5 : 4;
     if (cnt === positionCnt)
       return {
@@ -123,15 +123,15 @@ function setupMocks(
       insert: jest.fn().mockReturnThis(),
       select: jest.fn().mockReturnThis(),
       single: jest.fn().mockResolvedValue({
-        data: { id: "task-1", description: "Implementiraj login" },
+        data: { id: "task-1", description: "Implement login" },
         error: null,
       }),
     };
   });
 }
 
-// ─── TESTI ────────────────────────────────────────────────────────────────────
-describe("POST /api/stories/:storyId/tasks — dodajanje naloge (#14)", () => {
+// ─── TESTS ────────────────────────────────────────────────────────────────────
+describe("POST /api/stories/:storyId/tasks — create task (#14)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetUser.mockResolvedValue({
@@ -140,8 +140,8 @@ describe("POST /api/stories/:storyId/tasks — dodajanje naloge (#14)", () => {
     });
   });
 
-  // ─── #1: Regularen potek ──────────────────────────────────────────────────
-  it("201 — uspešno doda nalogo", async () => {
+  // ─── #1: Successful task creation ────────────────────────────────────────
+  it("201 — successfully creates a task", async () => {
     setupMocks();
 
     const res = await POST(makeRequest(validBody), makeContext());
@@ -150,17 +150,17 @@ describe("POST /api/stories/:storyId/tasks — dodajanje naloge (#14)", () => {
     expect(body.id).toBe("task-1");
   });
 
-  // ─── #2: Zgodba izven aktivnega sprinta ───────────────────────────────────
-  it("400 — zgodba nima sprinta (sprint_id = null)", async () => {
+  // ─── #2: Story not in an active sprint ───────────────────────────────────
+  it("400 — story has no sprint (sprint_id = null)", async () => {
     setupMocks({ story: { ...defaultStory, sprint_id: null } });
 
     const res = await POST(makeRequest(validBody), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/sprintu/i);
+    expect(body.error).toMatch(/active sprint/i);
   });
 
-  it("400 — sprint ni aktiven (planned)", async () => {
+  it("400 — sprint is not active (planned)", async () => {
     const futureSprint = {
       id: "sprint-1",
       start_date: tomorrow,
@@ -171,10 +171,10 @@ describe("POST /api/stories/:storyId/tasks — dodajanje naloge (#14)", () => {
     const res = await POST(makeRequest(validBody), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/sprintu/i);
+    expect(body.error).toMatch(/active sprint/i);
   });
 
-  it("400 — sprint je že zaključen (completed)", async () => {
+  it("400 — sprint is already completed", async () => {
     const pastSprint = {
       id: "sprint-1",
       start_date: new Date(Date.now() - 2 * 86400000)
@@ -187,21 +187,21 @@ describe("POST /api/stories/:storyId/tasks — dodajanje naloge (#14)", () => {
     const res = await POST(makeRequest(validBody), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/sprintu/i);
+    expect(body.error).toMatch(/active sprint/i);
   });
 
-  // ─── #3: Realizirana zgodba ───────────────────────────────────────────────
-  it("400 — zgodba je realizirana", async () => {
+  // ─── #3: Completed story ──────────────────────────────────────────────────
+  it("400 — story is completed", async () => {
     setupMocks({ story: { ...defaultStory, status: "done" } });
 
     const res = await POST(makeRequest(validBody), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/realiziran/i);
+    expect(body.error).toMatch(/completed story/i);
   });
 
-  // ─── #4: Neregularna ocena časa ───────────────────────────────────────────
-  it("400 — ocena časa je 0", async () => {
+  // ─── #4: Invalid estimated hours ─────────────────────────────────────────
+  it("400 — estimated hours is zero", async () => {
     setupMocks();
 
     const res = await POST(
@@ -210,10 +210,10 @@ describe("POST /api/stories/:storyId/tasks — dodajanje naloge (#14)", () => {
     );
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/časa/i);
+    expect(body.error).toMatch(/estimated hours/i);
   });
 
-  it("400 — ocena časa je negativna", async () => {
+  it("400 — estimated hours is negative", async () => {
     setupMocks();
 
     const res = await POST(
@@ -222,20 +222,20 @@ describe("POST /api/stories/:storyId/tasks — dodajanje naloge (#14)", () => {
     );
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/časa/i);
+    expect(body.error).toMatch(/estimated hours/i);
   });
 
-  it("400 — ocena časa manjka", async () => {
+  it("400 — estimated hours is missing", async () => {
     setupMocks();
 
     const res = await POST(makeRequest({ description: "Test" }), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/časa/i);
+    expect(body.error).toMatch(/estimated hours/i);
   });
 
-  // ─── #5: Dodeljevanje člana razvojne skupine ──────────────────────────────
-  it("201 — uspešno doda nalogo z veljavnim assigneejem", async () => {
+  // ─── #5: Assigning a team member ─────────────────────────────────────────
+  it("201 — successfully creates task with valid assignee", async () => {
     setupMocks({ includeAssignee: true });
 
     const res = await POST(
@@ -245,7 +245,7 @@ describe("POST /api/stories/:storyId/tasks — dodajanje naloge (#14)", () => {
     expect(res.status).toBe(201);
   });
 
-  it("400 — assignee ni član projekta", async () => {
+  it("400 — assignee is not a project member", async () => {
     setupMocks({ includeAssignee: true, assigneeMembership: null });
 
     const res = await POST(
@@ -254,10 +254,10 @@ describe("POST /api/stories/:storyId/tasks — dodajanje naloge (#14)", () => {
     );
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/projekt/i);
+    expect(body.error).toMatch(/not a member/i);
   });
 
-  it("400 — assignee je product_owner (ne more prevzeti naloge)", async () => {
+  it("400 — assignee is product_owner (cannot be assigned tasks)", async () => {
     setupMocks({
       includeAssignee: true,
       assigneeMembership: { role: "product_owner" },
@@ -269,37 +269,43 @@ describe("POST /api/stories/:storyId/tasks — dodajanje naloge (#14)", () => {
     );
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/razvijalci/i);
+    expect(body.error).toMatch(/developers and scrum masters/i);
   });
 
-  // ─── Dodatni testi ────────────────────────────────────────────────────────
-  it("403 — product_owner ne more dodajati nalog", async () => {
+  // ─── Additional tests ─────────────────────────────────────────────────────
+  it("403 — product_owner cannot add tasks", async () => {
     setupMocks({ membership: { role: "product_owner" } });
 
     const res = await POST(makeRequest(validBody), makeContext());
     expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toMatch(/scrum masters and developers/i);
   });
 
-  it("403 — uporabnik ni član projekta", async () => {
+  it("403 — user is not a project member", async () => {
     setupMocks({ membership: null });
 
     const res = await POST(makeRequest(validBody), makeContext());
     expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toMatch(/not a member/i);
   });
 
-  it("401 — neprijavljen uporabnik", async () => {
+  it("401 — unauthenticated user", async () => {
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
 
     const res = await POST(makeRequest(validBody), makeContext());
     expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toMatch(/unauthorized/i);
   });
 
-  it("400 — manjka opis naloge", async () => {
+  it("400 — missing task description", async () => {
     setupMocks();
 
     const res = await POST(makeRequest({ estimated_hours: 4 }), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/opis/i);
+    expect(body.error).toMatch(/description/i);
   });
 });

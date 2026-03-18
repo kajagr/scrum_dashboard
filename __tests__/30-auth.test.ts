@@ -27,12 +27,12 @@ jest.mock("@/lib/supabase/server", () => ({
   ),
 }));
 
-// ─── Mock fs (za common-passwords.txt) ───────────────────────────────────────
+// ─── Mock fs (for common-passwords.txt) ──────────────────────────────────────
 jest.mock("fs", () => ({
   readFileSync: jest.fn(() => "password123456\nqwerty123456\n"),
 }));
 
-// ─── Helper funkcije ──────────────────────────────────────────────────────────
+// ─── Helper functions ─────────────────────────────────────────────────────────
 function makeLoginRequest(body: object) {
   return new NextRequest("http://localhost/api/auth/login", {
     method: "POST",
@@ -49,36 +49,37 @@ function makeChangePasswordRequest(body: object) {
   });
 }
 
-// ─── TESTI ZA LOGIN ───────────────────────────────────────────────────────────
+// ─── LOGIN TESTS ──────────────────────────────────────────────────────────────
 describe("POST /api/auth/login (#30)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Default: uspešna prijava
+    // Default: successful login
     mockSignInWithPassword.mockResolvedValue({
       data: { user: { id: "user-1", email: "test@test.com" } },
       error: null,
     });
 
-    // Default: posodobi login čase
+    // Default: update login timestamps
     mockFrom.mockImplementation(() => ({
       select: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
-      maybeSingle: jest
-        .fn()
-        .mockResolvedValue({ data: { current_login_at: null }, error: null }),
+      maybeSingle: jest.fn().mockResolvedValue({
+        data: { current_login_at: null },
+        error: null,
+      }),
       update: jest.fn().mockReturnThis(),
     }));
 
-    // Default: ni MFA
+    // Default: no MFA
     mockMfaGetLevel.mockResolvedValue({
       data: { currentLevel: "aal1", nextLevel: "aal1" },
       error: null,
     });
   });
 
-  // ─── #1: Pravilno geslo in email ──────────────────────────────────────────
-  it("200 — uspešna prijava s pravilnimi podatki", async () => {
+  // ─── #1: Correct email and password ──────────────────────────────────────
+  it("200 — successful login with valid credentials", async () => {
     let cnt = 0;
     mockFrom.mockImplementation(() => {
       cnt++;
@@ -86,12 +87,10 @@ describe("POST /api/auth/login (#30)", () => {
         return {
           select: jest.fn().mockReturnThis(),
           eq: jest.fn().mockReturnThis(),
-          maybeSingle: jest
-            .fn()
-            .mockResolvedValue({
-              data: { current_login_at: null },
-              error: null,
-            }),
+          maybeSingle: jest.fn().mockResolvedValue({
+            data: { current_login_at: null },
+            error: null,
+          }),
         };
       return {
         update: jest.fn().mockReturnThis(),
@@ -104,27 +103,29 @@ describe("POST /api/auth/login (#30)", () => {
     );
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.message).toMatch(/uspešna/i);
+    expect(body.message).toMatch(/login successful/i);
+    expect(body.user).toBeDefined();
+    expect(body.user.email).toBe("test@test.com");
   });
 
-  // ─── #2: Napačno geslo ────────────────────────────────────────────────────
-  it("401 — napačno geslo", async () => {
+  // ─── #2: Wrong password ───────────────────────────────────────────────────
+  it("401 — wrong password", async () => {
     mockSignInWithPassword.mockResolvedValue({
       data: { user: null },
       error: { message: "Invalid login credentials" },
     });
 
     const res = await LOGIN(
-      makeLoginRequest({ email: "test@test.com", password: "napačno" }),
+      makeLoginRequest({ email: "test@test.com", password: "wrongpassword" }),
     );
     expect(res.status).toBe(401);
     const body = await res.json();
-    // Generična napaka — ne razkrije ali je napačno geslo ali email
-    expect(body.error).toMatch(/email|geslo/i);
+    // Generic error — does not reveal whether email or password is wrong
+    expect(body.error).toMatch(/email|password/i);
   });
 
-  // ─── #3: Napačen email ────────────────────────────────────────────────────
-  it("401 — napačen email", async () => {
+  // ─── #3: Wrong email ──────────────────────────────────────────────────────
+  it("401 — wrong email", async () => {
     mockSignInWithPassword.mockResolvedValue({
       data: { user: null },
       error: { message: "Invalid login credentials" },
@@ -134,13 +135,13 @@ describe("POST /api/auth/login (#30)", () => {
       makeLoginRequest({ email: "wrong@test.com", password: "geslo123456" }),
     );
     expect(res.status).toBe(401);
-    // Enaka generična napaka kot pri napačnem geslu
+    // Same generic error as wrong password
     const body = await res.json();
-    expect(body.error).toMatch(/email|geslo/i);
+    expect(body.error).toMatch(/email|password/i);
   });
 
-  // ─── MFA ──────────────────────────────────────────────────────────────────
-  it("200 — vrne requiresMfa če ima user 2FA", async () => {
+  // ─── #4: MFA ──────────────────────────────────────────────────────────────
+  it("200 — returns requiresMfa if user has 2FA enabled", async () => {
     let cnt = 0;
     mockFrom.mockImplementation(() => {
       cnt++;
@@ -148,12 +149,10 @@ describe("POST /api/auth/login (#30)", () => {
         return {
           select: jest.fn().mockReturnThis(),
           eq: jest.fn().mockReturnThis(),
-          maybeSingle: jest
-            .fn()
-            .mockResolvedValue({
-              data: { current_login_at: null },
-              error: null,
-            }),
+          maybeSingle: jest.fn().mockResolvedValue({
+            data: { current_login_at: null },
+            error: null,
+          }),
         };
       return {
         update: jest.fn().mockReturnThis(),
@@ -179,13 +178,28 @@ describe("POST /api/auth/login (#30)", () => {
     expect(body.factorId).toBe("factor-1");
   });
 
-  it("400 — manjkata email in geslo", async () => {
+  // ─── #5: Missing email and password ───────────────────────────────────────
+  it("400 — missing email and password", async () => {
     const res = await LOGIN(makeLoginRequest({}));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/email.*password|required/i);
+  });
+
+  // ─── #6: Missing password only ────────────────────────────────────────────
+  it("400 — missing password", async () => {
+    const res = await LOGIN(makeLoginRequest({ email: "test@test.com" }));
+    expect(res.status).toBe(400);
+  });
+
+  // ─── #7: Missing email only ───────────────────────────────────────────────
+  it("400 — missing email", async () => {
+    const res = await LOGIN(makeLoginRequest({ password: "geslo123456" }));
     expect(res.status).toBe(400);
   });
 });
 
-// ─── TESTI ZA CHANGE PASSWORD ─────────────────────────────────────────────────
+// ─── CHANGE PASSWORD TESTS ────────────────────────────────────────────────────
 describe("POST /api/auth/change-password (#30)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -203,12 +217,12 @@ describe("POST /api/auth/change-password (#30)", () => {
     mockUpdateUser.mockResolvedValue({ error: null });
   });
 
-  // ─── #1: Uspešna sprememba gesla ──────────────────────────────────────────
-  it("200 — uspešno spremeni geslo", async () => {
+  // ─── #1: Successful password change ──────────────────────────────────────
+  it("200 — successfully changes password", async () => {
     const res = await CHANGE_PASSWORD(
       makeChangePasswordRequest({
-        oldPassword: "StaroGeslo123",
-        newPassword: "NovoGeslo456!",
+        oldPassword: "OldPassword123",
+        newPassword: "NewPassword456!",
       }),
     );
     expect(res.status).toBe(200);
@@ -216,8 +230,8 @@ describe("POST /api/auth/change-password (#30)", () => {
     expect(body.message).toMatch(/successfully/i);
   });
 
-  // ─── #2: Napačno staro geslo ──────────────────────────────────────────────
-  it("401 — napačno staro geslo", async () => {
+  // ─── #2: Wrong old password ───────────────────────────────────────────────
+  it("401 — wrong old password", async () => {
     mockSignInWithPassword.mockResolvedValue({
       data: { user: null },
       error: { message: "Invalid credentials" },
@@ -225,19 +239,19 @@ describe("POST /api/auth/change-password (#30)", () => {
 
     const res = await CHANGE_PASSWORD(
       makeChangePasswordRequest({
-        oldPassword: "NapačnoGeslo",
-        newPassword: "NovoGeslo456!",
+        oldPassword: "WrongPassword",
+        newPassword: "NewPassword456!",
       }),
     );
     expect(res.status).toBe(401);
   });
 
-  // ─── #3: Geslo prekratko (< 12 znakov) ───────────────────────────────────
-  it("400 — novo geslo je prekratko (< 12 znakov)", async () => {
+  // ─── #3: Password too short (< 12 characters) ────────────────────────────
+  it("400 — new password is too short (< 12 characters)", async () => {
     const res = await CHANGE_PASSWORD(
       makeChangePasswordRequest({
-        oldPassword: "StaroGeslo123",
-        newPassword: "kratek",
+        oldPassword: "OldPassword123",
+        newPassword: "short",
       }),
     );
     expect(res.status).toBe(400);
@@ -245,12 +259,12 @@ describe("POST /api/auth/change-password (#30)", () => {
     expect(body.error).toMatch(/12/i);
   });
 
-  // ─── #4: Geslo predolgo (> 64 znakov) ────────────────────────────────────
-  it("400 — novo geslo je predolgo (> 64 znakov)", async () => {
+  // ─── #4: Password too long (> 64 characters) ─────────────────────────────
+  it("400 — new password is too long (> 64 characters)", async () => {
     const longPassword = "a".repeat(65);
     const res = await CHANGE_PASSWORD(
       makeChangePasswordRequest({
-        oldPassword: "StaroGeslo123",
+        oldPassword: "OldPassword123",
         newPassword: longPassword,
       }),
     );
@@ -259,11 +273,11 @@ describe("POST /api/auth/change-password (#30)", () => {
     expect(body.error).toMatch(/128|64/i);
   });
 
-  // ─── #5: Pogosto geslo (iz slovarja) ─────────────────────────────────────
-  it("400 — geslo je v seznamu pogostih gesel", async () => {
+  // ─── #5: Common password (from dictionary) ────────────────────────────────
+  it("400 — password is in the list of common passwords", async () => {
     const res = await CHANGE_PASSWORD(
       makeChangePasswordRequest({
-        oldPassword: "StaroGeslo123",
+        oldPassword: "OldPassword123",
         newPassword: "password123456",
       }),
     );
@@ -272,17 +286,18 @@ describe("POST /api/auth/change-password (#30)", () => {
     expect(body.error).toMatch(/common/i);
   });
 
-  // ─── Dodatni testi ────────────────────────────────────────────────────────
-  it("400 — manjkata oldPassword ali newPassword", async () => {
+  // ─── #6: Missing oldPassword or newPassword ───────────────────────────────
+  it("400 — missing oldPassword or newPassword", async () => {
     const res = await CHANGE_PASSWORD(
       makeChangePasswordRequest({
-        oldPassword: "StaroGeslo123",
+        oldPassword: "OldPassword123",
       }),
     );
     expect(res.status).toBe(400);
   });
 
-  it("401 — neprijavljen uporabnik", async () => {
+  // ─── #7: Unauthenticated user ─────────────────────────────────────────────
+  it("401 — unauthenticated user", async () => {
     mockGetUser.mockResolvedValue({
       data: { user: null },
       error: new Error("Unauthorized"),
@@ -290,8 +305,8 @@ describe("POST /api/auth/change-password (#30)", () => {
 
     const res = await CHANGE_PASSWORD(
       makeChangePasswordRequest({
-        oldPassword: "StaroGeslo123",
-        newPassword: "NovoGeslo456!",
+        oldPassword: "OldPassword123",
+        newPassword: "NewPassword456!",
       }),
     );
     expect(res.status).toBe(401);
