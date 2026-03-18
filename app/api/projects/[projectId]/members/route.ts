@@ -3,7 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { canManageProjectMembers } from "@/lib/permissions";
 import type { ProjectRole } from "@/lib/types";
 
-const VALID_ROLES: ProjectRole[] = ["product_owner", "scrum_master", "developer"];
+const VALID_ROLES: ProjectRole[] = [
+  "product_owner",
+  "scrum_master",
+  "developer",
+];
 
 interface MemberInput {
   user_id: string;
@@ -74,7 +78,7 @@ interface MemberInput {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Projekt ne obstaja."
+ *                   example: "Project not found."
  *       500:
  *         description: Internal server error
  *         content:
@@ -84,7 +88,7 @@ interface MemberInput {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Napaka pri pridobivanju članov."
+ *                   example: "Error fetching members."
  *
  * components:
  *   schemas:
@@ -111,13 +115,15 @@ interface MemberInput {
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ projectId: string }> }
+  { params }: { params: Promise<{ projectId: string }> },
 ) {
   try {
     const { projectId } = await params;
     const supabase = await createClient();
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -130,15 +136,20 @@ export async function GET(
       .maybeSingle();
 
     if (!project) {
-      return NextResponse.json({ error: "Projekt ne obstaja." }, { status: 404 });
+      return NextResponse.json(
+        { error: "Project not found." },
+        { status: 404 },
+      );
     }
 
     const { data: members, error } = await supabase
       .from("project_members")
-      .select(`
+      .select(
+        `
         *,
         user:users(id, email, username, first_name, last_name)
-      `)
+      `,
+      )
       .eq("project_id", projectId);
 
     if (error) {
@@ -148,8 +159,8 @@ export async function GET(
     return NextResponse.json(members);
   } catch {
     return NextResponse.json(
-      { error: "Napaka pri pridobivanju članov." },
-      { status: 500 }
+      { error: "Error fetching members." },
+      { status: 500 },
     );
   }
 }
@@ -245,15 +256,15 @@ export async function GET(
  *                   type: string
  *                   examples:
  *                     emptyList:
- *                       value: "Seznam članov je obvezen."
+ *                       value: "Member list is required."
  *                     duplicates:
- *                       value: "Seznam vsebuje podvojene uporabnike."
+ *                       value: "The list contains duplicate users."
  *                     invalidRole:
- *                       value: "Neveljavna vloga: manager. Veljavne vloge so: product_owner, scrum_master, developer"
+ *                       value: "Invalid role: manager. Valid roles are: product_owner, scrum_master, developer"
  *                     missingUsers:
- *                       value: "Naslednji uporabniki ne obstajajo: d5e8f1a2-3b4c-5d6e-7f8a-9b0c1d2e3f4a"
+ *                       value: "The following users do not exist: d5e8f1a2-3b4c-5d6e-7f8a-9b0c1d2e3f4a"
  *                     alreadyMembers:
- *                       value: "Naslednji uporabniki so že člani projekta: janez.novak"
+ *                       value: "The following users are already members of this project: janez.novak"
  *       401:
  *         description: User not authenticated
  *         content:
@@ -273,7 +284,7 @@ export async function GET(
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Nimaš pravic za upravljanje članov tega projekta."
+ *                   example: "You don't have permission to manage members of this project."
  *       404:
  *         description: Project not found
  *         content:
@@ -283,7 +294,7 @@ export async function GET(
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Projekt ne obstaja."
+ *                   example: "Project not found."
  *       500:
  *         description: Internal server error
  *         content:
@@ -293,17 +304,19 @@ export async function GET(
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Napaka pri obdelavi zahteve."
+ *                   example: "Error processing request."
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ projectId: string }> }
+  { params }: { params: Promise<{ projectId: string }> },
 ) {
   try {
     const { projectId: projectId } = await params;
     const supabase = await createClient();
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -312,8 +325,10 @@ export async function POST(
     const canManage = await canManageProjectMembers(user.id, projectId);
     if (!canManage) {
       return NextResponse.json(
-        { error: "Nimaš pravic za upravljanje članov tega projekta." },
-        { status: 403 }
+        {
+          error: "You don't have permission to manage members of this project.",
+        },
+        { status: 403 },
       );
     }
 
@@ -324,7 +339,10 @@ export async function POST(
       .maybeSingle();
 
     if (!project) {
-      return NextResponse.json({ error: "Projekt ne obstaja." }, { status: 404 });
+      return NextResponse.json(
+        { error: "Project not found." },
+        { status: 404 },
+      );
     }
 
     const body = await request.json();
@@ -332,8 +350,8 @@ export async function POST(
 
     if (!members || !Array.isArray(members) || members.length === 0) {
       return NextResponse.json(
-        { error: "Seznam članov je obvezen." },
-        { status: 400 }
+        { error: "Member list is required." },
+        { status: 400 },
       );
     }
 
@@ -341,16 +359,18 @@ export async function POST(
     const uniqueUserIds = new Set(userIds);
     if (uniqueUserIds.size !== userIds.length) {
       return NextResponse.json(
-        { error: "Seznam vsebuje podvojene uporabnike." },
-        { status: 400 }
+        { error: "The list contains duplicate users." },
+        { status: 400 },
       );
     }
 
     for (const member of members) {
       if (!VALID_ROLES.includes(member.role)) {
         return NextResponse.json(
-          { error: `Neveljavna vloga: ${member.role}. Veljavne vloge so: ${VALID_ROLES.join(", ")}` },
-          { status: 400 }
+          {
+            error: `Invalid role: ${member.role}. Valid roles are: ${VALID_ROLES.join(", ")}`,
+          },
+          { status: 400 },
         );
       }
     }
@@ -365,8 +385,10 @@ export async function POST(
 
     if (missingUsers.length > 0) {
       return NextResponse.json(
-        { error: `Naslednji uporabniki ne obstajajo: ${missingUsers.join(", ")}` },
-        { status: 400 }
+        {
+          error: `The following users do not exist: ${missingUsers.join(", ")}`,
+        },
+        { status: 400 },
       );
     }
 
@@ -385,8 +407,10 @@ export async function POST(
 
       const usernames = alreadyMemberUsers?.map((u) => u.username).join(", ");
       return NextResponse.json(
-        { error: `Naslednji uporabniki so že člani projekta: ${usernames}` },
-        { status: 400 }
+        {
+          error: `The following users are already members of this project: ${usernames}`,
+        },
+        { status: 400 },
       );
     }
 
@@ -398,31 +422,30 @@ export async function POST(
 
     const { data: insertedMembers, error: insertError } = await supabase
       .from("project_members")
-      .insert(memberInserts)
-      .select(`
+      .insert(memberInserts).select(`
         *,
         user:users(id, email, username, first_name, last_name)
       `);
 
     if (insertError) {
       return NextResponse.json(
-        { error: "Napaka pri dodajanju članov: " + insertError.message },
-        { status: 500 }
+        { error: "Error adding members: " + insertError.message },
+        { status: 500 },
       );
     }
 
     return NextResponse.json(
       {
-        message: `Uspešno dodanih ${insertedMembers.length} članov.`,
+        message: `Successfully added ${insertedMembers.length} member(s).`,
         members: insertedMembers,
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (err) {
     console.error("Error adding members:", err);
     return NextResponse.json(
-      { error: "Napaka pri obdelavi zahteve." },
-      { status: 500 }
+      { error: "Error processing request." },
+      { status: 500 },
     );
   }
 }

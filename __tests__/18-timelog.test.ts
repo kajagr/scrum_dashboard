@@ -15,7 +15,7 @@ jest.mock("@/lib/supabase/server", () => ({
   ),
 }));
 
-// ─── Helper funkcije ──────────────────────────────────────────────────────────
+// ─── Helper functions ─────────────────────────────────────────────────────────
 function makeRequest(url = "http://localhost/api/tasks/task-1/start") {
   return new NextRequest(url, { method: "POST" });
 }
@@ -24,7 +24,7 @@ function makeContext(taskId = "task-1") {
   return { params: Promise.resolve({ taskId }) };
 }
 
-// ─── Default mock podatki ─────────────────────────────────────────────────────
+// ─── Default mock data ────────────────────────────────────────────────────────
 const defaultTask = {
   id: "task-1",
   user_story_id: "story-1",
@@ -41,7 +41,7 @@ const defaultStory = {
   status: "in_progress",
 };
 
-// ─── TESTI ZA START ───────────────────────────────────────────────────────────
+// ─── START TESTS ──────────────────────────────────────────────────────────────
 describe("POST /api/tasks/:taskId/start", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -100,8 +100,8 @@ describe("POST /api/tasks/:taskId/start", () => {
     });
   }
 
-  // ─── #1: Regularen potek ───────────────────────────────────────────────────
-  it("200 — uspešno začne delo na nalogi", async () => {
+  // ─── #1: Successful start ─────────────────────────────────────────────────
+  it("200 — successfully starts working on a task", async () => {
     setupStartMocks();
 
     const res = await START(makeRequest(), makeContext());
@@ -110,19 +110,19 @@ describe("POST /api/tasks/:taskId/start", () => {
     expect(body.is_active).toBe(true);
   });
 
-  // ─── #2: Naloga ni vaša ────────────────────────────────────────────────────
-  it("400 — naloga ni sprejeta s strani trenutnega uporabnika", async () => {
+  // ─── #2: Task does not belong to current user ─────────────────────────────
+  it("400 — task is not accepted by the current user (different assignee)", async () => {
     setupStartMocks({
-      task: { ...defaultTask, assignee_id: "drug-user", is_accepted: true },
+      task: { ...defaultTask, assignee_id: "other-user", is_accepted: true },
     });
 
     const res = await START(makeRequest(), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/vaša/i);
+    expect(body.error).toMatch(/not yours/i);
   });
 
-  it("400 — naloga ni sprejeta (is_accepted = false)", async () => {
+  it("400 — task is not accepted (is_accepted = false)", async () => {
     setupStartMocks({
       task: { ...defaultTask, is_accepted: false },
     });
@@ -130,11 +130,11 @@ describe("POST /api/tasks/:taskId/start", () => {
     const res = await START(makeRequest(), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/vaša/i);
+    expect(body.error).toMatch(/not yours/i);
   });
 
-  // ─── #3: Zgodba je zaključena ──────────────────────────────────────────────
-  it("400 — zgodba je že zaključena", async () => {
+  // ─── #3: Story is completed ───────────────────────────────────────────────
+  it("400 — story is already completed", async () => {
     setupStartMocks({
       story: { ...defaultStory, status: "done" },
     });
@@ -142,11 +142,11 @@ describe("POST /api/tasks/:taskId/start", () => {
     const res = await START(makeRequest(), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/zaključena/i);
+    expect(body.error).toMatch(/completed/i);
   });
 
-  // ─── #4: Naloga je že aktivna ─────────────────────────────────────────────
-  it("400 — naloga je že aktivna", async () => {
+  // ─── #4: Task is already active ───────────────────────────────────────────
+  it("400 — task is already active", async () => {
     setupStartMocks({
       task: { ...defaultTask, is_active: true },
     });
@@ -154,10 +154,22 @@ describe("POST /api/tasks/:taskId/start", () => {
     const res = await START(makeRequest(), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/aktivna/i);
+    expect(body.error).toMatch(/already active/i);
   });
 
-  it("401 — neprijavljen uporabnik", async () => {
+  // ─── #5: User already has an active task ──────────────────────────────────
+  it("400 — user already has another active task", async () => {
+    setupStartMocks({
+      activeTasks: [{ id: "task-other" }],
+    });
+
+    const res = await START(makeRequest(), makeContext());
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/active task/i);
+  });
+
+  it("401 — unauthenticated user", async () => {
     mockGetUser.mockResolvedValue({
       data: { user: null },
       error: new Error("Unauthorized"),
@@ -165,10 +177,12 @@ describe("POST /api/tasks/:taskId/start", () => {
 
     const res = await START(makeRequest(), makeContext());
     expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toMatch(/unauthorized/i);
   });
 });
 
-// ─── TESTI ZA STOP ────────────────────────────────────────────────────────────
+// ─── STOP TESTS ───────────────────────────────────────────────────────────────
 describe("POST /api/tasks/:taskId/stop", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -181,7 +195,7 @@ describe("POST /api/tasks/:taskId/stop", () => {
   const activeTask = {
     ...defaultTask,
     is_active: true,
-    active_since: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 uri nazaj
+    active_since: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
   };
 
   function setupStopMocks(overrides: { task?: any; existingLog?: any } = {}) {
@@ -193,14 +207,14 @@ describe("POST /api/tasks/:taskId/stop", () => {
       cnt++;
       if (cnt === 1)
         return {
-          // tasks — pridobi nalogo
+          // tasks — fetch task
           select: jest.fn().mockReturnThis(),
           eq: jest.fn().mockReturnThis(),
           maybeSingle: jest.fn().mockResolvedValue({ data: task, error: null }),
         };
       if (cnt === 2)
         return {
-          // time_logs — preveri obstoječi vpis
+          // time_logs — check existing log for today
           select: jest.fn().mockReturnThis(),
           eq: jest.fn().mockReturnThis(),
           maybeSingle: jest
@@ -216,7 +230,7 @@ describe("POST /api/tasks/:taskId/stop", () => {
           : { insert: jest.fn().mockResolvedValue({ error: null }) };
       if (cnt === 4)
         return {
-          // time_logs — seštej vse ure
+          // time_logs — sum all logged hours
           select: jest.fn().mockReturnThis(),
           eq: jest
             .fn()
@@ -235,8 +249,8 @@ describe("POST /api/tasks/:taskId/stop", () => {
     });
   }
 
-  // ─── #1: Regularen potek ───────────────────────────────────────────────────
-  it("200 — uspešno konča delo in zabeleži čas", async () => {
+  // ─── #1: Successful stop ──────────────────────────────────────────────────
+  it("200 — successfully stops work and logs time", async () => {
     setupStopMocks();
 
     const res = await STOP(
@@ -246,12 +260,13 @@ describe("POST /api/tasks/:taskId/stop", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.is_active).toBe(false);
+    expect(body.logged_hours).toBe(2);
   });
 
-  // ─── #2: Agregacija časa po dnevu ─────────────────────────────────────────
-  it("200 — prišteje ure k obstoječemu vpisu za danes", async () => {
+  // ─── #2: Time aggregation by day ──────────────────────────────────────────
+  it("200 — adds hours to existing log entry for today", async () => {
     setupStopMocks({
-      existingLog: { id: "log-1", hours: 1.5 }, // že 1.5h zabeleženih danes
+      existingLog: { id: "log-1", hours: 1.5 }, // already 1.5h logged today
     });
 
     const res = await STOP(
@@ -261,8 +276,8 @@ describe("POST /api/tasks/:taskId/stop", () => {
     expect(res.status).toBe(200);
   });
 
-  // ─── #3: Naloga ni aktivna ────────────────────────────────────────────────
-  it("400 — naloga ni aktivna", async () => {
+  // ─── #3: Task is not active ───────────────────────────────────────────────
+  it("400 — task is not active", async () => {
     setupStopMocks({
       task: { ...activeTask, is_active: false },
     });
@@ -273,13 +288,13 @@ describe("POST /api/tasks/:taskId/stop", () => {
     );
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/aktivna/i);
+    expect(body.error).toMatch(/not active/i);
   });
 
-  // ─── #4: Naloga ni vaša ────────────────────────────────────────────────────
-  it("400 — naloga pripada drugemu uporabniku", async () => {
+  // ─── #4: Task does not belong to current user ─────────────────────────────
+  it("400 — task belongs to another user", async () => {
     setupStopMocks({
-      task: { ...activeTask, assignee_id: "drug-user" },
+      task: { ...activeTask, assignee_id: "other-user" },
     });
 
     const res = await STOP(
@@ -288,10 +303,10 @@ describe("POST /api/tasks/:taskId/stop", () => {
     );
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/vaša/i);
+    expect(body.error).toMatch(/not active or does not belong/i);
   });
 
-  it("401 — neprijavljen uporabnik", async () => {
+  it("401 — unauthenticated user", async () => {
     mockGetUser.mockResolvedValue({
       data: { user: null },
       error: new Error("Unauthorized"),
@@ -302,5 +317,7 @@ describe("POST /api/tasks/:taskId/stop", () => {
       makeContext(),
     );
     expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toMatch(/unauthorized/i);
   });
 });

@@ -62,7 +62,9 @@ import { canCreateProject, projectNameExists } from "@/lib/permissions";
 export async function GET() {
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -194,7 +196,9 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -204,7 +208,7 @@ export async function POST(request: NextRequest) {
   if (!canCreate) {
     return NextResponse.json(
       { error: "Only an administrator can create a project" },
-      { status: 403 }
+      { status: 403 },
     );
   }
 
@@ -212,14 +216,17 @@ export async function POST(request: NextRequest) {
   const { name, description, members } = body;
 
   if (!name) {
-    return NextResponse.json({ error: "Project name is required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Project name is required" },
+      { status: 400 },
+    );
   }
 
   const nameExists = await projectNameExists(name);
   if (nameExists) {
     return NextResponse.json(
       { error: "A project with this name already exists" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -236,28 +243,6 @@ export async function POST(request: NextRequest) {
   if (projectError) {
     return NextResponse.json({ error: projectError.message }, { status: 500 });
   }
-
-  if (members && Array.isArray(members) && members.length > 0) {
-    const memberInserts = members.map((member: { user_id: string; role: string }) => ({
-      project_id: project.id,
-      user_id: member.user_id,
-      role: member.role,
-    }));
-
-    const { error: membersError } = await supabase
-      .from("project_members")
-      .insert(memberInserts);
-
-    if (membersError) {
-      console.error("Error adding members:", membersError);
-    }
-  }
-
-  await supabase.from("project_members").insert({
-    project_id: project.id,
-    user_id: user.id,
-    role: "product_owner",
-  });
 
   return NextResponse.json(project, { status: 201 });
 }

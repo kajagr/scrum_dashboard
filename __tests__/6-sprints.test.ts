@@ -31,7 +31,7 @@ jest.mock("@/lib/supabase/server", () => ({
   ),
 }));
 
-// ─── Helper funkcije ──────────────────────────────────────────────────────────
+// ─── Helper functions ─────────────────────────────────────────────────────────
 function makeRequest(body: object) {
   return new NextRequest("http://localhost/api/projects/test-project/sprints", {
     method: "POST",
@@ -44,40 +44,38 @@ function makeContext(projectId = "test-project") {
   return { params: Promise.resolve({ projectId }) };
 }
 
-// Datum v prihodnosti
 function futureDate(daysFromNow: number) {
   const d = new Date();
   d.setDate(d.getDate() + daysFromNow);
   return d.toISOString().split("T")[0];
 }
 
-// Datum v preteklosti
 function pastDate(daysAgo: number) {
   const d = new Date();
   d.setDate(d.getDate() - daysAgo);
   return d.toISOString().split("T")[0];
 }
 
-// ─── Testi ────────────────────────────────────────────────────────────────────
+// ─── Tests ────────────────────────────────────────────────────────────────────
 describe("POST /api/projects/:projectId/sprints", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Default: user je prijavljen
+    // Default: user is authenticated
     mockGetUser.mockResolvedValue({
       data: { user: { id: "user-1" } },
       error: null,
     });
-    // Default: ni prekrivajočih sprintov
+    // Default: no overlapping sprints
     mockGte.mockResolvedValue({ data: [], error: null });
-    // Default: insert uspe
+    // Default: insert succeeds
     mockSingle.mockResolvedValue({
       data: { id: "sprint-1", name: "Sprint 1" },
       error: null,
     });
   });
 
-  // ─── #1: Običajen potek ───────────────────────────────────────────────────
-  it("201 — uspešno ustvari sprint z veljavnimi podatki", async () => {
+  // ─── #1: Successful sprint creation ──────────────────────────────────────
+  it("201 — successfully creates sprint with valid data", async () => {
     const res = await POST(
       makeRequest({
         name: "Sprint 1",
@@ -91,10 +89,11 @@ describe("POST /api/projects/:projectId/sprints", () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.id).toBe("sprint-1");
+    expect(body.name).toBe("Sprint 1");
   });
 
-  // ─── #2: Končni datum pred začetnim ──────────────────────────────────────
-  it("400 — končni datum je pred začetnim", async () => {
+  // ─── #2: End date before start date ──────────────────────────────────────
+  it("400 — end date is before start date", async () => {
     const res = await POST(
       makeRequest({
         name: "Sprint 1",
@@ -107,11 +106,11 @@ describe("POST /api/projects/:projectId/sprints", () => {
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/končni datum/i);
+    expect(body.error).toMatch(/end date/i);
   });
 
-  // ─── #3: Začetni datum v preteklosti ─────────────────────────────────────
-  it("400 — začetni datum je v preteklosti", async () => {
+  // ─── #3: Start date in the past ──────────────────────────────────────────
+  it("400 — start date is in the past", async () => {
     const res = await POST(
       makeRequest({
         name: "Sprint 1",
@@ -124,11 +123,11 @@ describe("POST /api/projects/:projectId/sprints", () => {
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/preteklosti/i);
+    expect(body.error).toMatch(/past/i);
   });
 
-  // ─── #4: Neveljavna hitrost ───────────────────────────────────────────────
-  it("400 — velocity je negativen", async () => {
+  // ─── #4: Invalid velocity ─────────────────────────────────────────────────
+  it("400 — velocity is negative", async () => {
     const res = await POST(
       makeRequest({
         name: "Sprint 1",
@@ -144,7 +143,7 @@ describe("POST /api/projects/:projectId/sprints", () => {
     expect(body.error).toMatch(/velocity/i);
   });
 
-  it("400 — velocity je 0", async () => {
+  it("400 — velocity is zero", async () => {
     const res = await POST(
       makeRequest({
         name: "Sprint 1",
@@ -160,7 +159,7 @@ describe("POST /api/projects/:projectId/sprints", () => {
     expect(body.error).toMatch(/velocity/i);
   });
 
-  it("400 — velocity je previsok (> 100)", async () => {
+  it("400 — velocity is too high (> 100)", async () => {
     const res = await POST(
       makeRequest({
         name: "Sprint 1",
@@ -176,15 +175,14 @@ describe("POST /api/projects/:projectId/sprints", () => {
     expect(body.error).toMatch(/velocity/i);
   });
 
-  // ─── #5: Prekrivanje sprintov ─────────────────────────────────────────────
-  it("409 — sprint se prekriva z obstoječim", async () => {
-    // Simuliraj da obstaja prekravajoči sprint — mock mora vrniti na koncu verige
+  // ─── #5: Overlapping sprints ──────────────────────────────────────────────
+  it("409 — sprint overlaps with an existing sprint", async () => {
     mockFrom.mockImplementationOnce(() => ({
       select: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
       lte: jest.fn().mockReturnThis(),
       gte: jest.fn().mockResolvedValue({
-        data: [{ id: "existing-sprint", name: "Obstoječi sprint" }],
+        data: [{ id: "existing-sprint", name: "Existing Sprint" }],
         error: null,
       }),
       insert: jest.fn().mockReturnThis(),
@@ -204,11 +202,11 @@ describe("POST /api/projects/:projectId/sprints", () => {
 
     expect(res.status).toBe(409);
     const body = await res.json();
-    expect(body.error).toMatch(/prekriva/i);
+    expect(body.error).toMatch(/overlaps/i);
   });
 
-  // ─── Dodatni testi ────────────────────────────────────────────────────────
-  it("401 — uporabnik ni prijavljen", async () => {
+  // ─── Additional tests ─────────────────────────────────────────────────────
+  it("401 — unauthenticated user", async () => {
     mockGetUser.mockResolvedValue({
       data: { user: null },
       error: new Error("Not authenticated"),
@@ -224,18 +222,36 @@ describe("POST /api/projects/:projectId/sprints", () => {
     );
 
     expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toMatch(/unauthorized/i);
   });
 
-  it("400 — manjkajoča obvezna polja", async () => {
+  it("400 — missing required fields", async () => {
     const res = await POST(
-      makeRequest({ name: "Sprint 1" }), // manjkata start_date in end_date
+      makeRequest({ name: "Sprint 1" }), // missing start_date and end_date
       makeContext(),
     );
 
     expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/required/i);
   });
 
-  it("403 — RLS napaka pri insertu", async () => {
+  it("201 — creates sprint without velocity (optional field)", async () => {
+    const res = await POST(
+      makeRequest({
+        name: "Sprint 1",
+        start_date: futureDate(1),
+        end_date: futureDate(14),
+        // velocity omitted
+      }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(201);
+  });
+
+  it("403 — RLS error on insert", async () => {
     mockSingle.mockResolvedValue({
       data: null,
       error: { message: "row-level security policy" },
@@ -252,5 +268,7 @@ describe("POST /api/projects/:projectId/sprints", () => {
     );
 
     expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toMatch(/permission/i);
   });
 });

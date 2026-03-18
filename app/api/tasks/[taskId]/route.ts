@@ -155,19 +155,19 @@ export async function GET(request: NextRequest, context: RouteContext) {
  *                   type: string
  *                   examples:
  *                     notInSprint:
- *                       value: "Naloga ni v nobenem sprintu."
+ *                       value: "Task is not in any sprint."
  *                     sprintNotActive:
- *                       value: "Nalogo lahko sprejmete samo v aktivnem sprintu."
+ *                       value: "Tasks can only be accepted in an active sprint."
  *                     alreadyAccepted:
- *                       value: "Naloga je že sprejeta."
+ *                       value: "Task has already been accepted."
  *                     assignedToOther:
- *                       value: "Naloga je dodeljena drugemu članu."
+ *                       value: "Task is assigned to another member."
  *                     notOwner:
- *                       value: "Niste lastnik te naloge."
+ *                       value: "You are not the owner of this task."
  *                     acceptedCannotEdit:
- *                       value: "Sprejete naloge ni mogoče urejati."
+ *                       value: "Accepted tasks cannot be edited."
  *                     invalidHours:
- *                       value: "Ocena časa mora biti pozitivno število."
+ *                       value: "Estimated hours must be a positive number."
  *                     invalidStatus:
  *                       value: "Invalid status. Must be: unassigned, assigned, in_progress, or completed."
  *       401:
@@ -193,9 +193,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
  *                     notMember:
  *                       value: "You are not a member of this project."
  *                     wrongRoleAccept:
- *                       value: "Samo razvijalci in skrbniki metodologije lahko sprejmejo nalogo."
+ *                       value: "Only developers and Scrum Masters can accept tasks."
  *                     wrongRoleEdit:
- *                       value: "Nimaš pravic za urejanje naloge."
+ *                       value: "You don't have permission to edit this task."
  *                     wrongRoleStatus:
  *                       value: "Only developers and scrum masters can work on tasks."
  *       404:
@@ -279,8 +279,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       ) {
         return NextResponse.json(
           {
-            error:
-              "Samo razvijalci in skrbniki metodologije lahko sprejmejo nalogo.",
+            error: "Only developers and Scrum Masters can accept tasks.",
           },
           { status: 403 },
         );
@@ -288,7 +287,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
       if (!story.sprint_id) {
         return NextResponse.json(
-          { error: "Naloga ni v nobenem sprintu." },
+          { error: "Task is not in any sprint." },
           { status: 400 },
         );
       }
@@ -301,7 +300,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
       if (!sprint)
         return NextResponse.json(
-          { error: "Sprint ne obstaja." },
+          { error: "Sprint not found." },
           { status: 400 },
         );
 
@@ -315,21 +314,21 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
       if (sprintStatus !== "active") {
         return NextResponse.json(
-          { error: "Nalogo lahko sprejmete samo v aktivnem sprintu." },
+          { error: "Tasks can only be accepted in an active sprint." },
           { status: 400 },
         );
       }
 
       if (task.is_accepted) {
         return NextResponse.json(
-          { error: "Naloga je že sprejeta." },
+          { error: "Task has already been accepted." },
           { status: 400 },
         );
       }
 
       if (task.assignee_id && task.assignee_id !== user.id) {
         return NextResponse.json(
-          { error: "Naloga je dodeljena drugemu članu." },
+          { error: "Task is assigned to another member." },
           { status: 400 },
         );
       }
@@ -357,7 +356,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (action === "resign") {
       if (!task.is_accepted || task.assignee_id !== user.id) {
         return NextResponse.json(
-          { error: "Niste lastnik te naloge." },
+          { error: "You are not the owner of this task." },
           { status: 400 },
         );
       }
@@ -388,13 +387,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         membership.role !== "scrum_master"
       ) {
         return NextResponse.json(
-          { error: "Nimaš pravic za urejanje naloge." },
+          { error: "You don't have permission to edit this task." },
           { status: 403 },
         );
       }
       if (task.is_accepted) {
         return NextResponse.json(
-          { error: "Sprejete naloge ni mogoče urejati." },
+          { error: "Accepted tasks cannot be edited." },
           { status: 400 },
         );
       }
@@ -408,7 +407,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         (isNaN(estimatedHours) || estimatedHours <= 0)
       ) {
         return NextResponse.json(
-          { error: "Ocena časa mora biti pozitivno število." },
+          { error: "Estimated hours must be a positive number." },
           { status: 400 },
         );
       }
@@ -516,7 +515,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "Naloga uspešno izbrisana."
+ *                   example: "Task deleted successfully."
  *       400:
  *         description: Task cannot be deleted because it is accepted
  *         content:
@@ -526,7 +525,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Sprejete naloge ni mogoče izbrisati."
+ *                   example: "Accepted tasks cannot be deleted."
  *       401:
  *         description: User not authenticated
  *         content:
@@ -546,7 +545,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Nimaš pravic za brisanje naloge."
+ *                   example: "You don't have permission to delete this task."
  *       404:
  *         description: Task or story not found
  *         content:
@@ -615,13 +614,13 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       (membership.role !== "developer" && membership.role !== "scrum_master")
     ) {
       return NextResponse.json(
-        { error: "Nimaš pravic za brisanje naloge." },
+        { error: "You don't have permission to delete this task." },
         { status: 403 },
       );
     }
     if (task.is_accepted) {
       return NextResponse.json(
-        { error: "Sprejete naloge ni mogoče izbrisati." },
+        { error: "Accepted tasks cannot be deleted." },
         { status: 400 },
       );
     }
@@ -632,7 +631,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       .eq("id", taskId);
     if (deleteError)
       return NextResponse.json({ error: deleteError.message }, { status: 500 });
-    return NextResponse.json({ message: "Naloga uspešno izbrisana." });
+    return NextResponse.json({ message: "Task deleted successfully." });
   } catch {
     return NextResponse.json(
       { error: "Error deleting task." },

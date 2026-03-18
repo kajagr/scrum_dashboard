@@ -14,7 +14,7 @@ jest.mock("@/lib/supabase/server", () => ({
   ),
 }));
 
-// ─── Helper funkcije ──────────────────────────────────────────────────────────
+// ─── Helper functions ─────────────────────────────────────────────────────────
 function makeRequest(body: object) {
   return new NextRequest("http://localhost/api/tasks/task-1", {
     method: "PATCH",
@@ -27,7 +27,7 @@ function makeContext(taskId = "task-1") {
   return { params: Promise.resolve({ taskId }) };
 }
 
-// ─── Default podatki ──────────────────────────────────────────────────────────
+// ─── Default data ─────────────────────────────────────────────────────────────
 const defaultTask = {
   id: "task-1",
   user_story_id: "story-1",
@@ -45,7 +45,7 @@ const defaultStory = {
 
 const defaultMembership = { role: "developer" };
 
-// ─── Setup mock ───────────────────────────────────────────────────────────────
+// ─── Setup mocks ──────────────────────────────────────────────────────────────
 function setupMocks(
   overrides: {
     task?: any;
@@ -102,8 +102,8 @@ function setupMocks(
   });
 }
 
-// ─── TESTI ────────────────────────────────────────────────────────────────────
-describe("PATCH /api/tasks/:taskId — odpovedovanje nalogi (#17)", () => {
+// ─── TESTS ────────────────────────────────────────────────────────────────────
+describe("PATCH /api/tasks/:taskId — resign from task (#17)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetUser.mockResolvedValue({
@@ -112,8 +112,8 @@ describe("PATCH /api/tasks/:taskId — odpovedovanje nalogi (#17)", () => {
     });
   });
 
-  // ─── #1: Regularen potek odpovedi ────────────────────────────────────────
-  it("200 — uspešno odpoved nalogi", async () => {
+  // ─── #1: Successful resign ────────────────────────────────────────────────
+  it("200 — successfully resigns from task", async () => {
     setupMocks();
 
     const res = await PATCH(makeRequest({ action: "resign" }), makeContext());
@@ -125,20 +125,20 @@ describe("PATCH /api/tasks/:taskId — odpovedovanje nalogi (#17)", () => {
     expect(body.is_accepted).toBe(false);
   });
 
-  // ─── #2: Naloga ni tvoja — ni sprejeta s strani tega userja ──────────────
-  it("400 — odpoved nalogi ki je ni sprejel trenutni uporabnik (drug assignee)", async () => {
+  // ─── #2: Task does not belong to current user ─────────────────────────────
+  it("400 — cannot resign from task assigned to a different user", async () => {
     setupMocks({
-      task: { ...defaultTask, assignee_id: "drug-user", is_accepted: true },
+      task: { ...defaultTask, assignee_id: "other-user", is_accepted: true },
     });
 
     const res = await PATCH(makeRequest({ action: "resign" }), makeContext());
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/lastnik/i);
+    expect(body.error).toMatch(/owner/i);
   });
 
-  it("400 — odpoved nalogi ki ni sprejeta (is_accepted = false)", async () => {
+  it("400 — cannot resign from a task that has not been accepted (is_accepted = false)", async () => {
     setupMocks({
       task: { ...defaultTask, is_accepted: false },
     });
@@ -147,14 +147,13 @@ describe("PATCH /api/tasks/:taskId — odpovedovanje nalogi (#17)", () => {
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/lastnik/i);
+    expect(body.error).toMatch(/owner/i);
   });
 
-  // ─── #3: Drug razvijalec lahko prevzame odpovedano nalogo ────────────────
-  // Integracija s #16 — simuliramo da je naloga po odpovedi unassigned
-  // in da jo drug razvijalec lahko sprejme (action: "accept")
-  it("200 — drug razvijalec sprejme odpovedano nalogo", async () => {
-    // Naloga je unassigned (po odpovedi)
+  // ─── #3: Another developer can accept a resigned task ────────────────────
+  // Integration with #16 — simulates that after resign the task is unassigned
+  // and another developer can accept it (action: "accept")
+  it("200 — another developer can accept a resigned task", async () => {
     const unassignedTask = {
       ...defaultTask,
       assignee_id: null,
@@ -200,7 +199,7 @@ describe("PATCH /api/tasks/:taskId — odpovedovanje nalogi (#17)", () => {
         };
       if (cnt === 4)
         return {
-          // sprints — preveri aktivni sprint
+          // sprints — check active sprint
           select: jest.fn().mockReturnThis(),
           eq: jest.fn().mockReturnThis(),
           maybeSingle: jest
@@ -224,7 +223,7 @@ describe("PATCH /api/tasks/:taskId — odpovedovanje nalogi (#17)", () => {
       };
     });
 
-    // Drug razvijalec (user-2) sprejme nalogo
+    // Another developer (user-2) accepts the task
     mockGetUser.mockResolvedValue({
       data: { user: { id: "user-2" } },
       error: null,
@@ -239,24 +238,28 @@ describe("PATCH /api/tasks/:taskId — odpovedovanje nalogi (#17)", () => {
     expect(body.status).toBe("assigned");
   });
 
-  // ─── Dodatni testi ────────────────────────────────────────────────────────
-  it("401 — neprijavljen uporabnik", async () => {
+  // ─── Additional tests ─────────────────────────────────────────────────────
+  it("401 — unauthenticated user", async () => {
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
 
     const res = await PATCH(makeRequest({ action: "resign" }), makeContext());
 
     expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toMatch(/unauthorized/i);
   });
 
-  it("403 — uporabnik ni član projekta", async () => {
+  it("403 — user is not a project member", async () => {
     setupMocks({ membership: null });
 
     const res = await PATCH(makeRequest({ action: "resign" }), makeContext());
 
     expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toMatch(/not a member/i);
   });
 
-  it("404 — naloga ne obstaja", async () => {
+  it("404 — task does not exist", async () => {
     mockFrom.mockImplementationOnce(() => ({
       select: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
@@ -266,5 +269,7 @@ describe("PATCH /api/tasks/:taskId — odpovedovanje nalogi (#17)", () => {
     const res = await PATCH(makeRequest({ action: "resign" }), makeContext());
 
     expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toMatch(/not found/i);
   });
 });

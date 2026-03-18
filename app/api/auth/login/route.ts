@@ -39,7 +39,7 @@ import { createClient } from "@/lib/supabase/server";
  *                   properties:
  *                     message:
  *                       type: string
- *                       example: "Prijava uspešna."
+ *                       example: "Login successful."
  *                     user:
  *                       type: object
  *                       properties:
@@ -69,7 +69,7 @@ import { createClient } from "@/lib/supabase/server";
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Email in geslo sta obvezna."
+ *                   example: "Email and password are required."
  *       401:
  *         description: Invalid credentials
  *         content:
@@ -79,7 +79,7 @@ import { createClient } from "@/lib/supabase/server";
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Napačen email ali geslo."
+ *                   example: "Wrong email or password."
  *       500:
  *         description: Internal server error
  *         content:
@@ -89,7 +89,7 @@ import { createClient } from "@/lib/supabase/server";
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Napaka pri prijavi."
+ *                   example: "An error occurred while logging in."
  */
 export async function POST(request: NextRequest) {
   try {
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     if (!email || !password) {
       return NextResponse.json(
-        { error: "Email in geslo sta obvezna." },
+        { error: "Email and password are required." },
         { status: 400 },
       );
     }
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     if (signInError || !signInData.user) {
       return NextResponse.json(
-        { error: "Napačen email ali geslo." },
+        { error: "Wrong email or password." },
         { status: 401 },
       );
     }
@@ -155,12 +155,15 @@ export async function POST(request: NextRequest) {
     // 4. Vrni uspeh
     return NextResponse.json(
       {
-        message: "Prijava uspešna.",
+        message: "Login successful.",
         user: { id: signInData.user.id, email: signInData.user.email },
       },
       { status: 200 },
     );
   } catch {
-    return NextResponse.json({ error: "Napaka pri prijavi." }, { status: 500 });
+    return NextResponse.json(
+      { error: "An error occurred while logging in." },
+      { status: 500 },
+    );
   }
 }

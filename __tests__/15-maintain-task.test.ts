@@ -14,7 +14,7 @@ jest.mock("@/lib/supabase/server", () => ({
   ),
 }));
 
-// ─── Helper funkcije ──────────────────────────────────────────────────────────
+// ─── Helper functions ─────────────────────────────────────────────────────────
 function makePatchRequest(body: object) {
   return new NextRequest("http://localhost/api/tasks/task-1", {
     method: "PATCH",
@@ -33,7 +33,7 @@ function makeContext(taskId = "task-1") {
   return { params: Promise.resolve({ taskId }) };
 }
 
-// ─── Default podatki ──────────────────────────────────────────────────────────
+// ─── Default data ─────────────────────────────────────────────────────────────
 const defaultTask = {
   id: "task-1",
   user_story_id: "story-1",
@@ -53,11 +53,11 @@ const defaultMembership = { role: "developer" };
 
 const editBody = {
   action: "edit",
-  description: "Posodobljen opis",
+  description: "Updated description",
   estimated_hours: 3,
 };
 
-// ─── Setup mock za PATCH ──────────────────────────────────────────────────────
+// ─── Setup mocks for PATCH ────────────────────────────────────────────────────
 function setupPatchMocks(
   overrides: {
     task?: any;
@@ -73,7 +73,7 @@ function setupPatchMocks(
       ? overrides.membership
       : defaultMembership;
   const updateResult = overrides.updateResult ?? {
-    data: { id: "task-1", description: "Posodobljen opis" },
+    data: { id: "task-1", description: "Updated description" },
     error: null,
   };
 
@@ -109,7 +109,7 @@ function setupPatchMocks(
   });
 }
 
-// ─── Setup mock za DELETE ─────────────────────────────────────────────────────
+// ─── Setup mocks for DELETE ───────────────────────────────────────────────────
 function setupDeleteMocks(
   overrides: {
     task?: any;
@@ -154,8 +154,8 @@ function setupDeleteMocks(
   });
 }
 
-// ─── TESTI ZA PATCH ───────────────────────────────────────────────────────────
-describe("PATCH /api/tasks/:taskId — urejanje naloge (#15)", () => {
+// ─── PATCH TESTS ──────────────────────────────────────────────────────────────
+describe("PATCH /api/tasks/:taskId — edit task (#15)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetUser.mockResolvedValue({
@@ -164,16 +164,18 @@ describe("PATCH /api/tasks/:taskId — urejanje naloge (#15)", () => {
     });
   });
 
-  // ─── #1: Regularen potek ──────────────────────────────────────────────────
-  it("200 — uspešno uredi nesprejeto nalogo", async () => {
+  // ─── #1: Successful edit ──────────────────────────────────────────────────
+  it("200 — successfully edits an unaccepted task", async () => {
     setupPatchMocks();
 
     const res = await PATCH(makePatchRequest(editBody), makeContext());
     expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.id).toBe("task-1");
   });
 
-  // ─── #2: Sprejeta naloga — ne more urejati ────────────────────────────────
-  it("400 — ne more urejati sprejete naloge", async () => {
+  // ─── #2: Accepted task cannot be edited ───────────────────────────────────
+  it("400 — cannot edit an accepted task", async () => {
     setupPatchMocks({
       task: { ...defaultTask, is_accepted: true, assignee_id: "user-2" },
     });
@@ -181,25 +183,29 @@ describe("PATCH /api/tasks/:taskId — urejanje naloge (#15)", () => {
     const res = await PATCH(makePatchRequest(editBody), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/sprejete/i);
+    expect(body.error).toMatch(/accepted tasks cannot be edited/i);
   });
 
-  // ─── Dodatni testi ────────────────────────────────────────────────────────
-  it("403 — uporabnik ni član projekta", async () => {
+  // ─── Additional tests ─────────────────────────────────────────────────────
+  it("403 — user is not a project member", async () => {
     setupPatchMocks({ membership: null });
 
     const res = await PATCH(makePatchRequest(editBody), makeContext());
     expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toMatch(/not a member/i);
   });
 
-  it("403 — product_owner nima pravic", async () => {
+  it("403 — product_owner does not have permission to edit tasks", async () => {
     setupPatchMocks({ membership: { role: "product_owner" } });
 
     const res = await PATCH(makePatchRequest(editBody), makeContext());
     expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toMatch(/permission/i);
   });
 
-  it("400 — neveljavna ocena časa (0)", async () => {
+  it("400 — invalid estimated hours (zero)", async () => {
     setupPatchMocks();
 
     const res = await PATCH(
@@ -208,10 +214,10 @@ describe("PATCH /api/tasks/:taskId — urejanje naloge (#15)", () => {
     );
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/časa|pozitivno/i);
+    expect(body.error).toMatch(/positive/i);
   });
 
-  it("400 — neveljavna ocena časa (negativna)", async () => {
+  it("400 — invalid estimated hours (negative)", async () => {
     setupPatchMocks();
 
     const res = await PATCH(
@@ -219,16 +225,20 @@ describe("PATCH /api/tasks/:taskId — urejanje naloge (#15)", () => {
       makeContext(),
     );
     expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/positive/i);
   });
 
-  it("401 — neprijavljen uporabnik", async () => {
+  it("401 — unauthenticated user", async () => {
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
 
     const res = await PATCH(makePatchRequest(editBody), makeContext());
     expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toMatch(/unauthorized/i);
   });
 
-  it("404 — naloga ne obstaja", async () => {
+  it("404 — task does not exist", async () => {
     mockFrom.mockImplementationOnce(() => ({
       select: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
@@ -237,11 +247,13 @@ describe("PATCH /api/tasks/:taskId — urejanje naloge (#15)", () => {
 
     const res = await PATCH(makePatchRequest(editBody), makeContext());
     expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toMatch(/not found/i);
   });
 });
 
-// ─── TESTI ZA DELETE ──────────────────────────────────────────────────────────
-describe("DELETE /api/tasks/:taskId — brisanje naloge (#15)", () => {
+// ─── DELETE TESTS ─────────────────────────────────────────────────────────────
+describe("DELETE /api/tasks/:taskId — delete task (#15)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetUser.mockResolvedValue({
@@ -250,18 +262,18 @@ describe("DELETE /api/tasks/:taskId — brisanje naloge (#15)", () => {
     });
   });
 
-  // ─── #1: Regularen potek ──────────────────────────────────────────────────
-  it("200 — uspešno izbriše nesprejeto nalogo", async () => {
+  // ─── #1: Successful delete ────────────────────────────────────────────────
+  it("200 — successfully deletes an unaccepted task", async () => {
     setupDeleteMocks();
 
     const res = await DELETE(makeDeleteRequest(), makeContext());
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.message).toMatch(/izbrisana/i);
+    expect(body.message).toMatch(/deleted successfully/i);
   });
 
-  // ─── #2: Brisanje sprejete naloge ─────────────────────────────────────────
-  it("400 — ne more izbrisati sprejete naloge", async () => {
+  // ─── #2: Accepted task cannot be deleted ──────────────────────────────────
+  it("400 — cannot delete an accepted task", async () => {
     setupDeleteMocks({
       task: { ...defaultTask, is_accepted: true, assignee_id: "user-2" },
     });
@@ -269,25 +281,29 @@ describe("DELETE /api/tasks/:taskId — brisanje naloge (#15)", () => {
     const res = await DELETE(makeDeleteRequest(), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/sprejete/i);
+    expect(body.error).toMatch(/accepted tasks cannot be deleted/i);
   });
 
-  // ─── Dodatni testi ────────────────────────────────────────────────────────
-  it("403 — product_owner nima pravic za brisanje", async () => {
+  // ─── Additional tests ─────────────────────────────────────────────────────
+  it("403 — product_owner does not have permission to delete tasks", async () => {
     setupDeleteMocks({ membership: { role: "product_owner" } });
 
     const res = await DELETE(makeDeleteRequest(), makeContext());
     expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toMatch(/permission/i);
   });
 
-  it("401 — neprijavljen uporabnik", async () => {
+  it("401 — unauthenticated user", async () => {
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
 
     const res = await DELETE(makeDeleteRequest(), makeContext());
     expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toMatch(/unauthorized/i);
   });
 
-  it("404 — naloga ne obstaja", async () => {
+  it("404 — task does not exist", async () => {
     mockFrom.mockImplementationOnce(() => ({
       select: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
@@ -296,5 +312,7 @@ describe("DELETE /api/tasks/:taskId — brisanje naloge (#15)", () => {
 
     const res = await DELETE(makeDeleteRequest(), makeContext());
     expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toMatch(/not found/i);
   });
 });

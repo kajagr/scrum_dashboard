@@ -14,7 +14,7 @@ jest.mock("@/lib/supabase/server", () => ({
   ),
 }));
 
-// ─── Helper funkcije ──────────────────────────────────────────────────────────
+// ─── Helper functions ─────────────────────────────────────────────────────────
 function makeRequest(body: object) {
   return new NextRequest("http://localhost/api/tasks/task-1", {
     method: "PATCH",
@@ -27,7 +27,7 @@ function makeContext(taskId = "task-1") {
   return { params: Promise.resolve({ taskId }) };
 }
 
-// ─── Default podatki ──────────────────────────────────────────────────────────
+// ─── Default data ─────────────────────────────────────────────────────────────
 const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
 const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
 
@@ -54,7 +54,7 @@ const activeSprint = {
 
 const defaultMembership = { role: "developer" };
 
-// ─── Setup mock ───────────────────────────────────────────────────────────────
+// ─── Setup mocks ──────────────────────────────────────────────────────────────
 function setupMocks(
   overrides: {
     task?: any;
@@ -125,8 +125,8 @@ function setupMocks(
   });
 }
 
-// ─── TESTI ────────────────────────────────────────────────────────────────────
-describe("PATCH /api/tasks/:taskId — sprejemanje naloge (#16)", () => {
+// ─── TESTS ────────────────────────────────────────────────────────────────────
+describe("PATCH /api/tasks/:taskId — accept task (#16)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetUser.mockResolvedValue({
@@ -135,8 +135,8 @@ describe("PATCH /api/tasks/:taskId — sprejemanje naloge (#16)", () => {
     });
   });
 
-  // ─── #1: Regularen potek ──────────────────────────────────────────────────
-  it("200 — uspešno sprejme nedodeljeno nalogo", async () => {
+  // ─── #1: Successful accept ────────────────────────────────────────────────
+  it("200 — successfully accepts an unassigned task", async () => {
     setupMocks();
 
     const res = await PATCH(makeRequest({ action: "accept" }), makeContext());
@@ -147,7 +147,7 @@ describe("PATCH /api/tasks/:taskId — sprejemanje naloge (#16)", () => {
     expect(body.status).toBe("assigned");
   });
 
-  it("200 — sprejme nalogo ki je bila predlagana trenutnemu userju", async () => {
+  it("200 — accepts a task that was suggested to the current user", async () => {
     setupMocks({
       task: { ...defaultTask, assignee_id: "user-1", is_accepted: false },
     });
@@ -156,8 +156,8 @@ describe("PATCH /api/tasks/:taskId — sprejemanje naloge (#16)", () => {
     expect(res.status).toBe(200);
   });
 
-  // ─── #2: Naloga je že sprejeta ────────────────────────────────────────────
-  it("400 — naloga je že sprejeta", async () => {
+  // ─── #2: Task already accepted ────────────────────────────────────────────
+  it("400 — task is already accepted", async () => {
     setupMocks({
       task: { ...defaultTask, is_accepted: true, assignee_id: "user-2" },
     });
@@ -165,11 +165,11 @@ describe("PATCH /api/tasks/:taskId — sprejemanje naloge (#16)", () => {
     const res = await PATCH(makeRequest({ action: "accept" }), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/sprejeta/i);
+    expect(body.error).toMatch(/already been accepted/i);
   });
 
-  // ─── #3: Naloga dodeljena drugemu članu ──────────────────────────────────
-  it("400 — naloga je predlagana drugemu članu", async () => {
+  // ─── #3: Task assigned to another member ──────────────────────────────────
+  it("400 — task is suggested to another member", async () => {
     setupMocks({
       task: { ...defaultTask, assignee_id: "user-99", is_accepted: false },
     });
@@ -177,18 +177,20 @@ describe("PATCH /api/tasks/:taskId — sprejemanje naloge (#16)", () => {
     const res = await PATCH(makeRequest({ action: "accept" }), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/drugemu/i);
+    expect(body.error).toMatch(/another member/i);
   });
 
-  // ─── Dodatni testi ────────────────────────────────────────────────────────
-  it("403 — product_owner ne more sprejeti naloge", async () => {
+  // ─── Additional tests ─────────────────────────────────────────────────────
+  it("403 — product_owner cannot accept a task", async () => {
     setupMocks({ membership: { role: "product_owner" } });
 
     const res = await PATCH(makeRequest({ action: "accept" }), makeContext());
     expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toMatch(/scrum master|developer/i);
   });
 
-  it("400 — sprint ni aktiven", async () => {
+  it("400 — sprint is not active", async () => {
     const pastSprint = {
       id: "sprint-1",
       start_date: new Date(Date.now() - 2 * 86400000)
@@ -201,20 +203,37 @@ describe("PATCH /api/tasks/:taskId — sprejemanje naloge (#16)", () => {
     const res = await PATCH(makeRequest({ action: "accept" }), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/sprintu/i);
+    expect(body.error).toMatch(/active sprint/i);
   });
 
-  it("400 — zgodba nima sprinta", async () => {
+  it("400 — story has no sprint", async () => {
     setupMocks({ story: { ...defaultStory, sprint_id: null } });
 
     const res = await PATCH(makeRequest({ action: "accept" }), makeContext());
     expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/sprint/i);
   });
 
-  it("401 — neprijavljen uporabnik", async () => {
+  it("401 — unauthenticated user", async () => {
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
 
     const res = await PATCH(makeRequest({ action: "accept" }), makeContext());
     expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toMatch(/unauthorized/i);
+  });
+
+  it("404 — task does not exist", async () => {
+    mockFrom.mockImplementationOnce(() => ({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+    }));
+
+    const res = await PATCH(makeRequest({ action: "accept" }), makeContext());
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toMatch(/not found/i);
   });
 });

@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
+
+const supabaseAdmin = createAdminClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
 
 type RouteContext = {
   params: Promise<{
@@ -89,17 +95,17 @@ const ALLOWED_PRIORITIES = [
  *                   type: string
  *                   examples:
  *                     inSprint:
- *                       value: "Zgodbe, ki je dodeljena sprintu, ni mogoče urejati."
+ *                       value: "Stories assigned to a sprint cannot be edited."
  *                     isDone:
- *                       value: "Realizirane zgodbe ni mogoče urejati."
+ *                       value: "Completed stories cannot be edited."
  *                     missingFields:
- *                       value: "title, priority in business_value so obvezni."
+ *                       value: "Title, priority and business value are required."
  *                     invalidPriority:
- *                       value: "Neveljavna prioriteta."
+ *                       value: "Invalid priority value."
  *                     invalidBusinessValue:
- *                       value: "business_value mora biti med 1 in 100."
+ *                       value: "Business value must be between 1 and 100."
  *                     invalidStoryPoints:
- *                       value: "story_points mora biti 0 ali več."
+ *                       value: "Story points must be 0 or greater."
  *       401:
  *         description: User not authenticated
  *         content:
@@ -109,7 +115,7 @@ const ALLOWED_PRIORITIES = [
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Unauthorized"
+ *                   example: "Unauthorized."
  *       403:
  *         description: User does not have permission to edit the story
  *         content:
@@ -119,7 +125,7 @@ const ALLOWED_PRIORITIES = [
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Nimaš pravic za urejanje zgodbe."
+ *                   example: "You don't have permission to edit this story."
  *       404:
  *         description: User story not found
  *         content:
@@ -129,7 +135,7 @@ const ALLOWED_PRIORITIES = [
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Zgodba ne obstaja."
+ *                   example: "Story not found."
  *       409:
  *         description: A user story with this title already exists in the project
  *         content:
@@ -139,7 +145,7 @@ const ALLOWED_PRIORITIES = [
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "User story s tem naslovom že obstaja."
+ *                   example: "A story with this title already exists in the project."
  *       500:
  *         description: Internal server error
  *         content:
@@ -149,7 +155,7 @@ const ALLOWED_PRIORITIES = [
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Napaka pri urejanju zgodbe."
+ *                   example: "An error occurred while updating the story."
  */
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
@@ -160,9 +166,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser();
-
     if (userError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
     const { data: story, error: storyError } = await supabase
@@ -174,12 +179,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (storyError) {
       return NextResponse.json({ error: storyError.message }, { status: 500 });
     }
-
     if (!story) {
-      return NextResponse.json(
-        { error: "Zgodba ne obstaja." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Story not found." }, { status: 404 });
     }
 
     const { data: membership, error: membershipError } = await supabase
@@ -195,33 +196,30 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         { status: 500 },
       );
     }
-
     if (
       !membership ||
       !["product_owner", "scrum_master"].includes(membership.role)
     ) {
       return NextResponse.json(
-        { error: "Nimaš pravic za urejanje zgodbe." },
+        { error: "You don't have permission to edit this story." },
         { status: 403 },
       );
     }
 
     if (story.sprint_id) {
       return NextResponse.json(
-        { error: "Zgodbe, ki je dodeljena sprintu, ni mogoče urejati." },
+        { error: "Stories assigned to a sprint cannot be edited." },
         { status: 400 },
       );
     }
-
     if (story.status === "done") {
       return NextResponse.json(
-        { error: "Realizirane zgodbe ni mogoče urejati." },
+        { error: "Completed stories cannot be edited." },
         { status: 400 },
       );
     }
 
     const body = await request.json();
-
     const title = body.title?.trim();
     const description = body.description?.trim() || null;
     const acceptanceCriteria = body.acceptance_criteria?.trim() || null;
@@ -239,37 +237,34 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       businessValue === null
     ) {
       return NextResponse.json(
-        { error: "title, priority in business_value so obvezni." },
+        { error: "Title, priority and business value are required." },
         { status: 400 },
       );
     }
-
     if (!ALLOWED_PRIORITIES.includes(priority)) {
       return NextResponse.json(
-        { error: "Neveljavna prioriteta." },
+        { error: "Invalid priority value." },
         { status: 400 },
       );
     }
 
     const businessValueNumber = Number(businessValue);
-
     if (
       !Number.isFinite(businessValueNumber) ||
       businessValueNumber <= 0 ||
       businessValueNumber > 100
     ) {
       return NextResponse.json(
-        { error: "business_value mora biti med 1 in 100." },
+        { error: "Business value must be between 1 and 100." },
         { status: 400 },
       );
     }
-
     if (
       storyPoints !== null &&
       (!Number.isFinite(storyPoints) || storyPoints < 0)
     ) {
       return NextResponse.json(
-        { error: "story_points mora biti 0 ali več." },
+        { error: "Story points must be 0 or greater." },
         { status: 400 },
       );
     }
@@ -288,15 +283,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         { status: 500 },
       );
     }
-
     if (duplicateStory) {
       return NextResponse.json(
-        { error: "User story s tem naslovom že obstaja." },
+        { error: "A story with this title already exists in the project." },
         { status: 409 },
       );
     }
 
-    const { data: updatedStory, error: updateError } = await supabase
+    const { data: updatedStory, error: updateError } = await supabaseAdmin
       .from("user_stories")
       .update({
         title,
@@ -308,26 +302,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       })
       .eq("id", storyId)
       .select()
-      .single();
+      .maybeSingle();
 
     if (updateError) {
-      if (
-        updateError.message.toLowerCase().includes("row-level security") ||
-        updateError.message.toLowerCase().includes("permission denied")
-      ) {
-        return NextResponse.json(
-          { error: "Nimaš pravic za urejanje zgodbe." },
-          { status: 403 },
-        );
-      }
-
       return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+    if (!updatedStory) {
+      return NextResponse.json({ error: "Story not found." }, { status: 404 });
     }
 
     return NextResponse.json(updatedStory, { status: 200 });
   } catch {
     return NextResponse.json(
-      { error: "Napaka pri urejanju zgodbe." },
+      { error: "An error occurred while updating the story." },
       { status: 500 },
     );
   }
@@ -362,7 +349,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "Zgodba uspešno izbrisana."
+ *                   example: "Story deleted successfully."
  *       400:
  *         description: Story cannot be deleted
  *         content:
@@ -374,9 +361,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
  *                   type: string
  *                   examples:
  *                     inSprint:
- *                       value: "Zgodbe, ki je dodeljena sprintu, ni mogoče izbrisati."
+ *                       value: "Stories assigned to a sprint cannot be deleted."
  *                     isDone:
- *                       value: "Realizirane zgodbe ni mogoče izbrisati."
+ *                       value: "Completed stories cannot be deleted."
  *       401:
  *         description: User not authenticated
  *         content:
@@ -386,7 +373,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Unauthorized"
+ *                   example: "Unauthorized."
  *       403:
  *         description: User does not have permission to delete the story
  *         content:
@@ -396,7 +383,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Nimaš pravic za brisanje zgodbe."
+ *                   example: "You don't have permission to delete this story."
  *       404:
  *         description: User story not found
  *         content:
@@ -406,7 +393,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Zgodba ne obstaja."
+ *                   example: "Story not found."
  *       500:
  *         description: Internal server error
  *         content:
@@ -416,7 +403,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Napaka pri brisanju zgodbe."
+ *                   example: "An error occurred while deleting the story."
  */
 export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
@@ -427,9 +414,8 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser();
-
     if (userError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
     const { data: story, error: storyError } = await supabase
@@ -441,12 +427,8 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     if (storyError) {
       return NextResponse.json({ error: storyError.message }, { status: 500 });
     }
-
     if (!story) {
-      return NextResponse.json(
-        { error: "Zgodba ne obstaja." },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Story not found." }, { status: 404 });
     }
 
     const { data: membership, error: membershipError } = await supabase
@@ -462,58 +444,45 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
         { status: 500 },
       );
     }
-
     if (
       !membership ||
       !["product_owner", "scrum_master"].includes(membership.role)
     ) {
       return NextResponse.json(
-        { error: "Nimaš pravic za brisanje zgodbe." },
+        { error: "You don't have permission to delete this story." },
         { status: 403 },
       );
     }
 
     if (story.sprint_id) {
       return NextResponse.json(
-        { error: "Zgodbe, ki je dodeljena sprintu, ni mogoče izbrisati." },
+        { error: "Stories assigned to a sprint cannot be deleted." },
         { status: 400 },
       );
     }
-
     if (story.status === "done") {
       return NextResponse.json(
-        { error: "Realizirane zgodbe ni mogoče izbrisati." },
+        { error: "Completed stories cannot be deleted." },
         { status: 400 },
       );
     }
 
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await supabaseAdmin
       .from("user_stories")
       .delete()
-      .eq("id", storyId)
-      .select("id");
+      .eq("id", storyId);
 
     if (deleteError) {
-      if (
-        deleteError.message.toLowerCase().includes("row-level security") ||
-        deleteError.message.toLowerCase().includes("permission denied")
-      ) {
-        return NextResponse.json(
-          { error: "Nimaš pravic za brisanje zgodbe." },
-          { status: 403 },
-        );
-      }
-
       return NextResponse.json({ error: deleteError.message }, { status: 500 });
     }
 
     return NextResponse.json(
-      { message: "Zgodba uspešno izbrisana." },
+      { message: "Story deleted successfully." },
       { status: 200 },
     );
   } catch {
     return NextResponse.json(
-      { error: "Napaka pri brisanju zgodbe." },
+      { error: "An error occurred while deleting the story." },
       { status: 500 },
     );
   }

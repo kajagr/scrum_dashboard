@@ -60,7 +60,7 @@ type RouteContext = {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Naloga ni aktivna ali ni vaša."
+ *                   example: "Task is not active or does not belong to you."
  *       401:
  *         description: User not authenticated
  *         content:
@@ -92,7 +92,7 @@ type RouteContext = {
  *                   type: string
  *                   examples:
  *                     missingActiveSince:
- *                       value: "Napaka: active_since ni nastavljen."
+ *                       value: "Error: active_since is not set."
  *                     generic:
  *                       value: "Error stopping task."
  */
@@ -101,29 +101,43 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const supabase = await createClient();
     const { taskId } = await context.params;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { data: task, error: taskError } = await supabase
       .from("tasks")
-      .select("id, user_story_id, status, assignee_id, is_accepted, is_active, active_since")
+      .select(
+        "id, user_story_id, status, assignee_id, is_accepted, is_active, active_since",
+      )
       .eq("id", taskId)
       .maybeSingle();
 
-    if (taskError) return NextResponse.json({ error: taskError.message }, { status: 500 });
-    if (!task) return NextResponse.json({ error: "Task not found." }, { status: 404 });
+    if (taskError)
+      return NextResponse.json({ error: taskError.message }, { status: 500 });
+    if (!task)
+      return NextResponse.json({ error: "Task not found." }, { status: 404 });
 
     if (!task.is_active || task.assignee_id !== user.id) {
-      return NextResponse.json({ error: "Naloga ni aktivna ali ni vaša." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Task is not active or does not belong to you." },
+        { status: 400 },
+      );
     }
 
     if (!task.active_since) {
-      return NextResponse.json({ error: "Napaka: active_since ni nastavljen." }, { status: 500 });
+      return NextResponse.json(
+        { error: "Error: active_since is not set." },
+        { status: 500 },
+      );
     }
 
     const activeSince = new Date(task.active_since);
     const now = new Date();
-    const hoursSpent = (now.getTime() - activeSince.getTime()) / (1000 * 60 * 60);
+    const hoursSpent =
+      (now.getTime() - activeSince.getTime()) / (1000 * 60 * 60);
     const roundedHours = Math.max(0.01, Math.round(hoursSpent * 100) / 100);
 
     const today = now.toISOString().split("T")[0];
@@ -144,7 +158,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
         })
         .eq("id", existingLog.id);
 
-      if (updateLogError) return NextResponse.json({ error: updateLogError.message }, { status: 500 });
+      if (updateLogError)
+        return NextResponse.json(
+          { error: updateLogError.message },
+          { status: 500 },
+        );
     } else {
       const { error: insertLogError } = await supabase
         .from("time_logs")
@@ -156,7 +174,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
           logged_at: now.toISOString(),
         });
 
-      if (insertLogError) return NextResponse.json({ error: insertLogError.message }, { status: 500 });
+      if (insertLogError)
+        return NextResponse.json(
+          { error: insertLogError.message },
+          { status: 500 },
+        );
     }
 
     const { data: allLogs } = await supabase
@@ -181,10 +203,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .select("*, assignee:users(id, first_name, last_name, email)")
       .single();
 
-    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+    if (updateError)
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
     return NextResponse.json(updatedTask);
-
   } catch {
-    return NextResponse.json({ error: "Error stopping task." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Error stopping task." },
+      { status: 500 },
+    );
   }
 }
