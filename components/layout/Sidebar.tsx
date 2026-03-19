@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard,
@@ -49,19 +49,15 @@ export default function Sidebar() {
   const router = useRouter();
   const supabase = createClient();
 
-  const routeProjectId = params?.projectId as string | undefined;
+  const currentProjectId = params?.projectId as string | undefined;
 
   const [isAdmin, setIsAdmin] = useState(false);
-  const [lastProjectId, setLastProjectId] = useState<string | undefined>(
-    undefined
-  );
 
   useEffect(() => {
     const checkAdmin = async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-
       if (!user) return;
 
       const { data } = await supabase
@@ -75,24 +71,6 @@ export default function Sidebar() {
 
     checkAdmin();
   }, [supabase]);
-
-  useEffect(() => {
-    if (routeProjectId) {
-      setLastProjectId(routeProjectId);
-      localStorage.setItem("lastProjectId", routeProjectId);
-      return;
-    }
-
-    const storedProjectId = localStorage.getItem("lastProjectId");
-    if (storedProjectId) {
-      setLastProjectId(storedProjectId);
-    }
-  }, [routeProjectId]);
-
-  const currentProjectId = useMemo(
-    () => routeProjectId ?? lastProjectId,
-    [routeProjectId, lastProjectId]
-  );
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
