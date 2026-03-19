@@ -127,17 +127,21 @@ export default function Navbar() {
               })}
             </div>
 
-            {user?.last_login_at && (
+            {user && (
               <div className="text-xs text-[var(--color-subtle)] mt-0.5">
-                Last login:{" "}
-                {new Date(user.last_login_at).toLocaleString("sl-SI", {
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: false,
-                })}
+                {user.last_login_at
+                  ? `Last login: ${new Date(user.last_login_at).toLocaleString(
+                      "sl-SI",
+                      {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false,
+                      },
+                    )}`
+                  : "First login"}
               </div>
             )}
           </div>
