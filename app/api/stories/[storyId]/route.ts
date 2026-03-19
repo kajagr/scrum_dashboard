@@ -252,10 +252,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (
       !Number.isFinite(businessValueNumber) ||
       businessValueNumber <= 0 ||
-      businessValueNumber > 100
+      businessValueNumber > 10
     ) {
       return NextResponse.json(
-        { error: "Business value must be between 1 and 100." },
+        { error: "Business value must be between 1 and 10." },
         { status: 400 },
       );
     }

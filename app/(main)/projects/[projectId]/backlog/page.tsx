@@ -914,7 +914,7 @@ export default function BacklogPage() {
               <input
                 type="number"
                 min="1"
-                max="100"
+                max="10"
                 value={editBusinessValue}
                 onChange={(e) =>
                   setEditBusinessValue(
