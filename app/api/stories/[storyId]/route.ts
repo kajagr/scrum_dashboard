@@ -273,7 +273,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       .from("user_stories")
       .select("id")
       .eq("project_id", story.project_id)
-      .eq("title", title)
+      .ilike("title", title)
       .neq("id", storyId)
       .maybeSingle();
 
