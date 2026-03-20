@@ -27,6 +27,27 @@ function makeContext(taskId = "task-1") {
   return { params: Promise.resolve({ taskId }) };
 }
 
+// ─── Shared mock builder ──────────────────────────────────────────────────────
+// Route uses .is("deleted_at", null) on tasks + user_stories queries,
+// so every read chain needs the .is() stub as well.
+function makeReadChain(resolvedValue: { data: any; error: any }) {
+  return {
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    is: jest.fn().mockReturnThis(), // ← was missing; caused silent failures
+    maybeSingle: jest.fn().mockResolvedValue(resolvedValue),
+  };
+}
+
+function makeUpdateChain(resolvedValue: { data: any; error: any }) {
+  return {
+    update: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    single: jest.fn().mockResolvedValue(resolvedValue),
+  };
+}
+
 // ─── Default data ─────────────────────────────────────────────────────────────
 const defaultTask = {
   id: "task-1",
@@ -45,13 +66,23 @@ const defaultStory = {
 
 const defaultMembership = { role: "developer" };
 
+const defaultUpdateResult = {
+  data: {
+    id: "task-1",
+    status: "unassigned",
+    assignee_id: null,
+    is_accepted: false,
+  },
+  error: null,
+};
+
 // ─── Setup mocks ──────────────────────────────────────────────────────────────
 function setupMocks(
   overrides: {
-    task?: any;
-    story?: any;
-    membership?: any;
-    updateResult?: any;
+    task?: Partial<typeof defaultTask>;
+    story?: Partial<typeof defaultStory>;
+    membership?: { role: string } | null;
+    updateResult?: { data: any; error: any };
   } = {},
 ) {
   const task = { ...defaultTask, ...overrides.task };
@@ -60,45 +91,15 @@ function setupMocks(
     overrides.membership !== undefined
       ? overrides.membership
       : defaultMembership;
-  const updateResult = overrides.updateResult ?? {
-    data: {
-      id: "task-1",
-      status: "unassigned",
-      assignee_id: null,
-      is_accepted: false,
-    },
-    error: null,
-  };
+  const updateResult = overrides.updateResult ?? defaultUpdateResult;
 
   let cnt = 0;
   mockFrom.mockImplementation(() => {
     cnt++;
-    if (cnt === 1)
-      return {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({ data: task, error: null }),
-      };
-    if (cnt === 2)
-      return {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({ data: story, error: null }),
-      };
-    if (cnt === 3)
-      return {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest
-          .fn()
-          .mockResolvedValue({ data: membership, error: null }),
-      };
-    return {
-      update: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      select: jest.fn().mockReturnThis(),
-      single: jest.fn().mockResolvedValue(updateResult),
-    };
+    if (cnt === 1) return makeReadChain({ data: task, error: null }); // tasks
+    if (cnt === 2) return makeReadChain({ data: story, error: null }); // user_stories
+    if (cnt === 3) return makeReadChain({ data: membership, error: null }); // project_members
+    return makeUpdateChain(updateResult); // tasks UPDATE
   });
 }
 
@@ -151,14 +152,17 @@ describe("PATCH /api/tasks/:taskId — resign from task (#17)", () => {
   });
 
   // ─── #3: Another developer can accept a resigned task ────────────────────
-  // Integration with #16 — simulates that after resign the task is unassigned
-  // and another developer can accept it (action: "accept")
   it("200 — another developer can accept a resigned task", async () => {
     const unassignedTask = {
       ...defaultTask,
       assignee_id: null,
       is_accepted: false,
       status: "unassigned",
+    };
+
+    // story must carry sprint_id so the route can query the sprint
+    const storyWithSprint = {
+      ...defaultStory,
       sprint_id: "sprint-1",
     };
 
@@ -171,56 +175,22 @@ describe("PATCH /api/tasks/:taskId — resign from task (#17)", () => {
     mockFrom.mockImplementation(() => {
       cnt++;
       if (cnt === 1)
-        return {
-          // tasks
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          maybeSingle: jest
-            .fn()
-            .mockResolvedValue({ data: unassignedTask, error: null }),
-        };
+        return makeReadChain({ data: unassignedTask, error: null }); // tasks
       if (cnt === 2)
-        return {
-          // user_stories
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          maybeSingle: jest
-            .fn()
-            .mockResolvedValue({ data: defaultStory, error: null }),
-        };
+        return makeReadChain({ data: storyWithSprint, error: null }); // user_stories
       if (cnt === 3)
-        return {
-          // project_members
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          maybeSingle: jest
-            .fn()
-            .mockResolvedValue({ data: { role: "developer" }, error: null }),
-        };
-      if (cnt === 4)
-        return {
-          // sprints — check active sprint
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          maybeSingle: jest
-            .fn()
-            .mockResolvedValue({ data: activeSprint, error: null }),
-        };
-      return {
-        // tasks — update (accept)
-        update: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValue({
-          data: {
-            id: "task-1",
-            assignee_id: "user-2",
-            is_accepted: true,
-            status: "assigned",
-          },
-          error: null,
-        }),
-      };
+        return makeReadChain({ data: { role: "developer" }, error: null }); // project_members
+      if (cnt === 4) return makeReadChain({ data: activeSprint, error: null }); // sprints
+      return makeUpdateChain({
+        // tasks UPDATE
+        data: {
+          id: "task-1",
+          assignee_id: "user-2",
+          is_accepted: true,
+          status: "assigned",
+        },
+        error: null,
+      });
     });
 
     // Another developer (user-2) accepts the task
@@ -260,11 +230,9 @@ describe("PATCH /api/tasks/:taskId — resign from task (#17)", () => {
   });
 
   it("404 — task does not exist", async () => {
-    mockFrom.mockImplementationOnce(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
-    }));
+    mockFrom.mockImplementationOnce(() =>
+      makeReadChain({ data: null, error: null }),
+    );
 
     const res = await PATCH(makeRequest({ action: "resign" }), makeContext());
 

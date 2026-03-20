@@ -27,6 +27,25 @@ function makeContext(taskId = "task-1") {
   return { params: Promise.resolve({ taskId }) };
 }
 
+// ─── Shared mock builder ──────────────────────────────────────────────────────
+function makeReadChain(resolvedValue: { data: any; error: any }) {
+  return {
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    is: jest.fn().mockReturnThis(), // ← route calls .is("deleted_at", null)
+    maybeSingle: jest.fn().mockResolvedValue(resolvedValue),
+  };
+}
+
+function makeUpdateChain(resolvedValue: { data: any; error: any }) {
+  return {
+    update: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    single: jest.fn().mockResolvedValue(resolvedValue),
+  };
+}
+
 // ─── Default data ─────────────────────────────────────────────────────────────
 const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
 const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
@@ -85,43 +104,11 @@ function setupMocks(
   let cnt = 0;
   mockFrom.mockImplementation(() => {
     cnt++;
-    if (cnt === 1)
-      return {
-        // tasks
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({ data: task, error: null }),
-      };
-    if (cnt === 2)
-      return {
-        // user_stories
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({ data: story, error: null }),
-      };
-    if (cnt === 3)
-      return {
-        // project_members
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest
-          .fn()
-          .mockResolvedValue({ data: membership, error: null }),
-      };
-    if (cnt === 4)
-      return {
-        // sprints
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({ data: sprint, error: null }),
-      };
-    return {
-      // tasks — update
-      update: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      select: jest.fn().mockReturnThis(),
-      single: jest.fn().mockResolvedValue(updateResult),
-    };
+    if (cnt === 1) return makeReadChain({ data: task, error: null }); // tasks
+    if (cnt === 2) return makeReadChain({ data: story, error: null }); // user_stories
+    if (cnt === 3) return makeReadChain({ data: membership, error: null }); // project_members
+    if (cnt === 4) return makeReadChain({ data: sprint, error: null }); // sprints
+    return makeUpdateChain(updateResult); // tasks UPDATE
   });
 }
 
@@ -225,11 +212,9 @@ describe("PATCH /api/tasks/:taskId — accept task (#16)", () => {
   });
 
   it("404 — task does not exist", async () => {
-    mockFrom.mockImplementationOnce(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
-    }));
+    mockFrom.mockImplementationOnce(() =>
+      makeReadChain({ data: null, error: null }),
+    );
 
     const res = await PATCH(makeRequest({ action: "accept" }), makeContext());
     expect(res.status).toBe(404);

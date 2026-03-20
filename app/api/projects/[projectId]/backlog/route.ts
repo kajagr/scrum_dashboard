@@ -201,6 +201,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       `,
       )
       .eq("project_id", projectId)
+      .is("deleted_at", null)
       .order("position", { ascending: true });
 
     if (storiesError) {

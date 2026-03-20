@@ -13,7 +13,7 @@ interface MemberToAdd {
 const ROLES: { value: ProjectRole; label: string }[] = [
   { value: "product_owner", label: "Product Owner" },
   { value: "scrum_master", label: "Scrum Master" },
-  { value: "developer", label: "Developer" },
+  { value: "developer", label: "Team Member" },
 ];
 
 const UNIQUE_ROLES: ProjectRole[] = ["product_owner", "scrum_master"];

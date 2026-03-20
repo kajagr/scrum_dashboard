@@ -33,6 +33,25 @@ function makeContext(taskId = "task-1") {
   return { params: Promise.resolve({ taskId }) };
 }
 
+// ─── Shared mock builders ─────────────────────────────────────────────────────
+function makeReadChain(resolvedValue: { data: any; error: any }) {
+  return {
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    is: jest.fn().mockReturnThis(), // route calls .is("deleted_at", null)
+    maybeSingle: jest.fn().mockResolvedValue(resolvedValue),
+  };
+}
+
+function makeUpdateChain(resolvedValue: { data: any; error: any }) {
+  return {
+    update: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    single: jest.fn().mockResolvedValue(resolvedValue),
+  };
+}
+
 // ─── Default data ─────────────────────────────────────────────────────────────
 const defaultTask = {
   id: "task-1",
@@ -80,32 +99,10 @@ function setupPatchMocks(
   let cnt = 0;
   mockFrom.mockImplementation(() => {
     cnt++;
-    if (cnt === 1)
-      return {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({ data: task, error: null }),
-      };
-    if (cnt === 2)
-      return {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({ data: story, error: null }),
-      };
-    if (cnt === 3)
-      return {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest
-          .fn()
-          .mockResolvedValue({ data: membership, error: null }),
-      };
-    return {
-      update: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      select: jest.fn().mockReturnThis(),
-      single: jest.fn().mockResolvedValue(updateResult),
-    };
+    if (cnt === 1) return makeReadChain({ data: task, error: null }); // tasks
+    if (cnt === 2) return makeReadChain({ data: story, error: null }); // user_stories
+    if (cnt === 3) return makeReadChain({ data: membership, error: null }); // project_members
+    return makeUpdateChain(updateResult); // tasks UPDATE
   });
 }
 
@@ -127,28 +124,12 @@ function setupDeleteMocks(
   let cnt = 0;
   mockFrom.mockImplementation(() => {
     cnt++;
-    if (cnt === 1)
-      return {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({ data: task, error: null }),
-      };
-    if (cnt === 2)
-      return {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({ data: story, error: null }),
-      };
-    if (cnt === 3)
-      return {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest
-          .fn()
-          .mockResolvedValue({ data: membership, error: null }),
-      };
+    if (cnt === 1) return makeReadChain({ data: task, error: null }); // tasks
+    if (cnt === 2) return makeReadChain({ data: story, error: null }); // user_stories
+    if (cnt === 3) return makeReadChain({ data: membership, error: null }); // project_members
+    // soft delete: .update({ deleted_at: ... }).eq()  — NOT .delete()
     return {
-      delete: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
       eq: jest.fn().mockResolvedValue({ error: null }),
     };
   });
@@ -239,11 +220,9 @@ describe("PATCH /api/tasks/:taskId — edit task (#15)", () => {
   });
 
   it("404 — task does not exist", async () => {
-    mockFrom.mockImplementationOnce(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
-    }));
+    mockFrom.mockImplementationOnce(() =>
+      makeReadChain({ data: null, error: null }),
+    );
 
     const res = await PATCH(makePatchRequest(editBody), makeContext());
     expect(res.status).toBe(404);
@@ -304,11 +283,9 @@ describe("DELETE /api/tasks/:taskId — delete task (#15)", () => {
   });
 
   it("404 — task does not exist", async () => {
-    mockFrom.mockImplementationOnce(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
-    }));
+    mockFrom.mockImplementationOnce(() =>
+      makeReadChain({ data: null, error: null }),
+    );
 
     const res = await DELETE(makeDeleteRequest(), makeContext());
     expect(res.status).toBe(404);

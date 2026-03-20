@@ -28,7 +28,6 @@ function makeContext(storyId = "story-1") {
 }
 
 // ─── Default data ─────────────────────────────────────────────────────────────
-const today = new Date().toISOString().split("T")[0];
 const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
 const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
 
@@ -51,6 +50,16 @@ const validBody = {
   description: "Implement login",
   estimated_hours: 4,
 };
+
+// ─── Shared mock builders ─────────────────────────────────────────────────────
+function makeReadChain(resolvedValue: { data: any; error: any }) {
+  return {
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    is: jest.fn().mockReturnThis(),
+    maybeSingle: jest.fn().mockResolvedValue(resolvedValue),
+  };
+}
 
 // ─── Setup mocks ──────────────────────────────────────────────────────────────
 function setupMocks(
@@ -78,48 +87,50 @@ function setupMocks(
   mockFrom.mockImplementation(() => {
     cnt++;
     if (cnt === 1)
-      return {
-        // user_stories
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        maybeSingle: jest.fn().mockResolvedValue({ data: story, error: null }),
-      };
+      // user_stories: .select().eq().is().maybeSingle()
+      return makeReadChain({ data: story, error: null });
+
     if (cnt === 2)
+      // sprints: .select().eq().maybeSingle()
       return {
-        // sprints
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
         maybeSingle: jest.fn().mockResolvedValue({ data: sprint, error: null }),
       };
+
     if (cnt === 3)
+      // project_members (current user): .select().eq().eq().maybeSingle()
       return {
-        // project_members (current user)
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
         maybeSingle: jest
           .fn()
           .mockResolvedValue({ data: membership, error: null }),
       };
+
     if (cnt === 4 && overrides.includeAssignee)
+      // project_members (assignee): .select().eq().eq().maybeSingle()
       return {
-        // project_members (assignee)
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
         maybeSingle: jest
           .fn()
           .mockResolvedValue({ data: assigneeMembership, error: null }),
       };
-    // position query: cnt 4 without assignee, cnt 5 with assignee
+
+    // position query: .select().eq().is().order().limit() — .limit() is terminal
     const positionCnt = overrides.includeAssignee ? 5 : 4;
     if (cnt === positionCnt)
       return {
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
+        is: jest.fn().mockReturnThis(), // ← route calls .is("deleted_at", null) here
         order: jest.fn().mockReturnThis(),
         limit: jest.fn().mockResolvedValue({ data: [], error: null }),
       };
+
+    // tasks — insert
     return {
-      // tasks — insert
       insert: jest.fn().mockReturnThis(),
       select: jest.fn().mockReturnThis(),
       single: jest.fn().mockResolvedValue({

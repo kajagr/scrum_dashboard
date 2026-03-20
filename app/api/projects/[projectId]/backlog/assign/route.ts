@@ -142,7 +142,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const supabase = await createClient();
     const { projectId } = await context.params;
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -153,7 +156,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (!Array.isArray(storyIds) || storyIds.length === 0) {
       return NextResponse.json(
         { error: "storyIds must be a non-empty array." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -174,7 +177,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (!activeSprint) {
       return NextResponse.json(
         { error: "No active sprint exists for this project." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -182,16 +185,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .from("user_stories")
       .select("id, project_id, status, sprint_id, story_points")
       .in("id", storyIds)
-      .eq("project_id", projectId);
+      .eq("project_id", projectId)
+      .is("deleted_at", null);
 
     if (storiesError) {
-      return NextResponse.json({ error: storiesError.message }, { status: 500 });
+      return NextResponse.json(
+        { error: storiesError.message },
+        { status: 500 },
+      );
     }
 
     if (!stories || stories.length !== storyIds.length) {
       return NextResponse.json(
-        { error: "Some stories do not exist or do not belong to this project." },
-        { status: 400 }
+        {
+          error: "Some stories do not exist or do not belong to this project.",
+        },
+        { status: 400 },
       );
     }
 
@@ -200,17 +209,24 @@ export async function POST(request: NextRequest, context: RouteContext) {
         .from("user_stories")
         .select("story_points")
         .eq("sprint_id", activeSprint.id)
-        .eq("project_id", projectId);
+        .eq("project_id", projectId)
+        .is("deleted_at", null);
 
-      const usedPoints = (alreadyInSprint ?? []).reduce((sum, s) => sum + (s.story_points ?? 0), 0);
-      const incomingPoints = stories.reduce((sum, s) => sum + (s.story_points ?? 0), 0);
+      const usedPoints = (alreadyInSprint ?? []).reduce(
+        (sum, s) => sum + (s.story_points ?? 0),
+        0,
+      );
+      const incomingPoints = stories.reduce(
+        (sum, s) => sum + (s.story_points ?? 0),
+        0,
+      );
 
       if (usedPoints + incomingPoints > activeSprint.velocity) {
         return NextResponse.json(
           {
             error: `Adding these stories (${incomingPoints} pts) would exceed the sprint velocity of ${activeSprint.velocity} pts. Currently ${usedPoints} pts are assigned.`,
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -218,8 +234,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const missingPoints = stories.find((s) => s.story_points == null);
     if (missingPoints) {
       return NextResponse.json(
-        { error: "All stories must have story points set before being assigned to a sprint." },
-        { status: 400 }
+        {
+          error:
+            "All stories must have story points set before being assigned to a sprint.",
+        },
+        { status: 400 },
       );
     }
 
@@ -227,21 +246,23 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (invalidDone) {
       return NextResponse.json(
         { error: "Completed stories cannot be assigned to a sprint." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const alreadyAssigned = stories.find((s) => s.sprint_id === activeSprint.id);
+    const alreadyAssigned = stories.find(
+      (s) => s.sprint_id === activeSprint.id,
+    );
     if (alreadyAssigned) {
       return NextResponse.json(
         { error: "Some stories are already assigned to the active sprint." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const { error: updateError } = await supabase
       .from("user_stories")
-      .update({ sprint_id: activeSprint.id })
+      .update({ sprint_id: activeSprint.id, status: "in_progress" })
       .in("id", storyIds)
       .eq("project_id", projectId);
 
@@ -252,7 +273,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       ) {
         return NextResponse.json(
           { error: "You don't have permission to assign stories to a sprint." },
-          { status: 403 }
+          { status: 403 },
         );
       }
       return NextResponse.json({ error: updateError.message }, { status: 500 });
@@ -264,12 +285,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
         sprint: activeSprint,
         assignedCount: storyIds.length,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch {
     return NextResponse.json(
       { error: "An error occurred while assigning stories to the sprint." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -15,6 +15,16 @@ jest.mock("@/lib/supabase/server", () => ({
   ),
 }));
 
+// ─── Shared mock builders ─────────────────────────────────────────────────────
+function makeReadChain(resolvedValue: { data: any; error: any }) {
+  return {
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    is: jest.fn().mockReturnThis(),
+    maybeSingle: jest.fn().mockResolvedValue(resolvedValue),
+  };
+}
+
 // ─── Helper functions ─────────────────────────────────────────────────────────
 function makeRequest(url = "http://localhost/api/tasks/task-1/start") {
   return new NextRequest(url, { method: "POST" });
@@ -70,27 +80,17 @@ describe("POST /api/tasks/:taskId/start", () => {
     let cnt = 0;
     mockFrom.mockImplementation(() => {
       cnt++;
-      if (cnt === 1)
-        return {
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          maybeSingle: jest.fn().mockResolvedValue({ data: task, error: null }),
-        };
-      if (cnt === 2)
-        return {
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          maybeSingle: jest
-            .fn()
-            .mockResolvedValue({ data: story, error: null }),
-        };
+      if (cnt === 1) return makeReadChain({ data: task, error: null }); // tasks fetch
+      if (cnt === 2) return makeReadChain({ data: story, error: null }); // user_stories fetch
       if (cnt === 3) {
-        const secondEq = jest
-          .fn()
-          .mockResolvedValue({ data: activeTasks, error: null });
-        const firstEq = jest.fn().mockReturnValue({ eq: secondEq });
-        return { select: jest.fn().mockReturnValue({ eq: firstEq }) };
+        // active tasks check: .select().eq().eq().is() — .is() is terminal
+        return {
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          is: jest.fn().mockResolvedValue({ data: activeTasks, error: null }),
+        };
       }
+      // tasks update
       return {
         update: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
@@ -195,7 +195,7 @@ describe("POST /api/tasks/:taskId/stop", () => {
   const activeTask = {
     ...defaultTask,
     is_active: true,
-    active_since: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
+    active_since: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2h ago
   };
 
   function setupStopMocks(overrides: { task?: any; existingLog?: any } = {}) {
@@ -206,38 +206,39 @@ describe("POST /api/tasks/:taskId/stop", () => {
     mockFrom.mockImplementation(() => {
       cnt++;
       if (cnt === 1)
-        return {
-          // tasks — fetch task
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          maybeSingle: jest.fn().mockResolvedValue({ data: task, error: null }),
-        };
+        // tasks fetch: .select().eq().is().maybeSingle()
+        return makeReadChain({ data: task, error: null });
+
       if (cnt === 2)
+        // time_logs — check existing log: .select().eq().eq().eq().maybeSingle()
         return {
-          // time_logs — check existing log for today
           select: jest.fn().mockReturnThis(),
           eq: jest.fn().mockReturnThis(),
           maybeSingle: jest
             .fn()
             .mockResolvedValue({ data: existingLog, error: null }),
         };
+
       if (cnt === 3)
+        // update existing log OR insert new log
         return existingLog
           ? {
               update: jest.fn().mockReturnThis(),
               eq: jest.fn().mockResolvedValue({ error: null }),
             }
           : { insert: jest.fn().mockResolvedValue({ error: null }) };
+
       if (cnt === 4)
+        // time_logs — sum all hours: .select().eq() terminal
         return {
-          // time_logs — sum all logged hours
           select: jest.fn().mockReturnThis(),
           eq: jest
             .fn()
             .mockResolvedValue({ data: [{ hours: 2 }], error: null }),
         };
+
+      // tasks update
       return {
-        // tasks — update
         update: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
@@ -266,7 +267,7 @@ describe("POST /api/tasks/:taskId/stop", () => {
   // ─── #2: Time aggregation by day ──────────────────────────────────────────
   it("200 — adds hours to existing log entry for today", async () => {
     setupStopMocks({
-      existingLog: { id: "log-1", hours: 1.5 }, // already 1.5h logged today
+      existingLog: { id: "log-1", hours: 1.5 },
     });
 
     const res = await STOP(

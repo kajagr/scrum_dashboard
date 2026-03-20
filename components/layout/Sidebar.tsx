@@ -28,10 +28,15 @@ const navigation = [
   {
     name: "Product Backlog",
     type: "project",
-    href: "/backlog",
+    href: "/product-backlog",
     icon: ClipboardList,
   },
-  { name: "Sprint Board", type: "project", href: "/board", icon: KanbanSquare },
+  {
+    name: "Sprint Backlog",
+    type: "project",
+    href: "/sprint-backlog",
+    icon: KanbanSquare,
+  },
   { name: "Sprints", type: "project", href: "/sprints", icon: Flag },
   {
     name: "Time Tracking",

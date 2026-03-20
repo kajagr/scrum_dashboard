@@ -102,6 +102,7 @@ function setupMocks(tasks: any[] = []) {
   mockFrom.mockImplementation(() => ({
     select: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
+    is: jest.fn().mockReturnThis(), // ✅ dodano
     order: jest.fn().mockResolvedValue({ data: tasks, error: null }),
   }));
 }

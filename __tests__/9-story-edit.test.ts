@@ -53,12 +53,13 @@ const defaultStory = {
 
 const defaultMembership = { role: "product_owner" };
 
+// business_value must be ≤ 10 — route validates businessValueNumber > 10
 const validBody = {
   title: "Updated story",
   description: "Description",
   acceptance_criteria: "Criteria",
   priority: "must_have",
-  business_value: 50,
+  business_value: 8,
   story_points: 5,
 };
 
@@ -87,7 +88,7 @@ function setupMocks(
     cnt++;
     if (cnt === 1)
       return {
-        // user_stories — fetch story
+        // user_stories — fetch story (no .is() in route here)
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
         maybeSingle: jest.fn().mockResolvedValue({ data: story, error: null }),
@@ -102,9 +103,10 @@ function setupMocks(
           .mockResolvedValue({ data: membership, error: null }),
       };
     return {
-      // user_stories — duplicate title check
+      // user_stories — duplicate title check: .eq().ilike().neq().maybeSingle()
       select: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
+      ilike: jest.fn().mockReturnThis(), // ← route uses .ilike(), not .eq()
       neq: jest.fn().mockReturnThis(),
       maybeSingle: jest
         .fn()
@@ -153,9 +155,9 @@ function setupDeleteMocks(
     return {};
   });
 
-  // Admin client — delete
+  // Admin client — soft delete: .update().eq()
   mockAdminFrom.mockImplementation(() => ({
-    delete: jest.fn().mockReturnThis(),
+    update: jest.fn().mockReturnThis(),
     eq: jest.fn().mockResolvedValue({ error: null }),
   }));
 }
