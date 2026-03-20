@@ -326,7 +326,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
  *   delete:
  *     summary: Delete a user story
  *     description: >
- *       Deletes a user story. Only Product Owners and Scrum Masters can delete stories.
+ *       Soft deletes a user story by ID (sets deleted_at timestamp).
+ *       Only Product Owners and Scrum Masters can delete stories.
  *       Stories assigned to a sprint or with status "done" cannot be deleted.
  *     tags:
  *       - Stories
@@ -469,7 +470,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
     const { error: deleteError } = await supabaseAdmin
       .from("user_stories")
-      .delete()
+      .update({ deleted_at: new Date().toISOString() })
       .eq("id", storyId);
 
     if (deleteError) {

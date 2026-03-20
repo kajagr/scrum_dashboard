@@ -28,7 +28,7 @@ const roleConfig: Record<string, { label: string; className: string }> = {
     className: "bg-primary-light text-primary border border-primary-border",
   },
   developer: {
-    label: "Developer",
+    label: "Team Member",
     className: "bg-surface text-muted border border-border",
   },
 };
@@ -70,7 +70,7 @@ export default function TeamPage() {
 
   const existingMemberIds = members.map((m) => m.user_id);
   const existingRoles = Object.fromEntries(
-    members.map((m) => [m.user_id, m.role as ProjectRole])
+    members.map((m) => [m.user_id, m.role as ProjectRole]),
   );
 
   if (loading) {

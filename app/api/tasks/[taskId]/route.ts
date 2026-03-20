@@ -65,10 +65,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
       .from("tasks")
       .select("*, assignee:users(id, first_name, last_name, email)")
       .eq("id", taskId)
-      .single();
+      .is("deleted_at", null)
+      .maybeSingle();
 
     if (error)
       return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!data)
+      return NextResponse.json({ error: "Task not found." }, { status: 404 });
     return NextResponse.json(data);
   } catch {
     return NextResponse.json(
@@ -238,6 +241,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       .from("tasks")
       .select("id, user_story_id, status, assignee_id, is_accepted")
       .eq("id", taskId)
+      .is("deleted_at", null)
       .maybeSingle();
 
     if (taskError)
@@ -249,6 +253,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       .from("user_stories")
       .select("id, project_id, sprint_id, status")
       .eq("id", task.user_story_id)
+      .is("deleted_at", null)
       .maybeSingle();
 
     if (storyError || !story)
@@ -492,7 +497,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
  *   delete:
  *     summary: Delete a task
  *     description: >
- *       Deletes a task by ID. Only developers and Scrum Masters can delete tasks.
+ *       Soft deletes a task by ID (sets deleted_at timestamp).
+ *       Only developers and Scrum Masters can delete tasks.
  *       Accepted tasks cannot be deleted.
  *     tags:
  *       - Tasks
@@ -586,6 +592,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       .from("tasks")
       .select("id, user_story_id, is_accepted")
       .eq("id", taskId)
+      .is("deleted_at", null)
       .maybeSingle();
 
     if (taskError)
@@ -627,7 +634,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
     const { error: deleteError } = await supabase
       .from("tasks")
-      .delete()
+      .update({ deleted_at: new Date().toISOString() })
       .eq("id", taskId);
     if (deleteError)
       return NextResponse.json({ error: deleteError.message }, { status: 500 });

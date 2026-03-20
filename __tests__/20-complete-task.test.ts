@@ -14,7 +14,7 @@ jest.mock("@/lib/supabase/server", () => ({
   ),
 }));
 
-// ─── Helper funkcije ──────────────────────────────────────────────────────────
+// ─── Helper functions ─────────────────────────────────────────────────────────
 function makeRequest(body: object) {
   return new NextRequest("http://localhost/api/tasks/task-1", {
     method: "PATCH",
@@ -27,7 +27,7 @@ function makeContext(taskId = "task-1") {
   return { params: Promise.resolve({ taskId }) };
 }
 
-// ─── Default podatki ──────────────────────────────────────────────────────────
+// ─── Default data ─────────────────────────────────────────────────────────────
 const defaultTask = {
   id: "task-1",
   user_story_id: "story-1",
@@ -45,7 +45,7 @@ const defaultStory = {
 
 const defaultMembership = { role: "developer" };
 
-// ─── Setup mock ───────────────────────────────────────────────────────────────
+// ─── Setup mocks ──────────────────────────────────────────────────────────────
 function setupMocks(
   overrides: {
     task?: any;
@@ -70,21 +70,23 @@ function setupMocks(
     cnt++;
     if (cnt === 1)
       return {
-        // tasks — pridobi nalogo
+        // tasks — fetch task
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
+        is: jest.fn().mockReturnThis(),
         maybeSingle: jest.fn().mockResolvedValue({ data: task, error: null }),
       };
     if (cnt === 2)
       return {
-        // user_stories — pridobi zgodbo
+        // user_stories — fetch story
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
+        is: jest.fn().mockReturnThis(),
         maybeSingle: jest.fn().mockResolvedValue({ data: story, error: null }),
       };
     if (cnt === 3)
       return {
-        // project_members — preveri članstvo
+        // project_members — check membership
         select: jest.fn().mockReturnThis(),
         eq: jest.fn().mockReturnThis(),
         maybeSingle: jest
@@ -101,8 +103,8 @@ function setupMocks(
   });
 }
 
-// ─── TESTI ────────────────────────────────────────────────────────────────────
-describe("PATCH /api/tasks/:taskId — zaključevanje naloge (#20)", () => {
+// ─── TESTS ────────────────────────────────────────────────────────────────────
+describe("PATCH /api/tasks/:taskId — complete task (#20)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetUser.mockResolvedValue({
@@ -111,8 +113,8 @@ describe("PATCH /api/tasks/:taskId — zaključevanje naloge (#20)", () => {
     });
   });
 
-  // ─── #1: Regularen potek ──────────────────────────────────────────────────
-  it("200 — uspešno zaključi nalogo", async () => {
+  // ─── #1: Successful completion ────────────────────────────────────────────
+  it("200 — successfully completes a task", async () => {
     setupMocks();
 
     const res = await PATCH(
@@ -125,10 +127,8 @@ describe("PATCH /api/tasks/:taskId — zaključevanje naloge (#20)", () => {
     expect(body.status).toBe("completed");
   });
 
-  // ─── #2: Zgodba je že zaključena ─────────────────────────────────────────
-  // Opomba: trenutni route ne blokira zaključevanja naloge pri zaključeni zgodbi
-  // To validacijo opravlja /start endpoint — tukaj testiramo da status update deluje
-  it("200 — status se posodobi na completed ne glede na status zgodbe", async () => {
+  // ─── #2: Story already done ───────────────────────────────────────────────
+  it("200 — status updates to completed regardless of story status", async () => {
     setupMocks({
       story: { ...defaultStory, status: "done" },
     });
@@ -138,15 +138,13 @@ describe("PATCH /api/tasks/:taskId — zaključevanje naloge (#20)", () => {
       makeContext(),
     );
 
-    // Route ne blokira tega — posodobi status
     expect(res.status).toBe(200);
   });
 
-  // ─── #3: Naloga ni vaša (razvijalec ni sprejel) ───────────────────────────
-  // Membership obstaja ampak task ni sprejeta s strani tega userja
-  it("200 — member projektne ekipe lahko označi status kot completed", async () => {
+  // ─── #3: Any project member can mark as completed ─────────────────────────
+  it("200 — project member can mark task status as completed", async () => {
     setupMocks({
-      task: { ...defaultTask, assignee_id: "drug-user", is_accepted: true },
+      task: { ...defaultTask, assignee_id: "other-user", is_accepted: true },
       membership: { role: "scrum_master" },
     });
 
@@ -155,12 +153,11 @@ describe("PATCH /api/tasks/:taskId — zaključevanje naloge (#20)", () => {
       makeContext(),
     );
 
-    // Route dovoli status update vsakemu članu projekta
     expect(res.status).toBe(200);
   });
 
-  // ─── Neveljavni statusi ───────────────────────────────────────────────────
-  it("400 — neveljavni status", async () => {
+  // ─── Invalid statuses ─────────────────────────────────────────────────────
+  it("400 — invalid status", async () => {
     setupMocks();
 
     const res = await PATCH(
@@ -173,7 +170,7 @@ describe("PATCH /api/tasks/:taskId — zaključevanje naloge (#20)", () => {
     expect(body.error).toMatch(/invalid status/i);
   });
 
-  it("400 — brez statusa in brez action", async () => {
+  it("400 — missing status and action", async () => {
     setupMocks();
 
     const res = await PATCH(makeRequest({}), makeContext());
@@ -181,8 +178,8 @@ describe("PATCH /api/tasks/:taskId — zaključevanje naloge (#20)", () => {
     expect(res.status).toBe(400);
   });
 
-  // ─── Dostop ───────────────────────────────────────────────────────────────
-  it("401 — neprijavljen uporabnik", async () => {
+  // ─── Access ───────────────────────────────────────────────────────────────
+  it("401 — unauthenticated user", async () => {
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
 
     const res = await PATCH(
@@ -193,7 +190,7 @@ describe("PATCH /api/tasks/:taskId — zaključevanje naloge (#20)", () => {
     expect(res.status).toBe(401);
   });
 
-  it("403 — uporabnik ni član projekta", async () => {
+  it("403 — user is not a project member", async () => {
     setupMocks({ membership: null });
 
     const res = await PATCH(
@@ -204,10 +201,11 @@ describe("PATCH /api/tasks/:taskId — zaključevanje naloge (#20)", () => {
     expect(res.status).toBe(403);
   });
 
-  it("404 — naloga ne obstaja", async () => {
+  it("404 — task does not exist", async () => {
     mockFrom.mockImplementationOnce(() => ({
       select: jest.fn().mockReturnThis(),
       eq: jest.fn().mockReturnThis(),
+      is: jest.fn().mockReturnThis(),
       maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
     }));
 

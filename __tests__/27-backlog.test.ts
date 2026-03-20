@@ -57,6 +57,7 @@ describe("GET /api/projects/:projectId/backlog", () => {
   });
 
   // ─── Pomožna funkcija za nastavitev mockov ────────────────────────────────
+
   function setupMocks(activeSprint: any, stories: any[]) {
     let callCount = 0;
     mockFrom.mockImplementation(() => {
@@ -75,10 +76,11 @@ describe("GET /api/projects/:projectId/backlog", () => {
           }),
         };
       } else {
-        // Drugi klic — user_stories
+        // Drugi klic — user_stories (z is("deleted_at", null))
         return {
           select: jest.fn().mockReturnThis(),
           eq: jest.fn().mockReturnThis(),
+          is: jest.fn().mockReturnThis(), // ✅ dodano
           order: jest.fn().mockResolvedValue({
             data: stories,
             error: null,

@@ -115,6 +115,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       `,
       )
       .eq("user_story_id", storyId)
+      .is("deleted_at", null)
       .order("position", { ascending: true });
 
     if (error) {
@@ -271,6 +272,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .from("user_stories")
       .select("id, project_id, sprint_id, status")
       .eq("id", storyId)
+      .is("deleted_at", null)
       .maybeSingle();
 
     if (storyError) {
@@ -420,6 +422,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .from("tasks")
       .select("position")
       .eq("user_story_id", storyId)
+      .is("deleted_at", null)
       .order("position", { ascending: false })
       .limit(1);
 

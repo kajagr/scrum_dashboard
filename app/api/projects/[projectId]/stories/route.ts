@@ -89,6 +89,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       .from("user_stories")
       .select("*")
       .eq("project_id", projectId)
+      .is("deleted_at", null)
       .order("position", { ascending: true });
 
     if (error) {
@@ -311,6 +312,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .select("id")
       .eq("project_id", projectId)
       .eq("title", title)
+      .is("deleted_at", null)
       .maybeSingle();
 
     if (duplicateCheckError) {
@@ -331,6 +333,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .from("user_stories")
       .select("position")
       .eq("project_id", projectId)
+      .is("deleted_at", null)
       .order("position", { ascending: false })
       .limit(1)
       .maybeSingle();

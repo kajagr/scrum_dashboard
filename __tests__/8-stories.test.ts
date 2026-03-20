@@ -9,11 +9,6 @@ jest.mock("@/lib/supabase/server", () => ({
 const mockGetUser = jest.fn();
 const mockFrom = jest.fn();
 
-// shared chain mocks
-const mockDuplicateMaybeSingle = jest.fn();
-const mockLastStoryMaybeSingle = jest.fn();
-const mockInsertSingle = jest.fn();
-
 function makeRequest(body: object) {
   return new Request("http://localhost/api/projects/project-1/stories", {
     method: "POST",
@@ -23,9 +18,83 @@ function makeRequest(body: object) {
 }
 
 function makeContext(projectId = "project-1") {
-  return {
-    params: Promise.resolve({ projectId }),
+  return { params: Promise.resolve({ projectId }) };
+}
+
+// ─── Shared mock builder ──────────────────────────────────────────────────────
+// Route calls .is("deleted_at", null) on both read queries — must be in chain.
+// mockFrom is called separately for duplicate check and lastStory, so we use
+// a counter to return the correct response per call instead of mockImplementationOnce
+// on a shared maybeSingle (which resets on every new jest.fn() instance).
+function setupMocks(
+  overrides: {
+    duplicateData?: any;
+    lastStoryData?: any;
+    insertResult?: { data: any; error: any };
+  } = {},
+) {
+  const duplicateResult = {
+    data: overrides.duplicateData ?? null,
+    error: null,
   };
+  const lastStoryResult = {
+    data:
+      overrides.lastStoryData !== undefined
+        ? overrides.lastStoryData
+        : { position: 4 },
+    error: null,
+  };
+  const insertResult = overrides.insertResult ?? {
+    data: {
+      id: "story-1",
+      project_id: "project-1",
+      title: "Prijava uporabnika",
+      description: "Kot uporabnik se želim prijaviti",
+      acceptance_criteria: "Uspešna prijava",
+      priority: "must_have",
+      business_value: 80,
+      story_points: 3,
+      status: "backlog",
+      position: 5,
+      created_by: "user-1",
+    },
+    error: null,
+  };
+
+  let cnt = 0;
+  mockFrom.mockImplementation(() => {
+    cnt++;
+    if (cnt === 1) {
+      // duplicate check
+      return {
+        select: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        is: jest.fn().mockReturnThis(),
+        order: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        maybeSingle: jest.fn().mockResolvedValue(duplicateResult),
+      };
+    }
+    if (cnt === 2) {
+      // last story position check
+      return {
+        select: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        is: jest.fn().mockReturnThis(),
+        order: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        maybeSingle: jest.fn().mockResolvedValue(lastStoryResult),
+      };
+    }
+    // insert
+    return {
+      insert: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          single: jest.fn().mockResolvedValue(insertResult),
+        }),
+      }),
+    };
+  });
 }
 
 describe("POST /api/projects/[projectId]/stories", () => {
@@ -37,62 +106,12 @@ describe("POST /api/projects/[projectId]/stories", () => {
       error: null,
     });
 
-    // default: ni podvojene zgodbe, ni obstoječih zgodb, insert uspe
-    mockDuplicateMaybeSingle.mockResolvedValue({
-      data: null,
-      error: null,
-    });
-
-    mockLastStoryMaybeSingle.mockResolvedValue({
-      data: { position: 4 },
-      error: null,
-    });
-
-    mockInsertSingle.mockResolvedValue({
-      data: {
-        id: "story-1",
-        project_id: "project-1",
-        title: "Prijava uporabnika",
-        description: "Kot uporabnik se želim prijaviti",
-        acceptance_criteria: "Uspešna prijava",
-        priority: "must_have",
-        business_value: 80,
-        story_points: 3,
-        status: "backlog",
-        position: 5,
-        created_by: "user-1",
-      },
-      error: null,
-    });
-
-    mockFrom.mockImplementation((table: string) => {
-      if (table !== "user_stories") {
-        throw new Error(`Unexpected table: ${table}`);
-      }
-
-      return {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        order: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockReturnThis(),
-        maybeSingle: jest
-          .fn()
-          .mockImplementationOnce(mockDuplicateMaybeSingle) // duplicate check
-          .mockImplementationOnce(mockLastStoryMaybeSingle), // last story check
-        insert: jest.fn().mockReturnValue({
-          select: jest.fn().mockReturnValue({
-            single: mockInsertSingle,
-          }),
-        }),
-      };
-    });
-
     (createClient as jest.Mock).mockResolvedValue({
-      auth: {
-        getUser: mockGetUser,
-      },
+      auth: { getUser: mockGetUser },
       from: mockFrom,
     });
+
+    setupMocks();
   });
 
   // ─── #1: Regularen potek ────────────────────────────────────────────────
@@ -110,22 +129,17 @@ describe("POST /api/projects/[projectId]/stories", () => {
     );
 
     expect(res.status).toBe(201);
-
     const body = await res.json();
     expect(body.title).toBe("Prijava uporabnika");
     expect(body.priority).toBe("must_have");
     expect(body.business_value).toBe(80);
     expect(body.position).toBe(5);
-
     expect(mockFrom).toHaveBeenCalledWith("user_stories");
   });
 
   // ─── #2: Podvajanje imena uporabniške zgodbe ────────────────────────────
   it("409 — zavrne uporabniško zgodbo z obstoječim naslovom", async () => {
-    mockDuplicateMaybeSingle.mockResolvedValue({
-      data: { id: "existing-story" },
-      error: null,
-    });
+    setupMocks({ duplicateData: { id: "existing-story" } });
 
     const res = await POST(
       makeRequest({
@@ -139,7 +153,6 @@ describe("POST /api/projects/[projectId]/stories", () => {
     );
 
     expect(res.status).toBe(409);
-
     const body = await res.json();
     expect(body.error).toMatch(/already exists/i);
   });
@@ -158,7 +171,6 @@ describe("POST /api/projects/[projectId]/stories", () => {
     );
 
     expect(res.status).toBe(400);
-
     const body = await res.json();
     expect(body.error).toMatch(/invalid priority/i);
   });
@@ -177,7 +189,6 @@ describe("POST /api/projects/[projectId]/stories", () => {
     );
 
     expect(res.status).toBe(400);
-
     const body = await res.json();
     expect(body.error).toMatch(/between 1 and 100/i);
   });
@@ -199,30 +210,26 @@ describe("POST /api/projects/[projectId]/stories", () => {
     );
 
     expect(res.status).toBe(401);
-
     const body = await res.json();
     expect(body.error).toMatch(/unauthorized/i);
   });
 
   it("400 — manjkajo obvezna polja", async () => {
     const res = await POST(
-      makeRequest({
-        title: "Zgodba brez prioritet",
-      }) as any,
+      makeRequest({ title: "Zgodba brez prioritet" }) as any,
       makeContext(),
     );
 
     expect(res.status).toBe(400);
-
     const body = await res.json();
     expect(body.error).toMatch(/required/i);
   });
 
   it("403 — zavrne uporabnika brez pravic za ustvarjanje zgodbe", async () => {
-    mockInsertSingle.mockResolvedValue({
-      data: null,
-      error: {
-        message: "new row violates row-level security policy",
+    setupMocks({
+      insertResult: {
+        data: null,
+        error: { message: "new row violates row-level security policy" },
       },
     });
 
@@ -238,24 +245,17 @@ describe("POST /api/projects/[projectId]/stories", () => {
     );
 
     expect(res.status).toBe(403);
-
     const body = await res.json();
     expect(body.error).toMatch(/do not have permission/i);
   });
 
   it("201 — ustvari prvo zgodbo s position 0, če še ni nobene zgodbe", async () => {
-    mockLastStoryMaybeSingle.mockResolvedValue({
-      data: null,
-      error: null,
-    });
-
-    mockInsertSingle.mockResolvedValue({
-      data: {
-        id: "story-1",
-        position: 0,
-        title: "Prva zgodba",
+    setupMocks({
+      lastStoryData: null,
+      insertResult: {
+        data: { id: "story-1", position: 0, title: "Prva zgodba" },
+        error: null,
       },
-      error: null,
     });
 
     const res = await POST(
@@ -268,7 +268,6 @@ describe("POST /api/projects/[projectId]/stories", () => {
     );
 
     expect(res.status).toBe(201);
-
     const body = await res.json();
     expect(body.position).toBe(0);
   });
@@ -284,7 +283,6 @@ describe("POST /api/projects/[projectId]/stories", () => {
     );
 
     expect(res.status).toBe(400);
-
     const body = await res.json();
     expect(body.error).toMatch(/between 1 and 100/i);
   });
@@ -301,39 +299,35 @@ describe("POST /api/projects/[projectId]/stories", () => {
     );
 
     expect(res.status).toBe(400);
-
     const body = await res.json();
     expect(body.error).toMatch(/story_points/i);
   });
 
   it("201 — sprejme vse dovoljene prioritete", async () => {
-    const priorities = [
-      "must_have",
-      "should_have",
-      "could_have",
-      "wont_have",
-    ];
+    const priorities = ["must_have", "should_have", "could_have", "wont_have"];
 
     for (const p of priorities) {
-      mockDuplicateMaybeSingle.mockResolvedValue({
-        data: null,
+      jest.clearAllMocks();
+      (createClient as jest.Mock).mockResolvedValue({
+        auth: { getUser: mockGetUser },
+        from: mockFrom,
+      });
+      mockGetUser.mockResolvedValue({
+        data: { user: { id: "user-1" } },
         error: null,
       });
-
-      mockLastStoryMaybeSingle.mockResolvedValue({
-        data: { position: 1 },
-        error: null,
-      });
-
-      mockInsertSingle.mockResolvedValue({
-        data: {
-          id: `story-${p}`,
-          title: `Zgodba ${p}`,
-          priority: p,
-          business_value: 40,
-          position: 2,
+      setupMocks({
+        lastStoryData: { position: 1 },
+        insertResult: {
+          data: {
+            id: `story-${p}`,
+            title: `Zgodba ${p}`,
+            priority: p,
+            business_value: 40,
+            position: 2,
+          },
+          error: null,
         },
-        error: null,
       });
 
       const res = await POST(

@@ -113,6 +113,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         "id, user_story_id, status, assignee_id, is_accepted, is_active, active_since",
       )
       .eq("id", taskId)
+      .is("deleted_at", null)
       .maybeSingle();
 
     if (taskError)

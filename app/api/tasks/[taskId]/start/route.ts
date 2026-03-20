@@ -101,6 +101,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .from("tasks")
       .select("id, user_story_id, status, assignee_id, is_accepted, is_active")
       .eq("id", taskId)
+      .is("deleted_at", null)
       .maybeSingle();
 
     if (taskError)
@@ -126,6 +127,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .from("user_stories")
       .select("id, project_id, status")
       .eq("id", task.user_story_id)
+      .is("deleted_at", null)
       .maybeSingle();
 
     if (storyError || !story)
@@ -142,7 +144,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .from("tasks")
       .select("id")
       .eq("assignee_id", user.id)
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .is("deleted_at", null);
 
     if (activeTasks && activeTasks.length > 0) {
       return NextResponse.json(
