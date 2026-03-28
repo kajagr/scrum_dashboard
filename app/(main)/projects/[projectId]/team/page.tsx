@@ -18,6 +18,12 @@ interface MemberWithUser {
   } | null;
 }
 
+const VALID_ROLES: ProjectRole[] = [
+  "product_owner",
+  "scrum_master",
+  "developer",
+];
+
 const roleConfig: Record<string, { label: string; className: string }> = {
   product_owner: {
     label: "Product Owner",
@@ -33,6 +39,27 @@ const roleConfig: Record<string, { label: string; className: string }> = {
   },
 };
 
+const roleLabel = (r: string) => roleConfig[r]?.label ?? r;
+
+function getHealthIssues(members: MemberWithUser[]): string[] {
+  const issues: string[] = [];
+  const owners = members.filter((m) => m.role === "product_owner").length;
+  const masters = members.filter((m) => m.role === "scrum_master").length;
+  if (owners === 0)
+    issues.push("Project has no Product Owner. Please assign one.");
+  if (owners > 1)
+    issues.push(
+      `Project has ${owners} Product Owners. Please demote one to Team Member.`,
+    );
+  if (masters === 0)
+    issues.push("Project has no Scrum Master. Please assign one.");
+  if (masters > 1)
+    issues.push(
+      `Project has ${masters} Scrum Masters. Please demote one to Team Member.`,
+    );
+  return issues;
+}
+
 export default function TeamPage() {
   const params = useParams();
   const projectId = params.projectId as string;
@@ -40,18 +67,66 @@ export default function TeamPage() {
   const [members, setMembers] = useState<MemberWithUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [healthIssues, setHealthIssues] = useState<string[]>([]);
+  const [editingRoleFor, setEditingRoleFor] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [canManage, setCanManage] = useState(false);
+
+  const isHealthy = healthIssues.length === 0;
+
+  // Check if current user can manage (admin or scrum_master)
+  useEffect(() => {
+    if (!projectId) return;
+    async function checkPermission() {
+      const [meRes, roleRes] = await Promise.all([
+        fetch("/api/auth/me", { cache: "no-store" }),
+        fetch(`/api/projects/${projectId}/members/me`, { cache: "no-store" }),
+      ]);
+      const me = meRes.ok ? await meRes.json() : null;
+      const role = roleRes.ok ? await roleRes.json() : null;
+      setCanManage(
+        me?.system_role === "admin" || role?.role === "scrum_master",
+      );
+    }
+    checkPermission();
+  }, [projectId]);
+
+  // Block browser back/reload when unhealthy
+  useEffect(() => {
+    if (isHealthy) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isHealthy]);
 
   const fetchMembers = async () => {
     try {
-      const res = await fetch(`/api/projects/${projectId}/members`);
-      if (!res.ok) {
-        const data = await res.json();
+      const [membersRes, meRes, roleRes] = await Promise.all([
+        fetch(`/api/projects/${projectId}/members`, { cache: "no-store" }),
+        fetch("/api/auth/me", { cache: "no-store" }),
+        fetch(`/api/projects/${projectId}/members/me`, { cache: "no-store" }),
+      ]);
+      if (!membersRes.ok) {
+        const data = await membersRes.json();
         setError(data.error || "Failed to load members.");
         setLoading(false);
         return;
       }
-      setMembers(await res.json());
+      const data: MemberWithUser[] = await membersRes.json();
+      setMembers(data);
+      setHealthIssues(getHealthIssues(data));
+      window.dispatchEvent(new CustomEvent("projectHealthChanged"));
+
+      // Re-check own permissions after every role change
+      const me = meRes.ok ? await meRes.json() : null;
+      const role = roleRes.ok ? await roleRes.json() : null;
+      setCanManage(
+        me?.system_role === "admin" || role?.role === "scrum_master",
+      );
     } catch {
       setError("Server connection error.");
     } finally {
@@ -67,6 +142,44 @@ export default function TeamPage() {
     setIsModalOpen(false);
     fetchMembers();
   };
+
+  async function handleRoleSelect(
+    member: MemberWithUser,
+    newRole: ProjectRole,
+  ) {
+    setActionError(null);
+    setEditingRoleFor(null);
+    if (newRole === member.role) return;
+
+    const res = await fetch(
+      `/api/projects/${projectId}/members/${member.user_id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: newRole }),
+      },
+    );
+    const data = await res.json();
+    if (!res.ok) {
+      setActionError(data.error ?? "Failed to update role.");
+      return;
+    }
+    fetchMembers();
+  }
+
+  async function handleRemove(userId: string) {
+    if (!confirm("Are you sure you want to remove this member?")) return;
+    setActionError(null);
+    const res = await fetch(`/api/projects/${projectId}/members/${userId}`, {
+      method: "DELETE",
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setActionError(data.error ?? "Failed to remove member.");
+      return;
+    }
+    fetchMembers();
+  }
 
   const existingMemberIds = members.map((m) => m.user_id);
   const existingRoles = Object.fromEntries(
@@ -110,7 +223,7 @@ export default function TeamPage() {
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="flex justify-between items-end mb-8">
+      <div className="flex justify-between items-end mb-6">
         <div>
           <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">
             Project
@@ -127,14 +240,54 @@ export default function TeamPage() {
               : "No members yet"}
           </p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors shadow-sm bg-primary hover:bg-primary-hover"
-        >
-          <span className="text-lg leading-none">+</span>
-          Add member
-        </button>
+        {canManage && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors shadow-sm bg-primary hover:bg-primary-hover"
+          >
+            <span className="text-lg leading-none">+</span>
+            Add member
+          </button>
+        )}
       </div>
+
+      {/* Health issues banner (non-dismissable) */}
+      {!isHealthy && (
+        <div className="mb-4 p-4 rounded-xl border-2 border-error-border bg-error-light">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-error text-lg">⚠</span>
+            <p className="text-sm font-semibold text-error">
+              Project role configuration is incomplete. Resolve the issues below
+              before continuing.
+            </p>
+          </div>
+          <ul className="list-disc list-inside space-y-1">
+            {healthIssues.map((issue, i) => (
+              <li key={i} className="text-sm text-error">
+                {issue}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-error opacity-75">
+            Navigation to other project pages is disabled until this is
+            resolved.
+          </p>
+        </div>
+      )}
+
+      {/* Action error banner */}
+      {actionError && (
+        <div className="flex items-start gap-2.5 p-3.5 mb-4 rounded-xl border border-error-border bg-error-light">
+          <span className="text-error text-base mt-0.5">⚠</span>
+          <p className="text-sm text-error">{actionError}</p>
+          <button
+            onClick={() => setActionError(null)}
+            className="ml-auto text-error text-xs underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Members list */}
       {members.length > 0 ? (
@@ -142,6 +295,8 @@ export default function TeamPage() {
           {members.map((member, i) => {
             const cfg = roleConfig[member.role] ?? roleConfig.developer;
             const initials = `${member.user?.first_name?.[0] ?? ""}${member.user?.last_name?.[0] ?? ""}`;
+            const isEditing = editingRoleFor === member.user_id;
+
             return (
               <div
                 key={member.id}
@@ -159,32 +314,69 @@ export default function TeamPage() {
                     <p className="text-xs text-muted">{member.user?.email}</p>
                   </div>
                 </div>
-                <span
-                  className={`px-2.5 py-1 text-xs font-medium rounded-full ${cfg.className}`}
-                >
-                  {cfg.label}
-                </span>
+
+                <div className="flex items-center gap-2">
+                  {isEditing ? (
+                    <div className="flex items-center gap-2">
+                      <select
+                        defaultValue={member.role}
+                        autoFocus
+                        onChange={(e) =>
+                          handleRoleSelect(
+                            member,
+                            e.target.value as ProjectRole,
+                          )
+                        }
+                        className="text-xs rounded-md px-2 py-1 border border-border bg-background text-foreground"
+                      >
+                        {VALID_ROLES.map((r) => (
+                          <option key={r} value={r}>
+                            {roleLabel(r)}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => setEditingRoleFor(null)}
+                        className="text-xs text-muted hover:text-foreground"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span
+                        className={`px-2.5 py-1 text-xs font-medium rounded-full ${cfg.className}`}
+                      >
+                        {cfg.label}
+                      </span>
+                      {canManage && (
+                        <>
+                          <button
+                            onClick={() => {
+                              setActionError(null);
+                              setEditingRoleFor(member.user_id);
+                            }}
+                            className="text-xs px-2.5 py-1 rounded-lg border border-border text-muted hover:text-foreground hover:border-primary transition-colors"
+                          >
+                            Change role
+                          </button>
+                          <button
+                            onClick={() => handleRemove(member.user_id)}
+                            className="text-xs px-2.5 py-1 rounded-lg border border-error-border text-error hover:bg-error-light transition-colors"
+                          >
+                            Remove
+                          </button>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             );
           })}
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-14 h-14 rounded-2xl border border-border bg-surface flex items-center justify-center mb-4">
-            <svg
-              className="w-6 h-6 text-primary"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"
-              />
-            </svg>
-          </div>
           <p className="font-semibold text-foreground mb-1">
             No team members yet
           </p>
