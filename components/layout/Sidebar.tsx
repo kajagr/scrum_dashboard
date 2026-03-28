@@ -18,7 +18,13 @@ import {
 } from "lucide-react";
 
 const navigation = [
-  { name: "Projects", type: "global", href: "/projects", icon: FolderKanban },
+  {
+    name: "Projects",
+    type: "global",
+    href: "/projects",
+    icon: FolderKanban,
+    alwaysEnabled: true,
+  },
   {
     name: "Dashboard",
     type: "project",
@@ -44,9 +50,26 @@ const navigation = [
     href: "/time-tracking",
     icon: Timer,
   },
-  { name: "Team", type: "project", href: "/team", icon: Users },
+  {
+    name: "Team",
+    type: "project",
+    href: "/team",
+    icon: Users,
+    alwaysEnabled: true,
+  },
   { name: "Settings", type: "project", href: "/settings", icon: Settings },
 ];
+
+// ─── Health check ──────────────────────────────────────────────────────────────
+interface Member {
+  role: string;
+}
+
+function isProjectHealthy(members: Member[]): boolean {
+  const owners = members.filter((m) => m.role === "product_owner").length;
+  const masters = members.filter((m) => m.role === "scrum_master").length;
+  return owners === 1 && masters === 1;
+}
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -57,25 +80,50 @@ export default function Sidebar() {
   const currentProjectId = params?.projectId as string | undefined;
 
   const [isAdmin, setIsAdmin] = useState(false);
+  const [projectHealthy, setProjectHealthy] = useState(true);
 
+  // Check admin role
   useEffect(() => {
     const checkAdmin = async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
-
       const { data } = await supabase
         .from("users")
         .select("system_role")
         .eq("id", user.id)
         .single();
-
       setIsAdmin(data?.system_role === "admin");
     };
-
     checkAdmin();
   }, [supabase]);
+
+  // Check project health on pathname change AND when team page fires projectHealthChanged
+  useEffect(() => {
+    if (!currentProjectId) {
+      setProjectHealthy(true);
+      return;
+    }
+
+    const checkHealth = async () => {
+      const res = await fetch(`/api/projects/${currentProjectId}/members`, {
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        setProjectHealthy(true);
+        return;
+      }
+      const members: Member[] = await res.json();
+      setProjectHealthy(isProjectHealthy(members));
+    };
+
+    checkHealth();
+
+    window.addEventListener("projectHealthChanged", checkHealth);
+    return () =>
+      window.removeEventListener("projectHealthChanged", checkHealth);
+  }, [currentProjectId, pathname]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -89,11 +137,11 @@ export default function Sidebar() {
           const Icon = item.icon;
 
           let href = "#";
-          let isDisabled = false;
           let isActive = false;
+          let isDisabled = false;
 
           if (item.type === "global") {
-            href = item.href;
+            href = item.href as string;
             isActive = pathname === href;
           }
 
@@ -106,6 +154,12 @@ export default function Sidebar() {
                 item.href === ""
                   ? pathname === `/projects/${currentProjectId}`
                   : pathname.startsWith(href);
+
+              // Block navigation when project roles are invalid,
+              // except for Team (where they fix it) and always-enabled items
+              if (!projectHealthy && !item.alwaysEnabled) {
+                isDisabled = true;
+              }
             }
           }
 
@@ -113,6 +167,11 @@ export default function Sidebar() {
             return (
               <div
                 key={item.name}
+                title={
+                  !projectHealthy && item.type === "project"
+                    ? "Fix team role issues on the Team page first"
+                    : undefined
+                }
                 className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-subtle cursor-not-allowed opacity-40"
               >
                 <Icon size={17} />
