@@ -7,12 +7,14 @@ import { useParams } from "next/navigation";
 import WallCompose from "@/components/features/wall/WallCompose";
 import WallPostCard from "@/components/features/wall/WallPostCard";
 import WallSidebar from "@/components/features/wall/WallSideBar";
+import WallHelpTooltip from "@/components/features/wall/WallHelpTooltip";
 
 type WallPost = {
   id: string;
   content: string;
   created_at: string;
   author: { id: string; first_name: string; last_name: string } | null;
+  comment_count?: number;
 };
 
 export default function WallPage() {
@@ -21,7 +23,7 @@ export default function WallPage() {
 
   const [posts, setPosts] = useState<WallPost[]>([]);
   const [loading, setLoading] = useState(true);
-  const [content, setContent] = useState("");
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,11 +36,19 @@ export default function WallPage() {
     }
   };
 
-  useEffect(() => { loadPosts(); }, [projectId]);
+  useEffect(() => {
+    loadPosts();
+    fetch(`/api/projects/${projectId}/members/me`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => { if (d.role) setUserRole(d.role); })
+      .catch(() => {});
+  }, [projectId]);
 
-  const handlePost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!content.trim()) return;
+  const handlePostDeleted = (id: string) => {
+    setPosts((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const handlePost = async (htmlContent: string) => {
     setPosting(true);
     setError(null);
     try {
@@ -46,11 +56,10 @@ export default function WallPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ content: content.trim() }),
+        body: JSON.stringify({ content: htmlContent }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Error posting."); return; }
-      setContent("");
       setPosts((prev) => [data, ...prev]);
     } catch {
       setError("A server error occurred.");
@@ -64,7 +73,10 @@ export default function WallPage() {
       {/* Header */}
       <div className="mb-8">
         <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Project</p>
-        <h1 className="text-3xl font-bold text-foreground leading-tight">Project Wall</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-3xl font-bold text-foreground leading-tight">Project Wall</h1>
+          <WallHelpTooltip />
+        </div>
         <p className="text-sm text-muted mt-1">
           {posts.length > 0 ? `${posts.length} post${posts.length === 1 ? "" : "s"}` : "Share updates with your team"}
         </p>
@@ -74,8 +86,6 @@ export default function WallPage() {
         {/* Main feed */}
         <div className="flex-1 min-w-0">
           <WallCompose
-            content={content}
-            onChange={(v) => { setContent(v); setError(null); }}
             onSubmit={handlePost}
             posting={posting}
             error={error}
@@ -96,9 +106,14 @@ export default function WallPage() {
                 {posts.map((post) => (
                   <WallPostCard
                     key={post.id}
+                    id={post.id}
                     author={post.author}
                     content={post.content}
                     created_at={post.created_at}
+                    projectId={projectId}
+                    isScrumMaster={userRole === "scrum_master"}
+                    onDeleted={handlePostDeleted}
+                    initialCommentCount={post.comment_count ?? 0}
                   />
                 ))}
               </div>

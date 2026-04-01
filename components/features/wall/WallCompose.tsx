@@ -1,24 +1,34 @@
 "use client";
 
+import { useRef } from "react";
+import RichTextEditor, { RichTextEditorRef } from "@/components/features/wall/RichTextEditor";
+
 interface WallComposeProps {
-  content: string;
-  onChange: (value: string) => void;
-  onSubmit: (e: React.FormEvent) => void;
+  onSubmit: (content: string) => Promise<void>;
   posting: boolean;
   error: string | null;
 }
 
-export default function WallCompose({ content, onChange, onSubmit, posting, error }: WallComposeProps) {
+export default function WallCompose({ onSubmit, posting, error }: WallComposeProps) {
+  const editorRef = useRef<RichTextEditorRef>(null);
+  const contentRef = useRef<string>("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!contentRef.current || editorRef.current?.isEmpty()) return;
+    await onSubmit(contentRef.current);
+    editorRef.current?.clearContent();
+    contentRef.current = "";
+  };
+
   return (
-    <form onSubmit={onSubmit} className="mb-8">
+    <form onSubmit={handleSubmit} className="mb-8">
       <div className="rounded-2xl border border-border bg-surface p-5 space-y-4">
-        <textarea
-          value={content}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onSubmit(e as any); }}
+        <RichTextEditor
+          ref={editorRef}
+          onChange={(html) => { contentRef.current = html; }}
           placeholder="Share an update with your team..."
-          rows={3}
-          className="w-full px-3 py-2.5 rounded-xl text-sm bg-background border border-border text-foreground placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none transition-all"
+          minHeight="80px"
         />
         {error && (
           <div className="flex items-start gap-2 p-3 rounded-xl border border-error-border bg-error-light">
@@ -32,7 +42,7 @@ export default function WallCompose({ content, onChange, onSubmit, posting, erro
           <p className="text-xs text-subtle">Cmd/Ctrl + Enter to post</p>
           <button
             type="submit"
-            disabled={posting || !content.trim()}
+            disabled={posting}
             className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-xl transition-colors shadow-sm disabled:opacity-50 bg-primary hover:bg-primary-hover"
           >
             {posting ? (
