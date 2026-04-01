@@ -15,6 +15,7 @@ import {
   LogOut,
   Flag,
   UserPlus,
+  BookOpen,
   MessageSquare,
 } from "lucide-react";
 
@@ -50,6 +51,12 @@ const navigation = [
     type: "project",
     href: "/time-tracking",
     icon: Timer,
+  },
+  {
+    name: "Documentation",
+    type: "project",
+    href: "/documentation",
+    icon: BookOpen,
   },
   {
     name: "Team",
@@ -89,7 +96,6 @@ export default function Sidebar() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [projectHealthy, setProjectHealthy] = useState(true);
 
-  // Check admin role
   useEffect(() => {
     const checkAdmin = async () => {
       const {
@@ -106,7 +112,6 @@ export default function Sidebar() {
     checkAdmin();
   }, [supabase]);
 
-  // Check project health on pathname change AND when team page fires projectHealthChanged
   useEffect(() => {
     if (!currentProjectId) {
       setProjectHealthy(true);
@@ -126,7 +131,6 @@ export default function Sidebar() {
     };
 
     checkHealth();
-
     window.addEventListener("projectHealthChanged", checkHealth);
     return () =>
       window.removeEventListener("projectHealthChanged", checkHealth);
@@ -162,8 +166,6 @@ export default function Sidebar() {
                   ? pathname === `/projects/${currentProjectId}`
                   : pathname.startsWith(href);
 
-              // Block navigation when project roles are invalid,
-              // except for Team (where they fix it) and always-enabled items
               if (!projectHealthy && !item.alwaysEnabled) {
                 isDisabled = true;
               }

@@ -46,45 +46,8 @@ const helpItems = [
     title: "Project details",
     desc: "This section displays the current project name and description.",
   },
-  {
-    icon: (
-      <svg
-        className="w-4 h-4 text-primary flex-shrink-0 mt-0.5"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M11 17h2M12 3v10m0 0l-3-3m3 3l3-3"
-        />
-      </svg>
-    ),
-    title: "Read-only for now",
-    desc: "The fields are currently disabled, so you can view project information but not edit it yet.",
-  },
-  {
-    icon: (
-      <svg
-        className="w-4 h-4 text-primary flex-shrink-0 mt-0.5"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <circle cx="12" cy="12" r="9" />
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M12 8h.01M11 12h1v4h1"
-        />
-      </svg>
-    ),
-    title: "Future changes",
-    desc: "Project editing options will be added later, so this page is prepared for future project management features.",
-  },
+ 
+ 
 ];
 
 export default function SettingsHelpTooltip() {

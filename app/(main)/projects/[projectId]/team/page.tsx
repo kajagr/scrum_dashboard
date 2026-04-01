@@ -45,6 +45,7 @@ function getHealthIssues(members: MemberWithUser[]): string[] {
   const issues: string[] = [];
   const owners = members.filter((m) => m.role === "product_owner").length;
   const masters = members.filter((m) => m.role === "scrum_master").length;
+
   if (owners === 0)
     issues.push("Project has no Product Owner. Please assign one.");
   if (owners > 1)
@@ -57,6 +58,7 @@ function getHealthIssues(members: MemberWithUser[]): string[] {
     issues.push(
       `Project has ${masters} Scrum Masters. Please demote one to Team Member.`,
     );
+
   return issues;
 }
 
@@ -75,30 +77,34 @@ export default function TeamPage() {
 
   const isHealthy = healthIssues.length === 0;
 
-  // Check if current user can manage (admin or scrum_master)
   useEffect(() => {
     if (!projectId) return;
+
     async function checkPermission() {
       const [meRes, roleRes] = await Promise.all([
         fetch("/api/auth/me", { cache: "no-store" }),
         fetch(`/api/projects/${projectId}/members/me`, { cache: "no-store" }),
       ]);
+
       const me = meRes.ok ? await meRes.json() : null;
       const role = roleRes.ok ? await roleRes.json() : null;
+
       setCanManage(
         me?.system_role === "admin" || role?.role === "scrum_master",
       );
     }
+
     checkPermission();
   }, [projectId]);
 
-  // Block browser back/reload when unhealthy
   useEffect(() => {
     if (isHealthy) return;
+
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
+
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [isHealthy]);
@@ -110,18 +116,19 @@ export default function TeamPage() {
         fetch("/api/auth/me", { cache: "no-store" }),
         fetch(`/api/projects/${projectId}/members/me`, { cache: "no-store" }),
       ]);
+
       if (!membersRes.ok) {
         const data = await membersRes.json();
         setError(data.error || "Failed to load members.");
         setLoading(false);
         return;
       }
+
       const data: MemberWithUser[] = await membersRes.json();
       setMembers(data);
       setHealthIssues(getHealthIssues(data));
       window.dispatchEvent(new CustomEvent("projectHealthChanged"));
 
-      // Re-check own permissions after every role change
       const me = meRes.ok ? await meRes.json() : null;
       const role = roleRes.ok ? await roleRes.json() : null;
       setCanManage(
@@ -143,13 +150,41 @@ export default function TeamPage() {
     fetchMembers();
   };
 
+  function isRoleTakenByAnotherMember(
+    targetRole: ProjectRole,
+    currentMember: MemberWithUser,
+  ) {
+    if (targetRole === "developer") return false;
+
+    return members.some(
+      (m) => m.user_id !== currentMember.user_id && m.role === targetRole,
+    );
+  }
+
+  function getRoleWarning(
+    targetRole: ProjectRole,
+    currentMember: MemberWithUser,
+  ) {
+    if (!isRoleTakenByAnotherMember(targetRole, currentMember)) return null;
+
+    
+
+    return null;
+  }
+
   async function handleRoleSelect(
     member: MemberWithUser,
     newRole: ProjectRole,
   ) {
     setActionError(null);
     setEditingRoleFor(null);
+
     if (newRole === member.role) return;
+
+    if (isRoleTakenByAnotherMember(newRole, member)) {
+      setActionError(getRoleWarning(newRole, member) ?? "Role already taken.");
+      return;
+    }
 
     const res = await fetch(
       `/api/projects/${projectId}/members/${member.user_id}`,
@@ -159,25 +194,33 @@ export default function TeamPage() {
         body: JSON.stringify({ role: newRole }),
       },
     );
+
     const data = await res.json();
+
     if (!res.ok) {
       setActionError(data.error ?? "Failed to update role.");
       return;
     }
+
     fetchMembers();
   }
 
   async function handleRemove(userId: string) {
     if (!confirm("Are you sure you want to remove this member?")) return;
+
     setActionError(null);
+
     const res = await fetch(`/api/projects/${projectId}/members/${userId}`, {
       method: "DELETE",
     });
+
     const data = await res.json();
+
     if (!res.ok) {
       setActionError(data.error ?? "Failed to remove member.");
       return;
     }
+
     fetchMembers();
   }
 
@@ -223,7 +266,7 @@ export default function TeamPage() {
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="flex justify-between items-end mb-6">
+      <div className="flex justify-between items-end mb-8">
         <div>
           <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">
             Project
@@ -240,6 +283,7 @@ export default function TeamPage() {
               : "No members yet"}
           </p>
         </div>
+
         {canManage && (
           <button
             onClick={() => setIsModalOpen(true)}
@@ -251,31 +295,32 @@ export default function TeamPage() {
         )}
       </div>
 
-      {/* Health issues banner (non-dismissable) */}
+      {/* Health issues */}
       {!isHealthy && (
-        <div className="mb-4 p-4 rounded-xl border-2 border-error-border bg-error-light">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-error text-lg">⚠</span>
-            <p className="text-sm font-semibold text-error">
-              Project role configuration is incomplete. Resolve the issues below
-              before continuing.
-            </p>
+        <div className="mb-4 rounded-xl border border-error-border bg-error-light p-4">
+          <div className="flex items-start gap-2.5">
+            <span className="text-error text-base mt-0.5">⚠</span>
+            <div>
+              <p className="text-sm font-semibold text-error mb-2">
+                Project role configuration is incomplete.
+              </p>
+              <ul className="list-disc list-inside space-y-1">
+                {healthIssues.map((issue, i) => (
+                  <li key={i} className="text-sm text-error">
+                    {issue}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-error opacity-75">
+                Navigation to other project pages is disabled until this is
+                resolved.
+              </p>
+            </div>
           </div>
-          <ul className="list-disc list-inside space-y-1">
-            {healthIssues.map((issue, i) => (
-              <li key={i} className="text-sm text-error">
-                {issue}
-              </li>
-            ))}
-          </ul>
-          <p className="mt-2 text-xs text-error opacity-75">
-            Navigation to other project pages is disabled until this is
-            resolved.
-          </p>
         </div>
       )}
 
-      {/* Action error banner */}
+      {/* Action error */}
       {actionError && (
         <div className="flex items-start gap-2.5 p-3.5 mb-4 rounded-xl border border-error-border bg-error-light">
           <span className="text-error text-base mt-0.5">⚠</span>
@@ -291,85 +336,124 @@ export default function TeamPage() {
 
       {/* Members list */}
       {members.length > 0 ? (
-        <div className="rounded-2xl border border-border overflow-hidden">
-          {members.map((member, i) => {
+        <div className="space-y-3">
+          {members.map((member) => {
             const cfg = roleConfig[member.role] ?? roleConfig.developer;
             const initials = `${member.user?.first_name?.[0] ?? ""}${member.user?.last_name?.[0] ?? ""}`;
             const isEditing = editingRoleFor === member.user_id;
 
+            const scrumMasterBlocked = getRoleWarning("scrum_master", member);
+            const productOwnerBlocked = getRoleWarning("product_owner", member);
+
             return (
               <div
                 key={member.id}
-                className={`flex items-center justify-between px-5 py-4 bg-surface transition-colors hover:bg-background
-                  ${i < members.length - 1 ? "border-b border-border" : ""}`}
+                className="rounded-2xl border border-border bg-surface px-5 py-4 shadow-sm"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-primary-light border border-primary-border flex items-center justify-center text-sm font-bold text-primary">
-                    {initials}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">
-                      {member.user?.first_name} {member.user?.last_name}
-                    </p>
-                    <p className="text-xs text-muted">{member.user?.email}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {isEditing ? (
-                    <div className="flex items-center gap-2">
-                      <select
-                        defaultValue={member.role}
-                        autoFocus
-                        onChange={(e) =>
-                          handleRoleSelect(
-                            member,
-                            e.target.value as ProjectRole,
-                          )
-                        }
-                        className="text-xs rounded-md px-2 py-1 border border-border bg-background text-foreground"
-                      >
-                        {VALID_ROLES.map((r) => (
-                          <option key={r} value={r}>
-                            {roleLabel(r)}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={() => setEditingRoleFor(null)}
-                        className="text-xs text-muted hover:text-foreground"
-                      >
-                        Cancel
-                      </button>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-full bg-primary-light border border-primary-border flex items-center justify-center text-sm font-bold text-primary shrink-0">
+                      {initials}
                     </div>
-                  ) : (
-                    <>
-                      <span
-                        className={`px-2.5 py-1 text-xs font-medium rounded-full ${cfg.className}`}
-                      >
-                        {cfg.label}
-                      </span>
-                      {canManage && (
-                        <>
-                          <button
-                            onClick={() => {
-                              setActionError(null);
-                              setEditingRoleFor(member.user_id);
-                            }}
-                            className="text-xs px-2.5 py-1 rounded-lg border border-border text-muted hover:text-foreground hover:border-primary transition-colors"
+
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">
+                        {member.user?.first_name} {member.user?.last_name}
+                      </p>
+                      <p className="text-xs text-muted truncate">
+                        {member.user?.email}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {isEditing ? (
+                      <div className="flex flex-col items-end gap-2">
+                        <div className="flex items-center gap-2">
+                          <select
+                            defaultValue={member.role}
+                            autoFocus
+                            onChange={(e) =>
+                              handleRoleSelect(
+                                member,
+                                e.target.value as ProjectRole,
+                              )
+                            }
+                            className="text-xs rounded-lg px-2.5 py-1.5 border border-border bg-background text-foreground"
                           >
-                            Change role
-                          </button>
+                            {VALID_ROLES.map((r) => {
+                              const warning = getRoleWarning(r, member);
+                              const disabled =
+                                r !== member.role &&
+                                isRoleTakenByAnotherMember(r, member);
+
+                              return (
+                                <option
+                                  key={r}
+                                  value={r}
+                                  disabled={disabled}
+                                  title={warning ?? undefined}
+                                >
+                                  {roleLabel(r)}
+                                  {disabled ? " — already assigned" : ""}
+                                </option>
+                              );
+                            })}
+                          </select>
+
                           <button
-                            onClick={() => handleRemove(member.user_id)}
-                            className="text-xs px-2.5 py-1 rounded-lg border border-error-border text-error hover:bg-error-light transition-colors"
+                            onClick={() => setEditingRoleFor(null)}
+                            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-error-border bg-error-light text-error hover:bg-error-light/80 transition-colors"
                           >
-                            Remove
+                            Cancel
                           </button>
-                        </>
-                      )}
-                    </>
-                  )}
+                        </div>
+
+                        {(scrumMasterBlocked || productOwnerBlocked) && (
+                          <div className="text-right">
+                            {scrumMasterBlocked && member.role !== "scrum_master" && (
+                              <p className="text-[11px] text-error">
+                                {scrumMasterBlocked}
+                              </p>
+                            )}
+                            {productOwnerBlocked && member.role !== "product_owner" && (
+                              <p className="text-[11px] text-error">
+                                {productOwnerBlocked}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        <span
+                          className={`px-2.5 py-1 text-xs font-medium rounded-full ${cfg.className}`}
+                        >
+                          {cfg.label}
+                        </span>
+
+                        {canManage && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setActionError(null);
+                                setEditingRoleFor(member.user_id);
+                              }}
+                              className="text-xs px-2.5 py-1 rounded-lg border border-border text-muted hover:text-foreground hover:border-primary transition-colors"
+                            >
+                              Change role
+                            </button>
+                            <button
+                              onClick={() => handleRemove(member.user_id)}
+                              className="px-3 py-1.5 text-xs font-medium rounded-lg border border-error-border bg-error-light text-error hover:bg-error-light/80 transition-colors"
+                            >
+                              Remove
+                            </button>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -377,11 +461,26 @@ export default function TeamPage() {
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <p className="font-semibold text-foreground mb-1">
-            No team members yet
-          </p>
+          <div className="w-14 h-14 rounded-2xl border flex items-center justify-center mb-4 bg-surface border-border">
+            <svg
+              className="w-6 h-6 text-primary"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M18 20a6 6 0 00-12 0M12 12a4 4 0 100-8 4 4 0 000 8zm7 8a7.5 7.5 0 00-3-5.99M5 14.01A7.5 7.5 0 002 20"
+              />
+            </svg>
+          </div>
+          <p className="font-semibold text-foreground mb-1">No team members yet</p>
           <p className="text-sm text-subtle">
-            Add your first member to get started.
+            {canManage
+              ? "Add your first member to get started."
+              : "No team members have been added yet."}
           </p>
         </div>
       )}
