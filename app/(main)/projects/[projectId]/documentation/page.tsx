@@ -218,6 +218,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import { jsPDF } from "jspdf";
 
 export default function DocumentationPage() {
   const params = useParams();
@@ -292,28 +293,27 @@ export default function DocumentationPage() {
   }
 
   function handleExportPdf() {
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>Documentation</title>
-          <style>
-            body { font-family: Georgia, serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.7; color: #111; }
-            pre { background: #f4f4f4; padding: 12px; border-radius: 4px; overflow-x: auto; }
-            code { font-family: monospace; background: #f4f4f4; padding: 2px 4px; border-radius: 3px; }
-            h1, h2, h3 { margin-top: 1.5em; }
-          </style>
-        </head>
-        <body>
-          <pre style="white-space: pre-wrap; font-family: Georgia, serif; border: none; background: none; padding: 0;">${content.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
-          <script>window.onload = () => { window.print(); window.onafterprint = () => window.close(); }<\/script>
-        </body>
-      </html>
-    `);
-    win.document.close();
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    const maxWidth = pageWidth - margin * 2;
+    const lineHeight = 7;
+    let y = 20;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+
+    const lines = doc.splitTextToSize(content || " ", maxWidth);
+    lines.forEach((line: string) => {
+      if (y > doc.internal.pageSize.getHeight() - margin) {
+        doc.addPage();
+        y = margin;
+      }
+      doc.text(line, margin, y);
+      y += lineHeight;
+    });
+
+    doc.save("documentation.pdf");
   }
 
   // Import
