@@ -6,6 +6,7 @@ import CreateStoryModal from "@/components/features/stories/CreateStoryModal";
 import BacklogHelpTooltip from "@/components/features/stories/BacklogHelpTooltip";
 import type { UserStory } from "@/lib/types";
 import EditStoryModal from "@/components/features/stories/EditStoryModal";
+import CommentsModal from "@/components/features/stories/CommentsModal";
 
 type SortKey = "created_at" | "business_value" | "priority";
 type TabKey = "unassigned" | "assigned" | "realized" | "future";
@@ -85,6 +86,7 @@ function StoryCard({
   onToggle,
   onEdit,
   canEdit,
+  onComments,
 }: {
   story: UserStory;
   selectable?: boolean;
@@ -92,6 +94,7 @@ function StoryCard({
   onToggle?: () => void;
   onEdit?: (story: UserStory) => void;
   canEdit?: boolean;
+  onComments?: (story: UserStory) => void;
 }) {
   const priority = PRIORITY_CONFIG[story.priority] ?? PRIORITY_CONFIG.wont_have;
   const status = STATUS_CONFIG[story.status] ?? STATUS_CONFIG.backlog;
@@ -152,6 +155,16 @@ function StoryCard({
                 Edit
               </button>
             )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onComments?.(story);
+              }}
+              className="inline-flex items-center rounded-lg bg-surface border border-border px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground hover:border-primary transition-colors"
+            >
+              Comments
+            </button>
             {story.business_value != null && (
               <span className="text-xs text-muted bg-surface border border-border px-2 py-0.5 rounded-lg">
                 BV {story.business_value}
@@ -244,6 +257,9 @@ export default function BacklogPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [projectRole, setProjectRole] = useState<string | null>(null);
   const [editingStory, setEditingStory] = useState<UserStory | null>(null);
+  const [commentingStory, setCommentingStory] = useState<UserStory | null>(
+    null,
+  );
 
   const openEditModal = (story: UserStory) => setEditingStory(story);
   const closeEditModal = () => setEditingStory(null);
@@ -681,6 +697,7 @@ export default function BacklogPage() {
                   projectRole === "product_owner") &&
                 (activeTab === "unassigned" || activeTab === "future")
               }
+              onComments={(story) => setCommentingStory(story)}
             />
           ))}
         </div>
@@ -738,6 +755,15 @@ export default function BacklogPage() {
           story={editingStory}
           onClose={closeEditModal}
           onSaved={loadBacklog}
+        />
+      )}
+
+      {commentingStory && (
+        <CommentsModal
+          storyId={commentingStory.id}
+          storyTitle={commentingStory.title}
+          isDone={commentingStory.status === "done"}
+          onClose={() => setCommentingStory(null)}
         />
       )}
     </div>
