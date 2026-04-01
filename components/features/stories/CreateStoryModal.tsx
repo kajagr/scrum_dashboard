@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Priority } from "@/lib/types";
 
 interface CreateStoryModalProps {
@@ -60,6 +61,8 @@ export default function CreateStoryModal({
   onClose,
   projectId,
 }: CreateStoryModalProps) {
+  const router = useRouter();
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [acceptanceCriteria, setAcceptanceCriteria] = useState("");
@@ -71,6 +74,7 @@ export default function CreateStoryModal({
 
   const validate = (): boolean => {
     const errors: FieldError = {};
+
     if (!title.trim()) {
       errors.title = "Title is required.";
     } else if (title.trim().length < 3) {
@@ -78,6 +82,7 @@ export default function CreateStoryModal({
     } else if (title.trim().length > 200) {
       errors.title = "Title is too long (max 200 characters).";
     }
+
     if (businessValue === "") {
       errors.businessValue = "Business value is required.";
     } else if (
@@ -88,6 +93,7 @@ export default function CreateStoryModal({
       errors.businessValue =
         "Business value must be an integer between 1 and 10.";
     }
+
     if (
       !["must_have", "should_have", "could_have", "wont_have"].includes(
         priority,
@@ -95,6 +101,7 @@ export default function CreateStoryModal({
     ) {
       errors.priority = "Invalid priority.";
     }
+
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -110,11 +117,18 @@ export default function CreateStoryModal({
     onClose();
   };
 
+  const handleOpenPlanningPoker = () => {
+  router.push(`/projects/${projectId}/planning-poker`);
+};
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setServerError(null);
+
     if (!validate()) return;
+
     setLoading(true);
+
     try {
       const res = await fetch(`/api/projects/${projectId}/stories`, {
         method: "POST",
@@ -129,7 +143,9 @@ export default function CreateStoryModal({
           business_value: businessValue,
         }),
       });
+
       const data = await res.json();
+
       if (!res.ok) {
         if (res.status === 409) {
           setFieldErrors({
@@ -144,9 +160,11 @@ export default function CreateStoryModal({
         } else {
           setServerError(data.error || "Error while creating story.");
         }
+
         setLoading(false);
         return;
       }
+
       handleClose();
     } catch {
       setServerError("A server error occurred.");
@@ -198,7 +216,6 @@ export default function CreateStoryModal({
             onSubmit={handleSubmit}
             className="flex flex-col gap-4 overflow-y-auto flex-1 pr-1"
           >
-            {/* Title */}
             <div>
               <label className={labelClass}>
                 Title{" "}
@@ -238,7 +255,6 @@ export default function CreateStoryModal({
               </div>
             </div>
 
-            {/* Description */}
             <div>
               <label className={labelClass}>Description</label>
               <textarea
@@ -250,7 +266,6 @@ export default function CreateStoryModal({
               />
             </div>
 
-            {/* Acceptance criteria */}
             <div>
               <label className={labelClass}>Acceptance Criteria</label>
               <textarea
@@ -262,7 +277,6 @@ export default function CreateStoryModal({
               />
             </div>
 
-            {/* Priority */}
             <div>
               <label className={labelClass}>
                 Priority{" "}
@@ -286,7 +300,9 @@ export default function CreateStoryModal({
                     }`}
                   >
                     <span
-                      className={`w-2 h-2 rounded-full flex-shrink-0 ${priority === p.value ? priorityDot[p.value] : "bg-subtle"}`}
+                      className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                        priority === p.value ? priorityDot[p.value] : "bg-subtle"
+                      }`}
                     />
                     <div className="min-w-0">
                       <p className="text-xs font-semibold leading-tight">
@@ -306,7 +322,6 @@ export default function CreateStoryModal({
               )}
             </div>
 
-            {/* Business Value */}
             <div>
               <label className={labelClass}>
                 Business Value{" "}
@@ -336,7 +351,6 @@ export default function CreateStoryModal({
               )}
             </div>
 
-            {/* Server error */}
             {serverError && (
               <div className="flex items-start gap-2.5 p-3.5 rounded-xl border border-error-border bg-error-light flex-shrink-0">
                 <svg
@@ -356,8 +370,15 @@ export default function CreateStoryModal({
               </div>
             )}
 
-            {/* Actions */}
             <div className="border-t border-border pt-4 flex justify-end gap-3 flex-shrink-0">
+              <button
+                type="button"
+                onClick={handleOpenPlanningPoker}
+                className="px-5 py-2.5 text-sm font-medium rounded-lg transition-colors bg-accent hover:bg-accent-hover text-white"
+              >
+                Open Planning Poker
+              </button>
+
               <button
                 type="button"
                 onClick={handleClose}
@@ -365,6 +386,7 @@ export default function CreateStoryModal({
               >
                 Cancel
               </button>
+
               <button
                 type="submit"
                 disabled={loading}
