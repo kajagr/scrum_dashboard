@@ -24,7 +24,6 @@ export default function WallPage() {
   const [posts, setPosts] = useState<WallPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [content, setContent] = useState("");
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,9 +48,7 @@ export default function WallPage() {
     setPosts((prev) => prev.filter((p) => p.id !== id));
   };
 
-  const handlePost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!content.trim()) return;
+  const handlePost = async (htmlContent: string) => {
     setPosting(true);
     setError(null);
     try {
@@ -59,11 +56,10 @@ export default function WallPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ content: content.trim() }),
+        body: JSON.stringify({ content: htmlContent }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Error posting."); return; }
-      setContent("");
       setPosts((prev) => [data, ...prev]);
     } catch {
       setError("A server error occurred.");
@@ -90,8 +86,6 @@ export default function WallPage() {
         {/* Main feed */}
         <div className="flex-1 min-w-0">
           <WallCompose
-            content={content}
-            onChange={(v) => { setContent(v); setError(null); }}
             onSubmit={handlePost}
             posting={posting}
             error={error}

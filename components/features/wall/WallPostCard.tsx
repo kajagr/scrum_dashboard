@@ -170,9 +170,13 @@ export default function WallPostCard({ id, author, content, created_at, projectI
               )
             )}
           </div>
-          <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap mb-3">
-            {content}
-          </p>
+          <div
+            className="text-sm text-foreground leading-relaxed mb-3 prose prose-sm max-w-none
+              prose-p:my-1 prose-headings:text-foreground prose-headings:font-semibold
+              prose-strong:text-foreground prose-ul:my-1 prose-ol:my-1
+              prose-blockquote:border-primary-border prose-blockquote:text-muted"
+            dangerouslySetInnerHTML={{ __html: content }}
+          />
 
           {/* Toggle comments */}
           <button
