@@ -2,24 +2,36 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 type RouteContext = {
-  params: Promise<{ projectId: string }>;
+  params: Promise<{ postId: string }>;
 };
 
-// GET /api/projects/[projectId]/wall
+// GET /api/wall/[postId]/comments
 export async function GET(_req: NextRequest, context: RouteContext) {
   try {
     const supabase = await createClient();
-    const { projectId } = await context.params;
+    const { postId } = await context.params;
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Check post exists
+    const { data: post } = await supabase
+      .from("project_wall_posts")
+      .select("id, project_id")
+      .eq("id", postId)
+      .maybeSingle();
+
+    if (!post) {
+      return NextResponse.json({ error: "Post not found." }, { status: 404 });
+    }
+
+    // Check membership
     const { data: membership } = await supabase
       .from("project_members")
       .select("role")
-      .eq("project_id", projectId)
+      .eq("project_id", post.project_id)
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -28,49 +40,53 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     }
 
     const { data, error } = await supabase
-      .from("project_wall_posts")
+      .from("post_comments")
       .select(`
         id,
         content,
         created_at,
-        author:users(id, first_name, last_name),
-        post_comments(count)
+        author:users(id, first_name, last_name)
       `)
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false });
+      .eq("post_id", postId)
+      .order("created_at", { ascending: true });
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Flatten comment count from Supabase aggregate
-    const posts = (data ?? []).map((post: any) => ({
-      ...post,
-      comment_count: post.post_comments?.[0]?.count ?? 0,
-      post_comments: undefined,
-    }));
-
-    return NextResponse.json(posts);
+    return NextResponse.json(data ?? []);
   } catch {
-    return NextResponse.json({ error: "Error fetching wall posts." }, { status: 500 });
+    return NextResponse.json({ error: "Error fetching comments." }, { status: 500 });
   }
 }
 
-// POST /api/projects/[projectId]/wall
+// POST /api/wall/[postId]/comments
 export async function POST(req: NextRequest, context: RouteContext) {
   try {
     const supabase = await createClient();
-    const { projectId } = await context.params;
+    const { postId } = await context.params;
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Check post exists
+    const { data: post } = await supabase
+      .from("project_wall_posts")
+      .select("id, project_id")
+      .eq("id", postId)
+      .maybeSingle();
+
+    if (!post) {
+      return NextResponse.json({ error: "Post not found." }, { status: 404 });
+    }
+
+    // Check membership
     const { data: membership } = await supabase
       .from("project_members")
       .select("role")
-      .eq("project_id", projectId)
+      .eq("project_id", post.project_id)
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -86,8 +102,12 @@ export async function POST(req: NextRequest, context: RouteContext) {
     }
 
     const { data, error } = await supabase
-      .from("project_wall_posts")
-      .insert({ project_id: projectId, user_id: user.id, content })
+      .from("post_comments")
+      .insert({
+        post_id: postId,
+        user_id: user.id,
+        content,
+      })
       .select(`
         id,
         content,
@@ -100,8 +120,8 @@ export async function POST(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ...data, comment_count: 0 }, { status: 201 });
+    return NextResponse.json(data, { status: 201 });
   } catch {
-    return NextResponse.json({ error: "Error creating wall post." }, { status: 500 });
+    return NextResponse.json({ error: "Error creating comment." }, { status: 500 });
   }
 }
