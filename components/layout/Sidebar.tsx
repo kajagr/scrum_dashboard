@@ -16,6 +16,7 @@ import {
   Flag,
   UserPlus,
   BookOpen,
+  MessageSquare,
 } from "lucide-react";
 
 const navigation = [
@@ -63,6 +64,12 @@ const navigation = [
     href: "/team",
     icon: Users,
     alwaysEnabled: true,
+  },
+  {
+    name: "Wall",
+    type: "project",
+    href: "/wall",
+    icon: MessageSquare,
   },
   { name: "Settings", type: "project", href: "/settings", icon: Settings },
 ];
