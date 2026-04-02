@@ -7,6 +7,12 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
+function normalizeEmail(email: string): string {
+  const [local, domain] = email.split("@");
+  if (!local || !domain) return email;
+  return `${local.replace(/\./g, "")}@${domain}`;
+}
+
 /**
  * @swagger
  * /api/users/profile:
@@ -261,6 +267,23 @@ export async function PUT(req: Request) {
     if (existingUsername) {
       return NextResponse.json(
         { error: "Username already exists." },
+        { status: 409 },
+      );
+    }
+
+    const { data: otherUsers } = await supabaseAdmin
+      .from("users")
+      .select("id, email")
+      .neq("id", currentUser.id);
+
+    const normalizedNew = normalizeEmail(email);
+    const isDuplicateEmail = otherUsers?.some(
+      (u) => normalizeEmail(u.email.toLowerCase()) === normalizedNew,
+    );
+
+    if (isDuplicateEmail) {
+      return NextResponse.json(
+        { error: "Email already exists." },
         { status: 409 },
       );
     }
