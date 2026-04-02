@@ -16,7 +16,6 @@ export default function EditSprintModal({
   onClose,
   sprint,
   projectId,
-  existingSprints,
 }: EditSprintModalProps) {
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("");
@@ -25,6 +24,8 @@ export default function EditSprintModal({
   const [velocity, setVelocity] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const isActive = sprint?.status === "active";
 
   useEffect(() => {
     if (sprint) {
@@ -41,13 +42,16 @@ export default function EditSprintModal({
     e.preventDefault();
     setError(null);
 
-    const today = new Date().toISOString().split("T")[0];
-    if (startDate < today) { setError("Začetni datum ne sme biti v preteklosti."); return; }
-    if (endDate <= startDate) { setError("Končni datum mora biti po začetnem datumu."); return; }
     if (velocity) {
       const v = Number(velocity);
       if (!Number.isFinite(v) || v <= 0) { setError("Hitrost mora biti pozitivno število."); return; }
       if (v > 100) { setError("Hitrost je previsoka (max 100)."); return; }
+    }
+
+    if (!isActive) {
+      const today = new Date().toISOString().split("T")[0];
+      if (startDate < today) { setError("Začetni datum ne sme biti v preteklosti."); return; }
+      if (endDate <= startDate) { setError("Končni datum mora biti po začetnem datumu."); return; }
     }
 
     setLoading(true);
@@ -56,13 +60,17 @@ export default function EditSprintModal({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          name,
-          goal: goal || null,
-          start_date: startDate,
-          end_date: endDate,
-          velocity: velocity ? Number(velocity) : null,
-        }),
+        body: JSON.stringify(
+          isActive
+            ? { velocity: velocity ? Number(velocity) : null }
+            : {
+                name,
+                goal: goal || null,
+                start_date: startDate,
+                end_date: endDate,
+                velocity: velocity ? Number(velocity) : null,
+              }
+        ),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Napaka pri posodabljanju sprinta."); return; }
@@ -89,35 +97,47 @@ export default function EditSprintModal({
             <div>
               <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-0.5">Sprint</p>
               <h2 className="text-2xl font-bold text-foreground leading-tight">Edit sprint</h2>
+              {isActive && (
+                <p className="text-xs text-muted mt-1 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
+                  Active — only velocity can be changed
+                </p>
+              )}
             </div>
             <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-lg leading-none transition-colors bg-background hover:bg-border text-muted">×</button>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className={labelClass}>Name <span className="text-error normal-case font-normal tracking-normal">*</span></label>
-              <input type="text" value={name} onChange={(e) => setName(e.target.value)} required className={inputClass} placeholder="Sprint 1" />
-            </div>
+            {/* Full fields — planned only */}
+            {!isActive && (
+              <>
+                <div>
+                  <label className={labelClass}>Name <span className="text-error normal-case font-normal tracking-normal">*</span></label>
+                  <input type="text" value={name} onChange={(e) => setName(e.target.value)} required className={inputClass} placeholder="Sprint 1" />
+                </div>
 
-            <div>
-              <label className={labelClass}>Goal</label>
-              <input type="text" value={goal} onChange={(e) => setGoal(e.target.value)} className={inputClass} placeholder="Optional sprint goal" />
-            </div>
+                <div>
+                  <label className={labelClass}>Goal</label>
+                  <input type="text" value={goal} onChange={(e) => setGoal(e.target.value)} className={inputClass} placeholder="Optional sprint goal" />
+                </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className={labelClass}>Start date <span className="text-error normal-case font-normal tracking-normal">*</span></label>
-                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>End date <span className="text-error normal-case font-normal tracking-normal">*</span></label>
-                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required className={inputClass} />
-              </div>
-            </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelClass}>Start date <span className="text-error normal-case font-normal tracking-normal">*</span></label>
+                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required className={inputClass} />
+                  </div>
+                  <div>
+                    <label className={labelClass}>End date <span className="text-error normal-case font-normal tracking-normal">*</span></label>
+                    <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required className={inputClass} />
+                  </div>
+                </div>
+              </>
+            )}
 
+            {/* Velocity — always shown */}
             <div>
               <label className={labelClass}>Velocity <span className="text-subtle normal-case font-normal tracking-normal">(optional)</span></label>
-              <input type="number" value={velocity} onChange={(e) => setVelocity(e.target.value)} min={1} max={100} className={inputClass} placeholder="e.g. 21" />
+              <input type="number" value={velocity} onChange={(e) => setVelocity(e.target.value)} min={1} max={100} className={inputClass} placeholder="e.g. 21" autoFocus={isActive} />
             </div>
 
             {error && (
