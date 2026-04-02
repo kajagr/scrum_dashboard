@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { canManageProjectMembers } from "@/lib/permissions";
 import type { ProjectRole } from "@/lib/types";
+
+const supabaseAdmin = createAdminClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
 
 const VALID_ROLES: ProjectRole[] = [
   "product_owner",
@@ -61,34 +67,10 @@ interface MemberInput {
  *                     $ref: '#/components/schemas/UserSummary'
  *       401:
  *         description: User not authenticated
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Unauthorized"
  *       404:
  *         description: Project not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Project not found."
  *       500:
  *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Error fetching members."
  *
  * components:
  *   schemas:
@@ -98,20 +80,15 @@ interface MemberInput {
  *         id:
  *           type: string
  *           format: uuid
- *           example: "d5e8f1a2-3b4c-5d6e-7f8a-9b0c1d2e3f4a"
  *         email:
  *           type: string
  *           format: email
- *           example: "janez.novak@example.com"
  *         username:
  *           type: string
- *           example: "janez.novak"
  *         first_name:
  *           type: string
- *           example: "Janez"
  *         last_name:
  *           type: string
- *           example: "Novak"
  */
 export async function GET(
   request: NextRequest,
@@ -150,7 +127,8 @@ export async function GET(
         user:users(id, email, username, first_name, last_name)
       `,
       )
-      .eq("project_id", projectId);
+      .eq("project_id", projectId)
+      .is("removed_at", null);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -173,7 +151,7 @@ export async function GET(
  *     description: >
  *       Bulk-adds one or more users to a project with specified roles.
  *       Only users with member management permissions can perform this action.
- *       All inserts are atomic — if any fail, none are added.
+ *       Previously removed members are restored instead of re-inserted.
  *     tags:
  *       - Members
  *     parameters:
@@ -183,8 +161,6 @@ export async function GET(
  *         schema:
  *           type: string
  *           format: uuid
- *         description: The ID of the project
- *         example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
  *     requestBody:
  *       required: true
  *       content:
@@ -206,112 +182,29 @@ export async function GET(
  *                     user_id:
  *                       type: string
  *                       format: uuid
- *                       example: "d5e8f1a2-3b4c-5d6e-7f8a-9b0c1d2e3f4a"
  *                     role:
  *                       type: string
  *                       enum: [product_owner, scrum_master, developer]
- *                       example: "developer"
  *     responses:
  *       201:
  *         description: Members successfully added
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Uspešno dodanih 2 članov."
- *                 members:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: string
- *                         format: uuid
- *                         example: "e5f6a7b8-c9d0-1234-efab-567890123456"
- *                       project_id:
- *                         type: string
- *                         format: uuid
- *                         example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
- *                       user_id:
- *                         type: string
- *                         format: uuid
- *                         example: "d5e8f1a2-3b4c-5d6e-7f8a-9b0c1d2e3f4a"
- *                       role:
- *                         type: string
- *                         enum: [product_owner, scrum_master, developer]
- *                         example: "developer"
- *                       user:
- *                         $ref: '#/components/schemas/UserSummary'
  *       400:
  *         description: Validation failed
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   examples:
- *                     emptyList:
- *                       value: "Member list is required."
- *                     duplicates:
- *                       value: "The list contains duplicate users."
- *                     invalidRole:
- *                       value: "Invalid role: manager. Valid roles are: product_owner, scrum_master, developer"
- *                     missingUsers:
- *                       value: "The following users do not exist: d5e8f1a2-3b4c-5d6e-7f8a-9b0c1d2e3f4a"
- *                     alreadyMembers:
- *                       value: "The following users are already members of this project: janez.novak"
  *       401:
  *         description: User not authenticated
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Unauthorized"
  *       403:
- *         description: User does not have permission to manage members
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "You don't have permission to manage members of this project."
+ *         description: User does not have permission
  *       404:
  *         description: Project not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Project not found."
  *       500:
  *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Error processing request."
  */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> },
 ) {
   try {
-    const { projectId: projectId } = await params;
+    const { projectId } = await params;
     const supabase = await createClient();
 
     const {
@@ -392,11 +285,13 @@ export async function POST(
       );
     }
 
+    // Preveri samo AKTIVNE člane (removed_at IS NULL)
     const { data: existingMembers } = await supabase
       .from("project_members")
       .select("user_id")
       .eq("project_id", projectId)
-      .in("user_id", userIds);
+      .in("user_id", userIds)
+      .is("removed_at", null);
 
     const alreadyMembers = existingMembers?.map((m) => m.user_id) || [];
     if (alreadyMembers.length > 0) {
@@ -414,30 +309,87 @@ export async function POST(
       );
     }
 
-    const memberInserts = members.map((member) => ({
-      project_id: projectId,
-      user_id: member.user_id,
-      role: member.role,
-    }));
-
-    const { data: insertedMembers, error: insertError } = await supabase
+    // Poišči soft-deletane člane (vrstica obstaja, ampak removed_at IS NOT NULL)
+    const { data: softDeleted } = await supabase
       .from("project_members")
-      .insert(memberInserts).select(`
-        *,
-        user:users(id, email, username, first_name, last_name)
-      `);
+      .select("user_id")
+      .eq("project_id", projectId)
+      .in("user_id", userIds)
+      .not("removed_at", "is", null);
 
-    if (insertError) {
+    const softDeletedIds = new Set(softDeleted?.map((m) => m.user_id) ?? []);
+    const toRestore = members.filter((m) => softDeletedIds.has(m.user_id));
+    const toInsert = members.filter((m) => !softDeletedIds.has(m.user_id));
+
+    // Soft-deletane OBNOVI z UPDATE — vzemi samo zadnjo vrstico (po joined_at DESC)
+    const restorePromises = toRestore.map(async (m) => {
+      // Poišči id zadnje soft-deleted vrstice za tega userja
+      const { data: existing } = await supabase
+        .from("project_members")
+        .select("id")
+        .eq("project_id", projectId)
+        .eq("user_id", m.user_id)
+        .not("removed_at", "is", null)
+        .order("joined_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!existing)
+        return { data: null, error: { message: "Row not found." } };
+
+      return supabaseAdmin
+        .from("project_members")
+        .update({
+          role: m.role,
+          removed_at: null,
+          joined_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id)
+        .select(`*, user:users(id, email, username, first_name, last_name)`)
+        .maybeSingle();
+    });
+
+    const restoredResults = await Promise.all(restorePromises);
+
+    const failedRestore = restoredResults.find((r) => r.error);
+    if (failedRestore) {
       return NextResponse.json(
-        { error: "Error adding members: " + insertError.message },
+        { error: "Error restoring member: " + failedRestore.error!.message },
         { status: 500 },
       );
     }
 
+    const restoredMembers = restoredResults.map((r) => r.data);
+
+    // Nove člane VSTAVI z INSERT
+    let insertedMembers: typeof restoredMembers = [];
+    if (toInsert.length > 0) {
+      const { data, error: insertError } = await supabase
+        .from("project_members")
+        .insert(
+          toInsert.map((m) => ({
+            project_id: projectId,
+            user_id: m.user_id,
+            role: m.role,
+          })),
+        )
+        .select(`*, user:users(id, email, username, first_name, last_name)`);
+
+      if (insertError) {
+        return NextResponse.json(
+          { error: "Error adding members: " + insertError.message },
+          { status: 500 },
+        );
+      }
+      insertedMembers = data ?? [];
+    }
+
+    const allMembers = [...restoredMembers, ...insertedMembers];
+
     return NextResponse.json(
       {
-        message: `Successfully added ${insertedMembers.length} member(s).`,
-        members: insertedMembers,
+        message: `Successfully added ${allMembers.length} member(s).`,
+        members: allMembers,
       },
       { status: 201 },
     );
