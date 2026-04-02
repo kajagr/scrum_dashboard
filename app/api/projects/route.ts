@@ -70,16 +70,36 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data, error } = await supabase
-    .from("projects")
-    .select("*")
-    .order("created_at", { ascending: false });
+  // Admini vidijo vse projekte
+  const { data: userData } = await supabase
+    .from("users")
+    .select("system_role")
+    .eq("id", user.id)
+    .single();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (userData?.system_role === "admin") {
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error)
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(data);
   }
 
-  return NextResponse.json(data);
+  // Navadni userji vidijo samo projekte kjer so aktivni člani (removed_at IS NULL)
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*, project_members!inner(user_id, removed_at)")
+    .eq("project_members.user_id", user.id)
+    .is("project_members.removed_at", null)
+    .order("created_at", { ascending: false });
+
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Odstrani project_members iz response (frontend jih ne potrebuje)
+  return NextResponse.json(data.map(({ project_members: _, ...p }) => p));
 }
 
 /**
