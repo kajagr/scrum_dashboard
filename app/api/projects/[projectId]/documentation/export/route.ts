@@ -5,7 +5,98 @@ type RouteContext = {
   params: Promise<{ projectId: string }>;
 };
 
-// GET /api/projects/:projectId/documentation/export?format=md|txt
+/**
+ * @swagger
+ * /api/projects/{projectId}/documentation/export:
+ *   get:
+ *     summary: Export project documentation as a file
+ *     description: >
+ *       Downloads the project documentation as a .md or .txt file.
+ *       Only project members can export documentation.
+ *       If no documentation exists yet, an empty file is returned.
+ *       PDF export is handled directly on the frontend using the browser's built-in print functionality and is not available via this endpoint.
+ *     tags:
+ *       - Documentation
+ *     parameters:
+ *       - in: path
+ *         name: projectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the project
+ *         example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+ *       - in: query
+ *         name: format
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [md, txt]
+ *           default: md
+ *         description: The file format to export. Defaults to md.
+ *         example: "md"
+ *     responses:
+ *       200:
+ *         description: File download response
+ *         headers:
+ *           Content-Disposition:
+ *             schema:
+ *               type: string
+ *               example: "attachment; filename=\"documentation.md\""
+ *           Content-Type:
+ *             schema:
+ *               type: string
+ *               example: "text/markdown; charset=utf-8"
+ *         content:
+ *           text/markdown:
+ *             schema:
+ *               type: string
+ *               example: "## Sprint 1\nImplementirali smo avtentikacijo."
+ *           text/plain:
+ *             schema:
+ *               type: string
+ *               example: "## Sprint 1\nImplementirali smo avtentikacijo."
+ *       400:
+ *         description: Unsupported export format
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Unsupported format. Use: md, txt"
+ *       401:
+ *         description: User not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Unauthorized"
+ *       403:
+ *         description: User is not a member of this project
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "You are not a member of this project."
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Error exporting documentation."
+ */
 export async function GET(req: NextRequest, context: RouteContext) {
   try {
     const supabase = await createClient();
