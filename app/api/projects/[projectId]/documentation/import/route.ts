@@ -11,8 +11,98 @@ type RouteContext = {
   params: Promise<{ projectId: string }>;
 };
 
-// POST /api/projects/:projectId/documentation/import
-// Accepts a .md or .txt file upload and replaces the documentation content.
+/**
+ * @swagger
+ * /api/projects/{projectId}/documentation/import:
+ *   post:
+ *     summary: Import documentation from a file
+ *     description: >
+ *       Accepts a .md or .txt file upload and replaces the project's documentation content (upsert).
+ *       Only project members can import documentation.
+ *     tags:
+ *       - Documentation
+ *     parameters:
+ *       - in: path
+ *         name: projectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the project
+ *         example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - file
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: A .md or .txt file whose content will replace the current documentation
+ *     responses:
+ *       200:
+ *         description: Documentation imported successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Documentation imported successfully."
+ *                 content:
+ *                   type: string
+ *                   description: The imported content
+ *                   example: "## Sprint 1\nImplementirali smo avtentikacijo."
+ *       400:
+ *         description: Missing file or unsupported file format
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   examples:
+ *                     noFile:
+ *                       value: "No file provided."
+ *                     wrongFormat:
+ *                       value: "Unsupported file format. Upload a .md or .txt file."
+ *       401:
+ *         description: User not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Unauthorized"
+ *       403:
+ *         description: User is not a member of this project
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "You are not a member of this project."
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Error importing documentation."
+ */
 export async function POST(req: NextRequest, context: RouteContext) {
   try {
     const supabase = await createClient();

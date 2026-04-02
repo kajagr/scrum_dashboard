@@ -5,7 +5,97 @@ type RouteContext = {
   params: Promise<{ projectId: string; postId: string; commentId: string }>;
 };
 
-// DELETE /api/projects/[projectId]/wall/[postId]/comments/[commentId]
+/**
+ * @swagger
+ * /api/projects/{projectId}/wall/{postId}/comments/{commentId}:
+ *   delete:
+ *     summary: Delete a wall post comment
+ *     description: >
+ *       Deletes a comment from a wall post.
+ *       Only the Scrum Master of the project can delete comments.
+ *     tags:
+ *       - Wall
+ *     parameters:
+ *       - in: path
+ *         name: projectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the project
+ *         example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+ *       - in: path
+ *         name: postId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the wall post
+ *         example: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+ *       - in: path
+ *         name: commentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The ID of the comment to delete
+ *         example: "c3d4e5f6-a7b8-9012-cdef-123456789012"
+ *     responses:
+ *       200:
+ *         description: Comment deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Comment deleted successfully."
+ *       401:
+ *         description: User not authenticated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Unauthorized"
+ *       403:
+ *         description: User is not a member or does not have the required role
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   examples:
+ *                     notMember:
+ *                       value: "You are not a member of this project."
+ *                     wrongRole:
+ *                       value: "Only the Scrum Master can delete comments."
+ *       404:
+ *         description: Comment not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Comment not found."
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Error deleting comment."
+ */
 export async function DELETE(_req: NextRequest, context: RouteContext) {
   try {
     const supabase = await createClient();
@@ -16,7 +106,6 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check membership — only scrum_master can delete
     const { data: membership } = await supabase
       .from("project_members")
       .select("role")
@@ -32,7 +121,6 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Only the Scrum Master can delete comments." }, { status: 403 });
     }
 
-    // Check comment exists
     const { data: comment } = await supabase
       .from("post_comments")
       .select("id")
