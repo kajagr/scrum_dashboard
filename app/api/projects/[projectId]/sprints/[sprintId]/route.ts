@@ -33,12 +33,13 @@ async function requireScrumMaster(
  *   put:
  *     summary: Update a sprint
  *     description: >
- *       Updates the name, goal, start date, end date, and velocity of a sprint.
- *       Only the Scrum Master of the project can perform this action.
- *       Only sprints that have not yet started (start_date > today) can be updated.
+ *       Updates a sprint. Only the Scrum Master of the project can perform this action.
+ *       - Planned sprints (not yet started): all fields can be updated (name, goal, start_date, end_date, velocity).
+ *       - Active sprints (already started, not yet ended): only velocity can be updated.
+ *       - Completed sprints: cannot be updated.
  *       Start date must not be in the past, end date must be after start date,
  *       velocity must be a positive number not exceeding 100,
- *       and the updated dates must not overlap with any other existing sprint.
+ *       and updated dates must not overlap with any other existing sprint.
  *     tags:
  *       - Sprints
  *     parameters:
@@ -79,12 +80,12 @@ async function requireScrumMaster(
  *               start_date:
  *                 type: string
  *                 format: date
- *                 description: Must not be in the past
+ *                 description: Ignored for active sprints
  *                 example: "2024-02-01"
  *               end_date:
  *                 type: string
  *                 format: date
- *                 description: Must be after start_date
+ *                 description: Ignored for active sprints
  *                 example: "2024-02-14"
  *               velocity:
  *                 type: integer
@@ -99,7 +100,7 @@ async function requireScrumMaster(
  *             schema:
  *               $ref: '#/components/schemas/Sprint'
  *       400:
- *         description: Validation failed or sprint has already started
+ *         description: Validation failed or sprint is completed
  *         content:
  *           application/json:
  *             schema:
@@ -108,8 +109,8 @@ async function requireScrumMaster(
  *                 error:
  *                   type: string
  *                   examples:
- *                     alreadyStarted:
- *                       value: "Sprinta ni mogoče urejati, ker se je že začel."
+ *                     completed:
+ *                       value: "Zaključenega sprinta ni mogoče urejati."
  *                     missingFields:
  *                       value: "name, start_date in end_date so obvezni."
  *                     pastStartDate:
@@ -190,7 +191,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
 
   const { data: sprint } = await supabase
     .from("sprints")
-    .select("id, start_date")
+    .select("id, start_date, end_date")
     .eq("id", sprintId)
     .eq("project_id", projectId)
     .maybeSingle();
@@ -199,14 +200,54 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: "Sprint ne obstaja." }, { status: 404 });
 
   const today = getToday();
-  if (sprint.start_date <= today)
+  const isActive = sprint.start_date <= today && sprint.end_date >= today;
+  const isCompleted = sprint.end_date < today;
+
+  if (isCompleted)
     return NextResponse.json(
-      { error: "Sprinta ni mogoče urejati, ker se je že začel." },
+      { error: "Zaključenega sprinta ni mogoče urejati." },
       { status: 400 },
     );
 
   const body = await req.json();
-  const { name, goal, start_date, end_date, velocity } = body;
+  const { velocity } = body;
+
+  // Validate velocity (applies to both planned and active)
+  if (velocity !== undefined && velocity !== null && velocity !== "") {
+    const velocityNumber = Number(velocity);
+    if (!Number.isFinite(velocityNumber) || velocityNumber <= 0)
+      return NextResponse.json(
+        { error: "Hitrost mora biti pozitivno število." },
+        { status: 400 },
+      );
+    if (velocityNumber > 100)
+      return NextResponse.json(
+        { error: "Hitrost je previsoka." },
+        { status: 400 },
+      );
+  }
+
+  // Active sprint — only velocity can change
+  if (isActive) {
+    const { data, error } = await supabase
+      .from("sprints")
+      .update({ velocity: velocity ?? null })
+      .eq("id", sprintId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("PUT /sprints/[sprintId] error:", error);
+      return NextResponse.json(
+        { error: "Napaka pri posodabljanju sprinta." },
+        { status: 500 },
+      );
+    }
+    return NextResponse.json(data);
+  }
+
+  // Planned sprint — full update
+  const { name, goal, start_date, end_date } = body;
 
   if (!name || !start_date || !end_date)
     return NextResponse.json(
@@ -225,20 +266,6 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
       { error: "Končni datum mora biti po začetnem datumu." },
       { status: 400 },
     );
-
-  if (velocity !== undefined && velocity !== null && velocity !== "") {
-    const velocityNumber = Number(velocity);
-    if (!Number.isFinite(velocityNumber) || velocityNumber <= 0)
-      return NextResponse.json(
-        { error: "Hitrost mora biti pozitivno število." },
-        { status: 400 },
-      );
-    if (velocityNumber > 100)
-      return NextResponse.json(
-        { error: "Hitrost je previsoka." },
-        { status: 400 },
-      );
-  }
 
   // Overlap check — exclude current sprint
   const { data: overlapping, error: overlapError } = await supabase
