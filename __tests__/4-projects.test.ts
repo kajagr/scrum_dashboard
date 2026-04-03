@@ -2,6 +2,15 @@ import { NextRequest } from "next/server";
 import { POST as CREATE_PROJECT } from "@/app/api/projects/route";
 import { POST as ADD_MEMBERS } from "@/app/api/projects/[projectId]/members/route";
 
+// ─── Mock supabaseAdmin (@supabase/supabase-js) ───────────────────────────────
+const mockAdminFrom = jest.fn<any, any>();
+
+jest.mock("@supabase/supabase-js", () => ({
+  createClient: jest.fn(() => ({
+    from: (...args: any[]) => mockAdminFrom(...args),
+  })),
+}));
+
 // ─── Mock Supabase ────────────────────────────────────────────────────────────
 const mockGetUser = jest.fn();
 const mockFrom = jest.fn<any, any>();
@@ -26,6 +35,25 @@ jest.mock("@/lib/permissions", () => ({
   canManageProjectMembers: (...args: any[]) =>
     mockCanManageProjectMembers(...args),
 }));
+
+// ─── Helper: thenable read chain (supports any method order) ─────────────────
+function makeReadChain(resolvedValue: { data: any; error: any }) {
+  const chain: any = {
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    ilike: jest.fn().mockReturnThis(),
+    neq: jest.fn().mockReturnThis(),
+    is: jest.fn().mockReturnThis(),
+    not: jest.fn().mockReturnThis(),
+    order: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    in: jest.fn().mockReturnThis(),
+    maybeSingle: jest.fn().mockResolvedValue(resolvedValue),
+    single: jest.fn().mockResolvedValue(resolvedValue),
+    then: jest.fn((resolve: (v: any) => any) => resolve(resolvedValue)),
+  };
+  return chain;
+}
 
 // ─── Helper functions ─────────────────────────────────────────────────────────
 function makeProjectRequest(body: object) {
@@ -60,7 +88,6 @@ describe("POST /api/projects", () => {
     mockProjectNameExists.mockResolvedValue(false);
   });
 
-  // ─── #1: Successful project creation ─────────────────────────────────────
   it("201 — successfully creates a project", async () => {
     const createdProject = {
       id: "project-1",
@@ -86,7 +113,6 @@ describe("POST /api/projects", () => {
     expect(body.id).toBe("project-1");
   });
 
-  // ─── #2: Duplicate project name ───────────────────────────────────────────
   it("400 — rejects project with duplicate name", async () => {
     mockProjectNameExists.mockResolvedValue(true);
 
@@ -99,7 +125,6 @@ describe("POST /api/projects", () => {
     expect(body.error).toMatch(/already exists/i);
   });
 
-  // ─── #3: Only admins can create projects ──────────────────────────────────
   it("403 — non-admin user cannot create a project", async () => {
     mockCanCreateProject.mockResolvedValue(false);
 
@@ -112,7 +137,6 @@ describe("POST /api/projects", () => {
     expect(body.error).toMatch(/administrator/i);
   });
 
-  // ─── #4: Missing project name ─────────────────────────────────────────────
   it("400 — missing project name", async () => {
     const res = await CREATE_PROJECT(
       makeProjectRequest({ description: "Some description" }),
@@ -123,7 +147,6 @@ describe("POST /api/projects", () => {
     expect(body.error).toMatch(/name.*required|required.*name/i);
   });
 
-  // ─── #5: Unauthenticated user ─────────────────────────────────────────────
   it("401 — unauthenticated user cannot create a project", async () => {
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
 
@@ -136,7 +159,6 @@ describe("POST /api/projects", () => {
     expect(body.error).toMatch(/unauthorized/i);
   });
 
-  // ─── #6: Project created without members ─────────────────────────────────
   it("201 — creates project without any members", async () => {
     const createdProject = { id: "project-1", name: "Solo Project" };
 
@@ -194,39 +216,39 @@ describe("POST /api/projects/:projectId/members", () => {
     let cnt = 0;
     mockFrom.mockImplementation(() => {
       cnt++;
-      if (cnt === 1)
-        return {
-          // projects — check project exists
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          maybeSingle: jest
-            .fn()
-            .mockResolvedValue({ data: project, error: null }),
-        };
-      if (cnt === 2)
-        return {
-          // users — check users exist
-          select: jest.fn().mockReturnThis(),
-          in: jest.fn().mockResolvedValue({ data: existingUsers, error: null }),
-        };
+
+      // 1. projects — existence check
+      if (cnt === 1) return makeReadChain({ data: project, error: null });
+
+      // 2. users — existence check
+      if (cnt === 2) return makeReadChain({ data: existingUsers, error: null });
+
+      // 3. project_members — active members check (.is("removed_at", null))
       if (cnt === 3)
-        return {
-          // project_members — check already existing members
-          select: jest.fn().mockReturnThis(),
-          eq: jest.fn().mockReturnThis(),
-          in: jest
-            .fn()
-            .mockResolvedValue({ data: existingMembers, error: null }),
-        };
+        return makeReadChain({
+          data: existingMembers.map((id) => ({ user_id: id })),
+          error: null,
+        });
+
+      // 4a. already active members → fetch usernames
+      if (cnt === 4 && existingMembers.length > 0)
+        return makeReadChain({
+          data: existingMembers.map((id) => ({ username: id })),
+          error: null,
+        });
+
+      // 4b. no active members → soft-deleted check
+      if (cnt === 4 && existingMembers.length === 0)
+        return makeReadChain({ data: [], error: null });
+
+      // 5. project_members — insert
       return {
-        // project_members — insert
         insert: jest.fn().mockReturnThis(),
         select: jest.fn().mockResolvedValue(insertResult),
       };
     });
   }
 
-  // ─── #1: Successfully add members with roles ──────────────────────────────
   it("201 — successfully adds members with roles", async () => {
     setupMembersAddMocks();
 
@@ -246,7 +268,6 @@ describe("POST /api/projects/:projectId/members", () => {
     expect(body.message).toMatch(/successfully added/i);
   });
 
-  // ─── #2: Invalid role ─────────────────────────────────────────────────────
   it("400 — rejects invalid role", async () => {
     setupMembersAddMocks();
 
@@ -262,7 +283,6 @@ describe("POST /api/projects/:projectId/members", () => {
     expect(body.error).toMatch(/invalid role/i);
   });
 
-  // ─── #3: No permission ────────────────────────────────────────────────────
   it("403 — user without permission cannot add members", async () => {
     mockCanManageProjectMembers.mockResolvedValue(false);
 
@@ -278,7 +298,6 @@ describe("POST /api/projects/:projectId/members", () => {
     expect(body.error).toMatch(/permission/i);
   });
 
-  // ─── #4: Duplicate users in request ──────────────────────────────────────
   it("400 — rejects duplicate users in the request", async () => {
     setupMembersAddMocks();
 
@@ -286,7 +305,7 @@ describe("POST /api/projects/:projectId/members", () => {
       makeMembersRequest({
         members: [
           { user_id: "user-1", role: "developer" },
-          { user_id: "user-1", role: "scrum_master" }, // duplicate
+          { user_id: "user-1", role: "scrum_master" },
         ],
       }),
       makeContext(),
@@ -297,11 +316,8 @@ describe("POST /api/projects/:projectId/members", () => {
     expect(body.error).toMatch(/duplicate/i);
   });
 
-  // ─── #5: User does not exist ──────────────────────────────────────────────
   it("400 — rejects non-existent users", async () => {
-    setupMembersAddMocks({
-      existingUsers: [], // no users exist
-    });
+    setupMembersAddMocks({ existingUsers: [] });
 
     const res = await ADD_MEMBERS(
       makeMembersRequest({
@@ -315,7 +331,6 @@ describe("POST /api/projects/:projectId/members", () => {
     expect(body.error).toMatch(/do not exist/i);
   });
 
-  // ─── #6: Unauthenticated user ─────────────────────────────────────────────
   it("401 — unauthenticated user cannot add members", async () => {
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
 
@@ -331,7 +346,6 @@ describe("POST /api/projects/:projectId/members", () => {
     expect(body.error).toMatch(/unauthorized/i);
   });
 
-  // ─── #7: Empty members list ───────────────────────────────────────────────
   it("400 — rejects empty members list", async () => {
     setupMembersAddMocks();
 
@@ -345,14 +359,10 @@ describe("POST /api/projects/:projectId/members", () => {
     expect(body.error).toMatch(/required/i);
   });
 
-  // ─── #8: Project not found ────────────────────────────────────────────────
   it("404 — returns 404 if project does not exist", async () => {
-    // Set up mock directly — project check returns null
-    mockFrom.mockImplementation(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
-    }));
+    mockFrom.mockImplementation(() =>
+      makeReadChain({ data: null, error: null }),
+    );
 
     const res = await ADD_MEMBERS(
       makeMembersRequest({
