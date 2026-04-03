@@ -55,9 +55,7 @@ function makePostRequest(body: object) {
 function makeDeleteRequest() {
   return new NextRequest(
     "http://localhost/api/projects/project-1/members/user-2",
-    {
-      method: "DELETE",
-    },
+    { method: "DELETE" },
   );
 }
 
@@ -80,26 +78,39 @@ function makeMemberContext(projectId = "project-1", userId = "user-2") {
   return { params: Promise.resolve({ projectId, userId }) };
 }
 
-// ─── Read chain: supports .select().eq().eq().maybeSingle() ───────────────────
+// ─── Read chain: supports alle Supabase fluent query methods ─────────────────
 function makeReadChain(resolvedValue: { data: any; error: any }) {
-  return {
+  const chain: any = {
     select: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
     ilike: jest.fn().mockReturnThis(),
     neq: jest.fn().mockReturnThis(),
-    in: jest.fn().mockResolvedValue(resolvedValue),
+    is: jest.fn().mockReturnThis(),
+    not: jest.fn().mockReturnThis(),
+    order: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    in: jest.fn().mockReturnThis(),
     maybeSingle: jest.fn().mockResolvedValue(resolvedValue),
     single: jest.fn().mockResolvedValue(resolvedValue),
+    // Thenable — await chain resolva direktno, ne glede na zadnjo metodo
+    then: jest.fn((resolve: (v: any) => any) => resolve(resolvedValue)),
   };
+  return chain;
 }
 
-// ─── Admin chain: .delete()/.update() + two .eq() calls (second is terminal) ──
+// ─── Admin write chain: supports .update().eq().eq().is() (soft delete) ──────
 function makeAdminWriteChain(resolvedValue: { error: any }) {
-  const secondEq = jest.fn().mockResolvedValue(resolvedValue);
-  const firstEq = jest.fn().mockReturnValue({ eq: secondEq });
+  const terminal = jest.fn().mockResolvedValue(resolvedValue);
+  const afterSecondEq = jest.fn().mockReturnValue({
+    is: terminal,
+    neq: terminal,
+    in: terminal,
+  });
+  const afterFirstEq = jest.fn().mockReturnValue({ eq: afterSecondEq });
   return {
-    delete: jest.fn().mockReturnValue({ eq: firstEq }),
-    update: jest.fn().mockReturnValue({ eq: firstEq }),
+    update: jest.fn().mockReturnValue({ eq: afterFirstEq }),
+    // za morebitne druge admin operacije
+    delete: jest.fn().mockReturnValue({ eq: afterFirstEq }),
   };
 }
 
@@ -127,7 +138,6 @@ describe("PUT /api/projects/:projectId — sprememba imena projekta (#5)", () =>
     const systemRole = overrides.systemRole ?? "user";
     const duplicate = overrides.duplicate ?? null;
 
-    // PUT uses Promise.all for membership + userData → match by table name
     mockFrom.mockImplementation((table: string) => {
       if (table === "project_members")
         return makeReadChain({ data: membership, error: null });
@@ -137,8 +147,6 @@ describe("PUT /api/projects/:projectId — sprememba imena projekta (#5)", () =>
           error: null,
         });
       if (table === "projects") {
-        // duplicate check: .ilike().neq().maybeSingle()
-        // update:          .update().eq().select().single()
         const chain: any = {
           select: jest.fn().mockReturnThis(),
           eq: jest.fn().mockReturnThis(),
@@ -254,35 +262,43 @@ describe("POST /api/projects/:projectId/members — dodajanje člana (#5)", () =
     const alreadyMembers = overrides.alreadyMembers ?? [];
     const insertError = overrides.insertError ?? null;
 
-    // Sequential calls — use a counter
     let cnt = 0;
     mockFrom.mockImplementation(() => {
       cnt++;
+
+      // 1. projects — existence check
       if (cnt === 1)
-        // projects — existence: .select().eq().maybeSingle()
         return makeReadChain({
           data: projectExists ? { id: "project-1" } : null,
           error: null,
         });
+
+      // 2. users — existence check
       if (cnt === 2)
-        // users — existence: .select().in()
         return makeReadChain({
           data: existingUsers.map((id) => ({ id })),
           error: null,
         });
+
+      // 3. project_members — active members check (.is("removed_at", null))
       if (cnt === 3)
-        // project_members — already in: .select().eq().in()
         return makeReadChain({
           data: alreadyMembers.map((id) => ({ user_id: id })),
           error: null,
         });
+
+      // 4a. If already active members → fetch usernames (then return 400)
       if (cnt === 4 && alreadyMembers.length > 0)
-        // users — fetch usernames: .select().in()
         return makeReadChain({
           data: alreadyMembers.map((id) => ({ username: id })),
           error: null,
         });
-      // project_members — insert: .insert().select()
+
+      // 4b. No active members → soft-deleted check (.not("removed_at", "is", null))
+      if (cnt === 4 && alreadyMembers.length === 0)
+        return makeReadChain({ data: [], error: null }); // nič soft-deletanih
+
+      // 5. project_members — insert new members
       return {
         insert: jest.fn().mockReturnThis(),
         select: jest.fn().mockResolvedValue({
@@ -311,7 +327,7 @@ describe("POST /api/projects/:projectId/members — dodajanje člana (#5)", () =
     expect(body.message).toMatch(/successfully added/i);
   });
 
-  it("400 — uporabnik je že član projekta", async () => {
+  it("400 — uporabnik je že aktiven član projekta", async () => {
     setupPostMocks({ alreadyMembers: ["user-2"] });
     const res = await POST(
       makePostRequest({ members: [{ user_id: "user-2", role: "developer" }] }),
@@ -423,9 +439,8 @@ describe("DELETE /api/projects/:projectId/members/:userId — odstranjevanje čl
         : { role: "developer" };
     const deleteError = overrides.deleteError ?? null;
 
-    // getCallerPermission uses Promise.all → project_members + users called simultaneously
-    // then target member check calls project_members again
-    // Use per-table counters to differentiate the two project_members calls
+    // mockFrom: getCallerPermission (project_members + users via Promise.all)
+    //           + target member check (project_members again)
     const tableCounters: Record<string, number> = {};
     mockFrom.mockImplementation((table: string) => {
       tableCounters[table] = (tableCounters[table] ?? 0) + 1;
@@ -445,9 +460,15 @@ describe("DELETE /api/projects/:projectId/members/:userId — odstranjevanje čl
       return makeReadChain({ data: null, error: null });
     });
 
-    mockAdminFrom.mockImplementation(() =>
-      makeAdminWriteChain({ error: deleteError }),
-    );
+    // mockAdminFrom: soft delete na project_members + user_stories query za task reset
+    mockAdminFrom.mockImplementation((table: string) => {
+      if (table === "project_members")
+        return makeAdminWriteChain({ error: deleteError });
+      if (table === "user_stories")
+        // Vrni prazno listo → preskoči task reset
+        return makeReadChain({ data: [], error: null });
+      return makeReadChain({ data: null, error: null });
+    });
   }
 
   it("200 — scrum_master uspešno odstrani člana", async () => {
@@ -466,7 +487,7 @@ describe("DELETE /api/projects/:projectId/members/:userId — odstranjevanje čl
     expect(body.error).toMatch(/permission/i);
   });
 
-  it("404 — član ne obstaja", async () => {
+  it("404 — član ne obstaja ali je že odstranjen", async () => {
     setupDeleteMocks({ targetMember: null });
     const res = await DELETE(makeDeleteRequest(), makeMemberContext());
     expect(res.status).toBe(404);
@@ -566,7 +587,7 @@ describe("PATCH /api/projects/:projectId/members/:userId — sprememba vloge (#5
     expect(body.error).toMatch(/permission/i);
   });
 
-  it("404 — član ne obstaja", async () => {
+  it("404 — član ne obstaja ali je že odstranjen", async () => {
     setupPatchMemberMocks({ targetMember: null });
     const res = await PATCH(
       makePatchMemberRequest({ role: "developer" }),
