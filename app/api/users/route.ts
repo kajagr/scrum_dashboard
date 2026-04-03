@@ -7,6 +7,12 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
+function normalizeEmail(email: string): string {
+  const [local, domain] = email.split("@");
+  if (!local || !domain) return email;
+  return `${local.replace(/\./g, "")}@${domain}`;
+}
+
 /**
  * @swagger
  * /api/users:
@@ -319,6 +325,7 @@ export async function POST(req: Request) {
       );
     }
 
+    // Username duplicate check
     const { data: existingUsername } = await supabaseAdmin
       .from("users")
       .select("id")
@@ -332,13 +339,17 @@ export async function POST(req: Request) {
       );
     }
 
-    const { data: existingEmail } = await supabaseAdmin
+    // Email duplicate check — normaliziramo pike v lokalnem delu
+    const { data: allUsers } = await supabaseAdmin
       .from("users")
-      .select("id")
-      .ilike("email", email)
-      .maybeSingle();
+      .select("email");
 
-    if (existingEmail) {
+    const normalizedNew = normalizeEmail(email);
+    const isDuplicateEmail = allUsers?.some(
+      (u) => normalizeEmail(u.email.toLowerCase()) === normalizedNew,
+    );
+
+    if (isDuplicateEmail) {
       return NextResponse.json(
         { error: "Email already exists." },
         { status: 409 },
