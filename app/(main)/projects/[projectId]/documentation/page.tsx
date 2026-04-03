@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { jsPDF } from "jspdf";
 import DocumentationHelpTooltip from "@/components/features/documentation/DocumentationHelpTooltip";
 
 // ─── Markdown → HTML ──────────────────────────────────────────────────────────
@@ -242,229 +241,6 @@ function htmlToText(html: string): string {
   return proc(div).trimEnd();
 }
 
-// ─── PDF renderer (no html2canvas needed) ─────────────────────────────────────
-type Run = { text: string; bold: boolean; italic: boolean };
-
-function collectRuns(node: Node, bold = false, italic = false): Run[] {
-  if (node.nodeType === Node.TEXT_NODE) {
-    const text = node.textContent ?? "";
-    return text ? [{ text, bold, italic }] : [];
-  }
-  if (node.nodeType !== Node.ELEMENT_NODE) return [];
-  const el = node as HTMLElement;
-  const tag = el.tagName.toLowerCase();
-  const b = bold || tag === "b" || tag === "strong";
-  const i = italic || tag === "i" || tag === "em";
-  return Array.from(el.childNodes).flatMap((c) => collectRuns(c, b, i));
-}
-
-function renderRunsToDoc(
-  doc: jsPDF,
-  runs: Run[],
-  x: number,
-  startY: number,
-  fontSize: number,
-  lineH: number,
-  maxW: number,
-  pageH: number,
-  margin: number,
-): number {
-  let y = startY;
-
-  // Build word tokens with their run metadata
-  type Token = { word: string; bold: boolean; italic: boolean };
-  const tokens: Token[] = [];
-  for (const run of runs) {
-    const words = run.text.split(/(\s+)/);
-    for (const w of words) {
-      if (w) tokens.push({ word: w, bold: run.bold, italic: run.italic });
-    }
-  }
-
-  let lineTokens: Token[] = [];
-  let lineW = 0;
-
-  const flushLine = () => {
-    if (!lineTokens.length) return;
-    let lx = x;
-    for (const t of lineTokens) {
-      const style =
-        t.bold && t.italic
-          ? "bolditalic"
-          : t.bold
-            ? "bold"
-            : t.italic
-              ? "italic"
-              : "normal";
-      doc.setFont("helvetica", style);
-      doc.setFontSize(fontSize);
-      doc.text(t.word, lx, y);
-      lx += doc.getTextWidth(t.word);
-    }
-    y += lineH;
-    if (y > pageH - margin) {
-      doc.addPage();
-      y = margin;
-    }
-    lineTokens = [];
-    lineW = 0;
-  };
-
-  for (const token of tokens) {
-    const style =
-      token.bold && token.italic
-        ? "bolditalic"
-        : token.bold
-          ? "bold"
-          : token.italic
-            ? "italic"
-            : "normal";
-    doc.setFont("helvetica", style);
-    doc.setFontSize(fontSize);
-    const w = doc.getTextWidth(token.word);
-
-    if (lineW + w > maxW && lineW > 0) flushLine();
-    lineTokens.push(token);
-    lineW += w;
-  }
-  flushLine();
-  return y;
-}
-
-function exportHtmlToPdf(editorEl: HTMLElement) {
-  const doc = new jsPDF({ unit: "pt", format: "a4" });
-  const margin = 50;
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  const maxW = pageW - margin * 2;
-  let y = margin;
-
-  const check = (needed: number) => {
-    if (y + needed > pageH - margin) {
-      doc.addPage();
-      y = margin;
-    }
-  };
-
-  for (const child of Array.from(editorEl.children)) {
-    const el = child as HTMLElement;
-    const tag = el.tagName.toLowerCase();
-
-    if (tag === "h1") {
-      check(32);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(22);
-      y = renderRunsToDoc(
-        doc,
-        collectRuns(el, true),
-        margin,
-        y,
-        22,
-        30,
-        maxW,
-        pageH,
-        margin,
-      );
-      y += 6;
-    } else if (tag === "h2") {
-      check(26);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(17);
-      y = renderRunsToDoc(
-        doc,
-        collectRuns(el, true),
-        margin,
-        y,
-        17,
-        24,
-        maxW,
-        pageH,
-        margin,
-      );
-      y += 4;
-    } else if (tag === "h3") {
-      check(22);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(13);
-      y = renderRunsToDoc(
-        doc,
-        collectRuns(el, true),
-        margin,
-        y,
-        13,
-        20,
-        maxW,
-        pageH,
-        margin,
-      );
-      y += 3;
-    } else if (tag === "p") {
-      const runs = collectRuns(el);
-      const text = runs
-        .map((r) => r.text)
-        .join("")
-        .trim();
-      if (!text) {
-        y += 16; // enaka višina kot normalna vrstica → ohrani vizualni razmik
-        if (y > pageH - margin) {
-          doc.addPage();
-          y = margin;
-        }
-        continue;
-      }
-      check(16);
-      y = renderRunsToDoc(doc, runs, margin, y, 11, 16, maxW, pageH, margin);
-      y += 3;
-    } else if (tag === "ul" || tag === "ol") {
-      Array.from(el.children).forEach((li, i) => {
-        check(16);
-        const bullet = tag === "ul" ? "• " : `${i + 1}. `;
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(11);
-        const bw = doc.getTextWidth(bullet);
-        doc.text(bullet, margin, y);
-        y = renderRunsToDoc(
-          doc,
-          collectRuns(li as HTMLElement),
-          margin + bw,
-          y,
-          11,
-          16,
-          maxW - bw,
-          pageH,
-          margin,
-        );
-      });
-      y += 4;
-    } else if (tag === "blockquote") {
-      check(16);
-      doc.setDrawColor(91, 141, 239);
-      doc.line(margin - 10, y - 11, margin - 10, y + 5);
-      doc.setDrawColor(0);
-      y = renderRunsToDoc(
-        doc,
-        collectRuns(el, false, true),
-        margin,
-        y,
-        11,
-        16,
-        maxW,
-        pageH,
-        margin,
-      );
-      y += 4;
-    } else if (tag === "hr") {
-      check(20);
-      doc.setDrawColor(180, 180, 180);
-      doc.line(margin, y, pageW - margin, y);
-      doc.setDrawColor(0);
-      y += 14;
-    }
-  }
-
-  doc.save("documentation.pdf");
-}
-
 // ─── Toolbar button ───────────────────────────────────────────────────────────
 function ToolbarBtn({
   title,
@@ -640,7 +416,49 @@ export default function DocumentationPage() {
       "text/plain;charset=utf-8",
     );
   const handleExportPdf = () => {
-    if (editorRef.current) exportHtmlToPdf(editorRef.current);
+    const content = editorRef.current?.innerHTML ?? "";
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Documentation</title>
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 11pt; line-height: 1.65; color: #111; padding: 2.5cm; max-width: 21cm; }
+          h1 { font-size: 22pt; font-weight: 700; margin: 1rem 0 0.4rem; }
+          h2 { font-size: 17pt; font-weight: 700; margin: 0.9rem 0 0.3rem; }
+          h3 { font-size: 13pt; font-weight: 600; margin: 0.7rem 0 0.25rem; }
+          p  { margin: 0.25rem 0; }
+          ul { list-style: disc;    padding-left: 1.4rem; margin: 0.3rem 0; }
+          ol { list-style: decimal; padding-left: 1.4rem; margin: 0.3rem 0; }
+          li { margin: 0.1rem 0; }
+          blockquote { border-left: 3px solid #5b8def; padding-left: 0.85rem; margin: 0.5rem 0; color: #555; font-style: italic; }
+          code { font-family: "Courier New", monospace; font-size: 9.5pt; background: #f3f4f6; border-radius: 3px; padding: 0.1em 0.35em; }
+          pre  { font-family: "Courier New", monospace; font-size: 9.5pt; background: #f3f4f6; border-radius: 6px; padding: 0.75rem 1rem; margin: 0.5rem 0; white-space: pre-wrap; word-break: break-all; }
+          hr   { border: none; border-top: 1px solid #ddd; margin: 0.8rem 0; }
+          a    { color: #5b8def; }
+          strong { font-weight: 700; }
+          em { font-style: italic; }
+          @media print {
+            body { padding: 0; }
+            @page { margin: 2cm; }
+          }
+        </style>
+      </head>
+      <body>${content}</body>
+    </html>
+  `);
+    printWindow.document.close();
+    printWindow.focus();
+    // Počakaj da se naloži nato print
+    printWindow.onload = () => {
+      printWindow.print();
+      printWindow.close();
+    };
     setExportOpen(false);
   };
 
