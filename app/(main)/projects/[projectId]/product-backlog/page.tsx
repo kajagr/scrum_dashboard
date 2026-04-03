@@ -107,8 +107,10 @@ function StoryCard({
 
   const priority = PRIORITY_CONFIG[story.priority] ?? PRIORITY_CONFIG.wont_have;
   const status = STATUS_CONFIG[story.status] ?? STATUS_CONFIG.backlog;
-  const missingPoints = selectable && story.story_points == null;
-  const clickable = selectable && !missingPoints;
+
+  const missingPoints = story.story_points == null;
+  const showCheckbox = selectable && !missingPoints;
+  const clickable = showCheckbox;
 
   const handleEstimateSubmit = async () => {
     const pts = Number(estimateVal);
@@ -142,12 +144,12 @@ function StoryCard({
         ${selected ? "bg-primary-light border-primary-border shadow-sm" : "bg-background border-border hover:border-subtle"}`}
     >
       <div className="flex items-start gap-3 p-4">
-        {selectable && (
+        {showCheckbox && (
           <div
             className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors
-            ${missingPoints ? "border-subtle opacity-40" : selected ? "bg-primary border-primary" : "border-subtle"}`}
+            ${selected ? "bg-primary border-primary" : "border-subtle"}`}
           >
-            {selected && !missingPoints && (
+            {selected && (
               <svg
                 className="w-2.5 h-2.5 text-white"
                 fill="none"
@@ -233,11 +235,13 @@ function StoryCard({
               ) : null}
             </div>
           </div>
+
           {story.description && (
             <p className="text-xs text-muted mb-2.5 line-clamp-2">
               {story.description}
             </p>
           )}
+
           <div className="flex items-center gap-1.5 flex-wrap">
             <span
               className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${priority.pill}`}
@@ -254,7 +258,6 @@ function StoryCard({
         </div>
       </div>
 
-      {/* Inline estimate form */}
       {estimating && (
         <div
           className="px-4 pb-4 border-t border-border pt-3"
