@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { jsPDF } from "jspdf";
+import DocumentationHelpTooltip from "@/components/features/documentation/DocumentationHelpTooltip";
 
 // ─── Markdown → HTML ──────────────────────────────────────────────────────────
 function markdownToHtml(md: string): string {
@@ -88,7 +89,6 @@ function markdownToHtml(md: string): string {
     }
     if (line.trim() === "") {
       closeList();
-      out.push("<p><br></p>");
       continue;
     }
     closeList();
@@ -102,72 +102,114 @@ function markdownToHtml(md: string): string {
 function htmlToMarkdown(html: string): string {
   const div = document.createElement("div");
   div.innerHTML = html;
+
   function proc(node: Node): string {
-    if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.textContent ?? "";
+    }
+
     if (node.nodeType !== Node.ELEMENT_NODE) return "";
+
     const el = node as HTMLElement;
     const tag = el.tagName.toLowerCase();
     const inner = Array.from(el.childNodes).map(proc).join("");
+
     switch (tag) {
       case "b":
-      case "strong":
-        return `**${inner}**`;
+      case "strong": {
+        const t = inner.replace(/\n/g, "");
+        return t ? `<strong>${t}</strong>` : "";
+      }
+
       case "i":
-      case "em":
-        return `*${inner}*`;
+      case "em": {
+        const t = inner.replace(/\n/g, "");
+        return t ? `<em>${t}</em>` : "";
+      }
+
       case "s":
-      case "del":
-        return `~~${inner}~~`;
-      case "code":
-        return `\`${inner}\``;
+      case "del": {
+        const t = inner.replace(/\n/g, "");
+        return t ? `~~${t}~~` : "";
+      }
+
+      case "code": {
+        const t = inner.replace(/\n/g, "");
+        return t ? `\`${t}\`` : "";
+      }
+
       case "pre":
-        return `\`\`\`\n${inner}\n\`\`\`\n`;
+        return `\`\`\`\n${el.textContent ?? ""}\n\`\`\`\n\n`;
+
       case "h1":
-        return `# ${inner}\n`;
+        return `# ${inner.trim()}\n\n`;
+
       case "h2":
-        return `## ${inner}\n`;
+        return `## ${inner.trim()}\n\n`;
+
       case "h3":
-        return `### ${inner}\n`;
+        return `### ${inner.trim()}\n\n`;
+
       case "p":
-        return inner ? `${inner}\n\n` : "\n";
+      case "div": {
+        const textContent = (el.textContent ?? "")
+          .replace(/\u00A0/g, " ")
+          .trim();
+        if (!textContent) return "";
+        return `${inner}\n\n`;
+      }
+
       case "br":
         return "\n";
+
       case "ul":
         return (
           Array.from(el.children)
-            .map((li) => `- ${proc(li)}`)
-            .join("\n") + "\n"
+            .map((li) => `- ${proc(li).trim()}`)
+            .join("\n") + "\n\n"
         );
+
       case "ol":
         return (
           Array.from(el.children)
-            .map((li, i) => `${i + 1}. ${proc(li)}`)
-            .join("\n") + "\n"
+            .map((li, i) => `${i + 1}. ${proc(li).trim()}`)
+            .join("\n") + "\n\n"
         );
+
       case "li":
         return inner;
-      case "blockquote":
-        return (
-          inner
-            .split("\n")
-            .filter(Boolean)
-            .map((l) => `> ${l}`)
-            .join("\n") + "\n"
-        );
+
+      case "blockquote": {
+        const text = inner
+          .split("\n")
+          .map((l) => l.trim())
+          .filter(Boolean)
+          .map((l) => `> ${l}`)
+          .join("\n");
+
+        return text ? `${text}\n\n` : "";
+      }
+
       case "a":
         return `[${inner}](${el.getAttribute("href") ?? ""})`;
+
       case "hr":
-        return "\n---\n";
+        return `---\n\n`;
+
       default:
         return inner;
     }
   }
+
   return proc(div)
+    .replace(/\u00A0/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
 // ─── HTML → plain text ────────────────────────────────────────────────────────
+
 function htmlToText(html: string): string {
   const div = document.createElement("div");
   div.innerHTML = html;
@@ -190,11 +232,14 @@ function htmlToText(html: string): string {
     if (tag === "br") return "\n";
     if (tag === "hr") return "\n---\n";
     const inner = Array.from(el.childNodes).map(proc).join("");
+    if (tag === "p") {
+      // Prazni <p> ali <p><br></p> → prazna vrstica, vsebinski → vsebina + \n
+      const content = inner.replace(/\n/g, " ").trim();
+      return content + "\n";
+    }
     return BLOCK.has(tag) ? inner.trimEnd() + "\n" : inner;
   }
-  return proc(div)
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  return proc(div).trimEnd();
 }
 
 // ─── PDF renderer (no html2canvas needed) ─────────────────────────────────────
@@ -360,7 +405,11 @@ function exportHtmlToPdf(editorEl: HTMLElement) {
         .join("")
         .trim();
       if (!text) {
-        y += 8;
+        y += 16; // enaka višina kot normalna vrstica → ohrani vizualni razmik
+        if (y > pageH - margin) {
+          doc.addPage();
+          y = margin;
+        }
         continue;
       }
       check(16);
@@ -579,12 +628,11 @@ export default function DocumentationPage() {
     setExportOpen(false);
   }
 
-  const handleExportMd = () =>
-    downloadBlob(
-      htmlToMarkdown(htmlRef.current),
-      "documentation.md",
-      "text/markdown;charset=utf-8",
-    );
+  const handleExportMd = () => {
+    const md = htmlToMarkdown(htmlRef.current);
+    console.log("RAW markdown:\n" + md); // ← zamenjaj obstoječi log
+    downloadBlob(md, "documentation.md", "text/markdown;charset=utf-8");
+  };
   const handleExportTxt = () =>
     downloadBlob(
       htmlToText(htmlRef.current),
@@ -624,8 +672,10 @@ export default function DocumentationPage() {
         ext === "md"
           ? markdownToHtml(raw)
           : raw
-              .split(/\n\n+/)
-              .map((b: string) => `<p>${b.replace(/\n/g, "<br>")}</p>`)
+              .split("\n")
+              .map((line: string) =>
+                line.trim() ? `<p>${line}</p>` : "<p><br></p>",
+              )
               .join("");
 
       htmlRef.current = html;
@@ -672,9 +722,12 @@ export default function DocumentationPage() {
           <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">
             Project
           </p>
-          <h1 className="text-3xl font-bold text-foreground leading-tight">
-            Documentation
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-foreground leading-tight">
+              Documentation
+            </h1>
+            <DocumentationHelpTooltip />
+          </div>
           <p className="text-sm text-muted mt-1">
             Shared project wiki — all members can edit
           </p>
