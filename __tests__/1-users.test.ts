@@ -1,11 +1,9 @@
 import { POST } from "@/app/api/users/route";
 
 // ─── Mock supabaseAdmin (@supabase/supabase-js) ───────────────────────────────
-const mockAdminSingle = jest.fn();
-const mockAdminMaybeSingle = jest.fn();
+const mockAdminFrom = jest.fn<any, any>();
 const mockAdminCreateUser = jest.fn();
 const mockAdminDeleteUser = jest.fn();
-const mockAdminFrom = jest.fn<any, any>();
 
 jest.mock("@supabase/supabase-js", () => ({
   createClient: jest.fn(() => ({
@@ -30,7 +28,22 @@ jest.mock("@/lib/supabase/server", () => ({
   ),
 }));
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
+// ─── Helper: thenable read chain ─────────────────────────────────────────────
+function makeReadChain(resolvedValue: { data: any; error: any }) {
+  const chain: any = {
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    ilike: jest.fn().mockReturnThis(),
+    neq: jest.fn().mockReturnThis(),
+    is: jest.fn().mockReturnThis(),
+    order: jest.fn().mockReturnThis(),
+    maybeSingle: jest.fn().mockResolvedValue(resolvedValue),
+    single: jest.fn().mockResolvedValue(resolvedValue),
+    then: jest.fn((resolve: (v: any) => any) => resolve(resolvedValue)),
+  };
+  return chain;
+}
+
 function makeRequest(body: object) {
   return new Request("http://localhost/api/users", {
     method: "POST",
@@ -48,31 +61,63 @@ const validBody = {
   system_role: "user",
 };
 
-// ─── Setup default mocks ──────────────────────────────────────────────────────
-function setupDefaultMocks() {
-  // Admin user check
-  mockAdminSingle.mockResolvedValue({
-    data: { system_role: "admin" },
-    error: null,
+// ─── Setup mocks ──────────────────────────────────────────────────────────────
+// POST flow:
+//   cnt=1: admin check      — .select("system_role").eq().single()
+//   cnt=2: username check   — .select("id").ilike().maybeSingle()
+//   cnt=3: all emails fetch — .select("email")  [thenable]
+//   cnt=4: insert profile   — .insert()
+function setupPostMocks(
+  overrides: {
+    isAdmin?: boolean;
+    duplicateUsername?: boolean;
+    existingEmails?: string[];
+    insertError?: any;
+  } = {},
+) {
+  const {
+    isAdmin = true,
+    duplicateUsername = false,
+    existingEmails = [],
+    insertError = null,
+  } = overrides;
+
+  let cnt = 0;
+  mockAdminFrom.mockImplementation(() => {
+    cnt++;
+
+    // 1. Admin check
+    if (cnt === 1)
+      return makeReadChain({
+        data: { system_role: isAdmin ? "admin" : "user" },
+        error: null,
+      });
+
+    // 2. Username duplicate check
+    if (cnt === 2)
+      return makeReadChain({
+        data: duplicateUsername ? { id: "existing" } : null,
+        error: null,
+      });
+
+    // 3. All emails fetch (za normalizirano email primerjavo)
+    if (cnt === 3)
+      return makeReadChain({
+        data: existingEmails.map((email) => ({ email })),
+        error: null,
+      });
+
+    // 4. Insert profile
+    return {
+      insert: jest.fn().mockResolvedValue({ error: insertError }),
+    };
   });
 
-  // Username and email do not exist
-  mockAdminMaybeSingle.mockResolvedValue({ data: null, error: null });
-
-  // Auth user successfully created
   mockAdminCreateUser.mockResolvedValue({
     data: { user: { id: "new-user-1" } },
     error: null,
   });
-
-  // Default from mock
-  mockAdminFrom.mockImplementation(() => ({
-    select: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockReturnThis(),
-    ilike: jest.fn().mockReturnValue({ maybeSingle: mockAdminMaybeSingle }),
-    insert: jest.fn().mockResolvedValue({ error: null }),
-    single: mockAdminSingle,
-  }));
+  mockAdminDeleteUser.mockResolvedValue({ error: null });
 }
 
 // ─── TESTS ────────────────────────────────────────────────────────────────────
@@ -83,11 +128,10 @@ describe("POST /api/users — adding users (#1)", () => {
       data: { user: { id: "admin-1" } },
       error: null,
     });
-    setupDefaultMocks();
   });
 
-  // ─── #1: Successful user creation ────────────────────────────────────────
   it("201 — successfully creates new user with all data", async () => {
+    setupPostMocks();
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(201);
     const body = await res.json();
@@ -97,6 +141,7 @@ describe("POST /api/users — adding users (#1)", () => {
   });
 
   it("201 — creates user with role 'user' (default)", async () => {
+    setupPostMocks();
     const res = await POST(makeRequest({ ...validBody, system_role: "user" }));
     expect(res.status).toBe(201);
     const body = await res.json();
@@ -104,87 +149,58 @@ describe("POST /api/users — adding users (#1)", () => {
   });
 
   it("201 — admin can create another admin", async () => {
+    setupPostMocks();
     const res = await POST(makeRequest({ ...validBody, system_role: "admin" }));
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.user.system_role).toBe("admin");
   });
 
-  // ─── #2: Duplicate username ───────────────────────────────────────────────
   it("409 — rejects user with existing username", async () => {
-    let ilikeCall = 0;
-    mockAdminFrom.mockImplementation(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      ilike: jest.fn().mockReturnValue({
-        maybeSingle: jest.fn().mockImplementation(() => {
-          ilikeCall++;
-          // First call = username check → exists
-          if (ilikeCall === 1)
-            return Promise.resolve({ data: { id: "existing" }, error: null });
-          return Promise.resolve({ data: null, error: null });
-        }),
-      }),
-      insert: jest.fn().mockResolvedValue({ error: null }),
-      single: mockAdminSingle,
-    }));
-
+    setupPostMocks({ duplicateUsername: true });
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(409);
     const body = await res.json();
     expect(body.error).toMatch(/username already exists/i);
   });
 
-  // ─── #3: Duplicate email ──────────────────────────────────────────────────
-  it("409 — rejects user with existing email", async () => {
-    let ilikeCall = 0;
-    mockAdminFrom.mockImplementation(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      ilike: jest.fn().mockReturnValue({
-        maybeSingle: jest.fn().mockImplementation(() => {
-          ilikeCall++;
-          // First call = username → ok, second call = email → exists
-          if (ilikeCall === 2)
-            return Promise.resolve({ data: { id: "existing" }, error: null });
-          return Promise.resolve({ data: null, error: null });
-        }),
-      }),
-      insert: jest.fn().mockResolvedValue({ error: null }),
-      single: mockAdminSingle,
-    }));
-
+  it("409 — rejects user with existing email (exact match)", async () => {
+    setupPostMocks({ existingEmails: ["test@example.com"] });
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(409);
     const body = await res.json();
     expect(body.error).toMatch(/email already exists/i);
   });
 
-  // ─── #4: Permissions ─────────────────────────────────────────────────────
-  it("403 — non-admin user cannot create a new user", async () => {
-    mockAdminSingle.mockResolvedValue({
-      data: { system_role: "user" },
-      error: null,
-    });
+  it("409 — rejects user with normalized duplicate email (pike)", async () => {
+    // t.e.s.t@example.com normalizira v test@example.com — enako kot test@example.com
+    setupPostMocks({ existingEmails: ["t.e.s.t@example.com"] });
+    const res = await POST(
+      makeRequest({ ...validBody, email: "test@example.com" }),
+    );
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toMatch(/email already exists/i);
+  });
 
+  it("403 — non-admin user cannot create a new user", async () => {
+    setupPostMocks({ isAdmin: false });
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(403);
     const body = await res.json();
     expect(body.error).toMatch(/only administrators can create users/i);
   });
 
-  // ─── #5: Authentication ───────────────────────────────────────────────────
   it("401 — unauthenticated user cannot create a user", async () => {
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
-
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body.error).toMatch(/unauthorized/i);
   });
 
-  // ─── #6: Validation ───────────────────────────────────────────────────────
   it("400 — missing required fields (email, password, username)", async () => {
+    setupPostMocks();
     const res = await POST(makeRequest({ email: "test@example.com" }));
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -192,6 +208,7 @@ describe("POST /api/users — adding users (#1)", () => {
   });
 
   it("400 — password is too short (< 12 characters)", async () => {
+    setupPostMocks();
     const res = await POST(makeRequest({ ...validBody, password: "short" }));
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -199,6 +216,7 @@ describe("POST /api/users — adding users (#1)", () => {
   });
 
   it("400 — password is too long (> 64 characters)", async () => {
+    setupPostMocks();
     const res = await POST(
       makeRequest({ ...validBody, password: "a".repeat(65) }),
     );
@@ -207,22 +225,8 @@ describe("POST /api/users — adding users (#1)", () => {
     expect(body.error).toMatch(/longer than 64 characters/i);
   });
 
-  // ─── #7: Profile creation failure rolls back auth user ───────────────────
   it("500 — deletes auth user if profile insert fails", async () => {
-    mockAdminDeleteUser.mockResolvedValue({ error: null });
-
-    mockAdminFrom.mockImplementation(() => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      ilike: jest.fn().mockReturnValue({
-        maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
-      }),
-      insert: jest.fn().mockResolvedValue({
-        error: { message: "DB constraint violation" },
-      }),
-      single: mockAdminSingle,
-    }));
-
+    setupPostMocks({ insertError: { message: "DB constraint violation" } });
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(500);
     const body = await res.json();

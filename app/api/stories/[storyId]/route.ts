@@ -170,9 +170,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
+    // story_points dodano v select
     const { data: story, error: storyError } = await supabase
       .from("user_stories")
-      .select("id, project_id, title, status, sprint_id")
+      .select("id, project_id, title, status, sprint_id, story_points")
       .eq("id", storyId)
       .maybeSingle();
 
@@ -207,10 +208,22 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     if (story.sprint_id) {
-      return NextResponse.json(
-        { error: "Stories assigned to a sprint cannot be edited." },
-        { status: 400 },
-      );
+      const { data: sprint } = await supabase
+        .from("sprints")
+        .select("start_date, end_date")
+        .eq("id", story.sprint_id)
+        .maybeSingle();
+
+      const today = new Date().toISOString().split("T")[0];
+      const isActive =
+        sprint && today >= sprint.start_date && today <= sprint.end_date;
+
+      if (isActive) {
+        return NextResponse.json(
+          { error: "Stories assigned to a sprint cannot be edited." },
+          { status: 400 },
+        );
+      }
     }
     if (story.status === "done") {
       return NextResponse.json(
@@ -225,10 +238,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const acceptanceCriteria = body.acceptance_criteria?.trim() || null;
     const priority = body.priority;
     const businessValue = body.business_value;
+
+    // PO ne more nastaviti story_points dokler jih SM ni prvič določil
     const storyPoints =
-      body.story_points === "" || body.story_points === undefined
+      membership.role === "product_owner" && story.story_points === null
         ? null
-        : Number(body.story_points);
+        : body.story_points === "" || body.story_points === undefined
+          ? null
+          : Number(body.story_points);
 
     if (
       !title ||
