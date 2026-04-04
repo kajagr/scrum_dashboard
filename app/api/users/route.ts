@@ -7,17 +7,23 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
+function normalizeEmail(email: string): string {
+  const [local, domain] = email.split("@");
+  if (!local || !domain) return email;
+  return `${local.replace(/\./g, "")}@${domain}`;
+}
+
 /**
  * @swagger
  * /api/users:
  *   get:
  *     summary: Get all users
- *     description: Returns all users in the system. Only administrators can access this endpoint.
+ *     description: Returns all active (non-deleted) users in the system. Only administrators can access this endpoint.
  *     tags:
  *       - Users
  *     responses:
  *       200:
- *         description: List of all users
+ *         description: List of all active users
  *         content:
  *           application/json:
  *             schema:
@@ -54,34 +60,10 @@ const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
  *                     example: "2024-01-15T10:30:00Z"
  *       401:
  *         description: User not authenticated
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Unauthorized"
  *       403:
  *         description: User is not an administrator
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Only administrators can view all users."
  *       500:
  *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "An error occurred while fetching users."
  */
 export async function GET() {
   try {
@@ -110,6 +92,7 @@ export async function GET() {
     const { data, error } = await supabaseAdmin
       .from("users")
       .select("*")
+      .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -178,92 +161,16 @@ export async function GET() {
  *     responses:
  *       201:
  *         description: User created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "User created successfully."
- *                 user:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: string
- *                       format: uuid
- *                       example: "d5e8f1a2-3b4c-5d6e-7f8a-9b0c1d2e3f4a"
- *                     email:
- *                       type: string
- *                       format: email
- *                       example: "janez.novak@example.com"
- *                     username:
- *                       type: string
- *                       example: "janez.novak"
- *                     system_role:
- *                       type: string
- *                       enum: [admin, user]
- *                       example: "user"
  *       400:
  *         description: Validation failed or auth error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   examples:
- *                     missingFields:
- *                       value: "Email, password and username are required."
- *                     passwordTooShort:
- *                       value: "Password must be at least 12 characters."
- *                     passwordTooLong:
- *                       value: "Password cannot be longer than 64 characters."
  *       401:
  *         description: User not authenticated
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Unauthorized"
  *       403:
  *         description: User is not an administrator
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Only administrators can create users."
  *       409:
  *         description: Username or email already exists
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   examples:
- *                     duplicateUsername:
- *                       value: "Username already exists."
- *                     duplicateEmail:
- *                       value: "Email already exists."
  *       500:
  *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Error creating user profile: ..."
  */
 export async function POST(req: Request) {
   try {
@@ -323,6 +230,7 @@ export async function POST(req: Request) {
       .from("users")
       .select("id")
       .ilike("username", username)
+      .is("deleted_at", null)
       .maybeSingle();
 
     if (existingUsername) {
@@ -332,13 +240,17 @@ export async function POST(req: Request) {
       );
     }
 
-    const { data: existingEmail } = await supabaseAdmin
+    const { data: allUsers } = await supabaseAdmin
       .from("users")
-      .select("id")
-      .ilike("email", email)
-      .maybeSingle();
+      .select("email")
+      .is("deleted_at", null);
 
-    if (existingEmail) {
+    const normalizedNew = normalizeEmail(email);
+    const isDuplicateEmail = allUsers?.some(
+      (u) => normalizeEmail(u.email.toLowerCase()) === normalizedNew,
+    );
+
+    if (isDuplicateEmail) {
       return NextResponse.json(
         { error: "Email already exists." },
         { status: 409 },
@@ -370,7 +282,6 @@ export async function POST(req: Request) {
 
     if (profileError) {
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-
       return NextResponse.json(
         { error: "Error creating user profile: " + profileError.message },
         { status: 500 },
