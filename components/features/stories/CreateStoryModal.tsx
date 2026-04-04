@@ -125,7 +125,7 @@ export default function CreateStoryModal({
           description: description.trim() || null,
           acceptance_criteria: acceptanceCriteria.trim() || null,
           priority,
-          story_points: 3,
+          story_points: null,
           business_value: businessValue,
         }),
       });

@@ -87,6 +87,8 @@ function StoryCard({
   onEdit,
   canEdit,
   onComments,
+  canEstimate,
+  onEstimateSubmit,
 }: {
   story: UserStory;
   selectable?: boolean;
@@ -95,111 +97,229 @@ function StoryCard({
   onEdit?: (story: UserStory) => void;
   canEdit?: boolean;
   onComments?: (story: UserStory) => void;
+  canEstimate?: boolean;
+  onEstimateSubmit?: (points: number) => Promise<{ error?: string }>;
 }) {
+  const [estimating, setEstimating] = useState(false);
+  const [estimateVal, setEstimateVal] = useState("");
+  const [estimateLoading, setEstimateLoading] = useState(false);
+  const [estimateError, setEstimateError] = useState<string | null>(null);
+
   const priority = PRIORITY_CONFIG[story.priority] ?? PRIORITY_CONFIG.wont_have;
   const status = STATUS_CONFIG[story.status] ?? STATUS_CONFIG.backlog;
-  const missingPoints = selectable && story.story_points == null;
-  const clickable = selectable && !missingPoints;
+
+  const missingPoints = story.story_points == null;
+  const showCheckbox = selectable && !missingPoints;
+  const clickable = showCheckbox;
+
+  const handleEstimateSubmit = async () => {
+    const pts = Number(estimateVal);
+    if (!Number.isFinite(pts) || pts <= 0) {
+      setEstimateError("Must be a positive number.");
+      return;
+    }
+    setEstimateLoading(true);
+    setEstimateError(null);
+    const result = await onEstimateSubmit?.(pts);
+    setEstimateLoading(false);
+    if (result?.error) {
+      setEstimateError(result.error);
+    } else {
+      setEstimating(false);
+      setEstimateVal("");
+    }
+  };
 
   return (
     <div
-      onClick={clickable ? onToggle : undefined}
+      onClick={clickable && !estimating ? onToggle : undefined}
       title={
-        missingPoints
+        missingPoints && !canEstimate
           ? "Story points must be set before assigning to a sprint"
           : undefined
       }
-      className={`flex items-start gap-3 p-4 rounded-xl border transition-all
-        ${clickable ? "cursor-pointer" : ""}
-        ${missingPoints ? "opacity-50 cursor-not-allowed" : ""}
+      className={`rounded-xl border transition-all
+        ${clickable && !estimating ? "cursor-pointer" : ""}
+        ${missingPoints && !canEstimate ? "opacity-50 cursor-not-allowed" : ""}
         ${selected ? "bg-primary-light border-primary-border shadow-sm" : "bg-background border-border hover:border-subtle"}`}
     >
-      {selectable && (
-        <div
-          className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors
-          ${missingPoints ? "border-subtle opacity-40" : selected ? "bg-primary border-primary" : "border-subtle"}`}
-        >
-          {selected && !missingPoints && (
-            <svg
-              className="w-2.5 h-2.5 text-white"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={3}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-          )}
-        </div>
-      )}
+      <div className="flex items-start gap-3 p-4">
+        {showCheckbox && (
+          <div
+            className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors
+            ${selected ? "bg-primary border-primary" : "border-subtle"}`}
+          >
+            {selected && (
+              <svg
+                className="w-2.5 h-2.5 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={3}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            )}
+          </div>
+        )}
 
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <p className="text-sm font-semibold text-foreground leading-snug">
-            {story.title}
-          </p>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {canEdit && (
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <p className="text-sm font-semibold text-foreground leading-snug">
+              {story.title}
+            </p>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit?.(story);
+                  }}
+                  className="inline-flex items-center rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-colors hover:bg-primary-hover"
+                >
+                  Edit
+                </button>
+              )}
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onEdit?.(story);
+                  onComments?.(story);
                 }}
-                className="inline-flex items-center rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-colors hover:bg-primary-hover"
+                className="inline-flex items-center rounded-lg bg-surface border border-border px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground hover:border-primary transition-colors"
               >
-                Edit
+                Comments
               </button>
-            )}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onComments?.(story);
-              }}
-              className="inline-flex items-center rounded-lg bg-surface border border-border px-3 py-1.5 text-xs font-medium text-muted hover:text-foreground hover:border-primary transition-colors"
+              {story.business_value != null && (
+                <span className="text-xs text-muted bg-surface border border-border px-2 py-0.5 rounded-lg">
+                  BV {story.business_value}
+                </span>
+              )}
+              {story.story_points != null ? (
+                <span className="text-xs text-muted bg-surface border border-border px-2 py-0.5 rounded-lg">
+                  {story.story_points} pts
+                </span>
+              ) : canEstimate ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEstimating(true);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-lg bg-accent-light border border-accent-border px-2.5 py-0.5 text-xs font-semibold text-accent-text hover:bg-accent/20 transition-colors"
+                >
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Estimate
+                </button>
+              ) : selectable ? (
+                <span className="text-xs text-error bg-error-light border border-error-border px-2 py-0.5 rounded-lg">
+                  No SP
+                </span>
+              ) : null}
+            </div>
+          </div>
+
+          {story.description && (
+            <p className="text-xs text-muted mb-2.5 line-clamp-2">
+              {story.description}
+            </p>
+          )}
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${priority.pill}`}
             >
-              Comments
-            </button>
-            {story.business_value != null && (
-              <span className="text-xs text-muted bg-surface border border-border px-2 py-0.5 rounded-lg">
-                BV {story.business_value}
-              </span>
-            )}
-            {story.story_points != null ? (
-              <span className="text-xs text-muted bg-surface border border-border px-2 py-0.5 rounded-lg">
-                {story.story_points} pts
-              </span>
-            ) : selectable ? (
-              <span className="text-xs text-error bg-error-light border border-error-border px-2 py-0.5 rounded-lg">
-                No SP
-              </span>
-            ) : null}
+              <span className={`w-1.5 h-1.5 rounded-full ${priority.dot}`} />
+              {priority.label}
+            </span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.pill}`}
+            >
+              {status.label}
+            </span>
           </div>
         </div>
-        {story.description && (
-          <p className="text-xs text-muted mb-2.5 line-clamp-2">
-            {story.description}
-          </p>
-        )}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span
-            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${priority.pill}`}
-          >
-            <span className={`w-1.5 h-1.5 rounded-full ${priority.dot}`} />
-            {priority.label}
-          </span>
-          <span
-            className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.pill}`}
-          >
-            {status.label}
-          </span>
-        </div>
       </div>
+
+      {estimating && (
+        <div
+          className="px-4 pb-4 border-t border-border pt-3"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="text-xs font-semibold text-foreground mb-2">
+            Set story points estimate
+          </p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={estimateVal}
+              onChange={(e) => {
+                setEstimateVal(e.target.value);
+                setEstimateError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleEstimateSubmit();
+                if (e.key === "Escape") {
+                  setEstimating(false);
+                  setEstimateVal("");
+                }
+              }}
+              placeholder="e.g. 5"
+              autoFocus
+              className="w-24 px-3 py-1.5 rounded-lg text-sm bg-surface border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+            />
+            <button
+              type="button"
+              onClick={handleEstimateSubmit}
+              disabled={estimateLoading || !estimateVal}
+              className="px-3 py-1.5 text-xs font-semibold text-white rounded-lg bg-primary hover:bg-primary-hover disabled:opacity-50 transition-colors"
+            >
+              {estimateLoading ? "Saving..." : "Set estimate"}
+            </button>
+            <button
+              type="button"
+              disabled
+              title="Planning Poker — coming soon"
+              className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-subtle cursor-not-allowed opacity-50"
+            >
+              🃏 Planning Poker
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEstimating(false);
+                setEstimateVal("");
+                setEstimateError(null);
+              }}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-muted hover:text-foreground transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+          {estimateError && (
+            <p className="text-xs text-error mt-1.5">{estimateError}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -261,9 +381,6 @@ export default function BacklogPage() {
     null,
   );
 
-  const openEditModal = (story: UserStory) => setEditingStory(story);
-  const closeEditModal = () => setEditingStory(null);
-
   const loadBacklog = async () => {
     try {
       setLoading(true);
@@ -298,6 +415,26 @@ export default function BacklogPage() {
   useEffect(() => {
     void loadBacklog();
   }, [projectId]);
+
+  const handleEstimate = async (
+    storyId: string,
+    points: number,
+  ): Promise<{ error?: string }> => {
+    try {
+      const res = await fetch(`/api/stories/${storyId}/estimate`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ story_points: points }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { error: data.error || "Failed to set estimate." };
+      await loadBacklog();
+      return {};
+    } catch {
+      return { error: "Server connection error." };
+    }
+  };
 
   const handleAssign = async () => {
     if (!selectedIds.length || !activeSprint) return;
@@ -351,7 +488,6 @@ export default function BacklogPage() {
   const exceedsVelocity =
     remainingVelocity != null && selectedPoints > remainingVelocity;
 
-  // Loči wont_have iz unassigned
   const unassignedRegular = unassigned.filter(
     (s) => s.priority !== "wont_have",
   );
@@ -424,7 +560,6 @@ export default function BacklogPage() {
               : "No stories yet"}
           </p>
         </div>
-
         <div className="flex items-center gap-3">
           {canAssign &&
             activeTab === "unassigned" &&
@@ -550,7 +685,6 @@ export default function BacklogPage() {
         </div>
       )}
 
-      {/* Error */}
       {(error || assignError) && (
         <div className="flex items-start gap-2.5 p-3.5 rounded-xl border border-error-border bg-error-light mb-5">
           <svg
@@ -573,7 +707,6 @@ export default function BacklogPage() {
       {/* Tabs + Sort */}
       <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
         <div className="flex items-center gap-1 p-1 rounded-xl bg-surface border border-border">
-          {/* Main tabs */}
           {MAIN_TABS.map((tab) => {
             const count =
               tab.key === "unassigned"
@@ -600,8 +733,6 @@ export default function BacklogPage() {
               </button>
             );
           })}
-
-          {/* Separator + Future Releases tab */}
           <div className="flex items-center gap-1">
             <div className="w-px h-4 bg-border mx-1" />
             <button
@@ -621,7 +752,6 @@ export default function BacklogPage() {
             </button>
           </div>
         </div>
-
         {currentList.length > 0 && (
           <div className="flex items-center gap-2">
             <span className="text-xs text-subtle">Sort by:</span>
@@ -660,7 +790,9 @@ export default function BacklogPage() {
               }}
               className="text-xs text-primary hover:underline font-medium"
             >
-              {selectedIds.length === unassignedRegular.length
+              {selectedIds.length ===
+                unassignedRegular.filter((s) => s.story_points != null)
+                  .length && selectedIds.length > 0
                 ? "Deselect all"
                 : "Select all"}
             </button>
@@ -691,13 +823,19 @@ export default function BacklogPage() {
               selectable={activeTab === "unassigned" && canAssign}
               selected={selectedIds.includes(story.id)}
               onToggle={() => toggleSelect(story.id)}
-              onEdit={(story) => openEditModal(story)}
+              onEdit={(s) => setEditingStory(s)}
               canEdit={
                 (projectRole === "scrum_master" ||
                   projectRole === "product_owner") &&
                 (activeTab === "unassigned" || activeTab === "future")
               }
-              onComments={(story) => setCommentingStory(story)}
+              onComments={(s) => setCommentingStory(s)}
+              canEstimate={
+                projectRole === "scrum_master" &&
+                (activeTab === "unassigned" || activeTab === "future") &&
+                story.story_points == null
+              }
+              onEstimateSubmit={(pts) => handleEstimate(story.id, pts)}
             />
           ))}
         </div>
@@ -753,8 +891,9 @@ export default function BacklogPage() {
       {editingStory && (
         <EditStoryModal
           story={editingStory}
-          onClose={closeEditModal}
+          onClose={() => setEditingStory(null)}
           onSaved={loadBacklog}
+          projectRole={projectRole}
         />
       )}
 

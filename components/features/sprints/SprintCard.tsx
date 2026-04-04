@@ -3,6 +3,9 @@ import type { Sprint } from "@/lib/types";
 interface SprintCardProps {
   sprint: Sprint;
   onClick?: () => void;
+  canEdit?: boolean;
+  onEdit?: (sprint: Sprint) => void;
+  onDelete?: (sprint: Sprint) => void;
 }
 
 const statusConfig = {
@@ -23,7 +26,7 @@ const statusConfig = {
   },
 };
 
-export default function SprintCard({ sprint, onClick }: SprintCardProps) {
+export default function SprintCard({ sprint, onClick, canEdit, onEdit, onDelete }: SprintCardProps) {
   const startDate = new Date(sprint.start_date).toLocaleDateString("en-GB", {
     day: "numeric", month: "short", year: "numeric",
   });
@@ -37,6 +40,9 @@ export default function SprintCard({ sprint, onClick }: SprintCardProps) {
 
   const status = sprint.status ?? "planned";
   const cfg = statusConfig[status] ?? statusConfig.planned;
+
+  const canModifyFull = canEdit && status === "planned";   // edit + delete
+  const canModifyVelocity = canEdit && status === "active"; // edit only (velocity)
 
   return (
     <div
@@ -55,10 +61,38 @@ export default function SprintCard({ sprint, onClick }: SprintCardProps) {
           <h3 className="font-semibold text-foreground text-base leading-snug">
             {sprint.name}
           </h3>
-          <span className={`flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border ${cfg.pill}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-            {cfg.label}
-          </span>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border ${cfg.pill}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+              {cfg.label}
+            </span>
+
+            {/* Edit — shown for planned and active */}
+            {(canModifyFull || canModifyVelocity) && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onEdit?.(sprint); }}
+                className="p-1.5 rounded-lg text-muted hover:text-foreground hover:bg-background transition-colors"
+                title={canModifyVelocity ? "Edit velocity" : "Edit sprint"}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
+                </svg>
+              </button>
+            )}
+
+            {/* Delete — only for planned */}
+            {canModifyFull && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete?.(sprint); }}
+                className="p-1.5 rounded-lg text-muted hover:text-error hover:bg-error-light transition-colors"
+                title="Delete sprint"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Goal */}

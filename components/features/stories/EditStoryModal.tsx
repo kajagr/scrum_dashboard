@@ -7,6 +7,7 @@ interface EditStoryModalProps {
   story: UserStory;
   onClose: () => void;
   onSaved: () => void;
+  projectRole?: string | null; // ✅ novo
 }
 
 const PRIORITIES = [
@@ -47,6 +48,7 @@ export default function EditStoryModal({
   story,
   onClose,
   onSaved,
+  projectRole,
 }: EditStoryModalProps) {
   const [title, setTitle] = useState(story.title ?? "");
   const [description, setDescription] = useState(story.description ?? "");
@@ -71,6 +73,13 @@ export default function EditStoryModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ✅ PO vidi story points polje samo ko so že nastavljeni (SM jih je prvič določil)
+  // Story points so vidni v Edit modalu SAMO ko so že enkrat nastavljeni
+  // (prva nastavitev gre skozi "Estimate" gumb na backlog kartici)
+  const canEditStoryPoints =
+    story.story_points !== null &&
+    (projectRole === "scrum_master" || projectRole === "product_owner");
+
   const handleSave = async () => {
     setSaving(true);
     setError(null);
@@ -84,7 +93,11 @@ export default function EditStoryModal({
           description,
           acceptance_criteria: acceptanceCriteria,
           priority,
-          story_points: storyPoints === "" ? null : storyPoints,
+          story_points: canEditStoryPoints
+            ? storyPoints === ""
+              ? null
+              : storyPoints
+            : undefined,
           business_value: businessValue,
         }),
       });
@@ -140,11 +153,9 @@ export default function EditStoryModal({
       />
 
       <div className="relative w-full max-w-xl mx-4 rounded-2xl overflow-hidden shadow-2xl bg-surface max-h-[92vh] flex flex-col">
-        {/* Gradient bar */}
         <div className="h-1 w-full bg-gradient-to-r from-primary to-accent flex-shrink-0" />
 
         <div className="p-7 flex flex-col overflow-hidden flex-1">
-          {/* Header */}
           <div className="flex items-center justify-between mb-6 flex-shrink-0">
             <div>
               <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-0.5">
@@ -244,22 +255,25 @@ export default function EditStoryModal({
             </div>
 
             {/* Story points + Business value */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className={labelClass}>Story Points</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={storyPoints}
-                  onChange={(e) =>
-                    setStoryPoints(
-                      e.target.value === "" ? "" : Number(e.target.value),
-                    )
-                  }
-                  placeholder="e.g. 5"
-                  className={inputClass}
-                />
-              </div>
+            <div className={canEditStoryPoints ? "grid grid-cols-2 gap-4" : ""}>
+              {/* ✅ Story points — vidno samo če ima SM ali PO (ko so že nastavljeni) */}
+              {canEditStoryPoints && (
+                <div>
+                  <label className={labelClass}>Story Points</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={storyPoints}
+                    onChange={(e) =>
+                      setStoryPoints(
+                        e.target.value === "" ? "" : Number(e.target.value),
+                      )
+                    }
+                    placeholder="e.g. 5"
+                    className={inputClass}
+                  />
+                </div>
+              )}
               <div>
                 <label className={labelClass}>
                   Business Value{" "}

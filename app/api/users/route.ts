@@ -226,6 +226,7 @@ export async function POST(req: Request) {
       );
     }
 
+    // Username duplicate check
     const { data: existingUsername } = await supabaseAdmin
       .from("users")
       .select("id")
@@ -240,6 +241,7 @@ export async function POST(req: Request) {
       );
     }
 
+// Email duplicate check — normaliziramo pike v lokalnem delu
     const { data: allUsers } = await supabaseAdmin
       .from("users")
       .select("email")
