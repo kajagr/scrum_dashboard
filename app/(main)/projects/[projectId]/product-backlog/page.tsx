@@ -112,7 +112,7 @@ function StoryCard({
         ${selected ? "bg-primary-light border-primary-border shadow-sm" : "bg-background border-border hover:border-subtle"}`}
     >
       <div className="flex items-start gap-3 p-4">
-        {selectable && (
+      {selectable && (
           <div className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors
             ${missingPoints ? "border-subtle opacity-40" : selected ? "bg-primary border-primary" : "border-subtle"}`}>
             {selected && !missingPoints && (
@@ -122,7 +122,6 @@ function StoryCard({
             )}
           </div>
         )}
-
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 mb-2">
             <p className="text-sm font-semibold text-foreground leading-snug">{story.title}</p>
@@ -185,9 +184,11 @@ function StoryCard({
               ) : null}
             </div>
           </div>
+
           {story.description && (
             <p className="text-xs text-muted mb-2.5 line-clamp-2">{story.description}</p>
           )}
+
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${priority.pill}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${priority.dot}`} />
@@ -203,7 +204,6 @@ function StoryCard({
         </div>
       </div>
 
-      {/* Inline estimate form */}
       {estimating && (
         <div className="px-4 pb-4 border-t border-border pt-3" onClick={(e) => e.stopPropagation()}>
           <p className="text-xs font-semibold text-foreground mb-2">Set story points estimate</p>

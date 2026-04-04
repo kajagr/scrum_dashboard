@@ -165,7 +165,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       .maybeSingle();
 
     if (membershipError) {
-      return NextResponse.json({ error: membershipError.message }, { status: 500 });
+      return NextResponse.json(
+        { error: membershipError.message },
+        { status: 500 },
+      );
     }
     if (!membership) {
       return NextResponse.json(
@@ -179,9 +182,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     // --- action: mark_ready ---
     if (action === "mark_ready") {
-      if (membership.role !== "scrum_master" && membership.role !== "developer") {
+      if (
+        membership.role !== "scrum_master" &&
+        membership.role !== "developer"
+      ) {
         return NextResponse.json(
-          { error: "Only Scrum Masters and developers can mark stories as ready." },
+          {
+            error:
+              "Only Scrum Masters and developers can mark stories as ready.",
+          },
           { status: 403 },
         );
       }
@@ -230,7 +239,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         .maybeSingle();
 
       if (updateError) {
-        return NextResponse.json({ error: updateError.message }, { status: 500 });
+        return NextResponse.json(
+          { error: updateError.message },
+          { status: 500 },
+        );
       }
 
       return NextResponse.json(updatedStory, { status: 200 });
@@ -283,24 +295,39 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           ? null
           : Number(body.story_points);
 
-    if (!title || !priority || businessValue === undefined || businessValue === null) {
+    if (
+      !title ||
+      !priority ||
+      businessValue === undefined ||
+      businessValue === null
+    ) {
       return NextResponse.json(
         { error: "Title, priority and business value are required." },
         { status: 400 },
       );
     }
     if (!ALLOWED_PRIORITIES.includes(priority)) {
-      return NextResponse.json({ error: "Invalid priority value." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid priority value." },
+        { status: 400 },
+      );
     }
 
     const businessValueNumber = Number(businessValue);
-    if (!Number.isFinite(businessValueNumber) || businessValueNumber <= 0 || businessValueNumber > 10) {
+    if (
+      !Number.isFinite(businessValueNumber) ||
+      businessValueNumber <= 0 ||
+      businessValueNumber > 10
+    ) {
       return NextResponse.json(
         { error: "Business value must be between 1 and 10." },
         { status: 400 },
       );
     }
-    if (storyPoints !== null && (!Number.isFinite(storyPoints) || storyPoints < 0)) {
+    if (
+      storyPoints !== null &&
+      (!Number.isFinite(storyPoints) || storyPoints < 0)
+    ) {
       return NextResponse.json(
         { error: "Story points must be 0 or greater." },
         { status: 400 },
@@ -316,7 +343,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       .maybeSingle();
 
     if (duplicateError) {
-      return NextResponse.json({ error: duplicateError.message }, { status: 500 });
+      return NextResponse.json(
+        { error: duplicateError.message },
+        { status: 500 },
+      );
     }
     if (duplicateStory) {
       return NextResponse.json(
@@ -431,9 +461,15 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       .maybeSingle();
 
     if (membershipError) {
-      return NextResponse.json({ error: membershipError.message }, { status: 500 });
+      return NextResponse.json(
+        { error: membershipError.message },
+        { status: 500 },
+      );
     }
-    if (!membership || !["product_owner", "scrum_master"].includes(membership.role)) {
+    if (
+      !membership ||
+      !["product_owner", "scrum_master"].includes(membership.role)
+    ) {
       return NextResponse.json(
         { error: "You don't have permission to delete this story." },
         { status: 403 },
@@ -441,10 +477,22 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     }
 
     if (story.sprint_id) {
-      return NextResponse.json(
-        { error: "Stories assigned to a sprint cannot be deleted." },
-        { status: 400 },
-      );
+      const { data: sprint } = await supabase
+        .from("sprints")
+        .select("start_date, end_date")
+        .eq("id", story.sprint_id)
+        .maybeSingle();
+
+      const today = new Date().toISOString().split("T")[0];
+      const isActive =
+        sprint && today >= sprint.start_date && today <= sprint.end_date;
+
+      if (isActive) {
+        return NextResponse.json(
+          { error: "Stories assigned to a sprint cannot be deleted." },
+          { status: 400 },
+        );
+      }
     }
     if (story.status === "done") {
       return NextResponse.json(
@@ -462,7 +510,10 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: deleteError.message }, { status: 500 });
     }
 
-    return NextResponse.json({ message: "Story deleted successfully." }, { status: 200 });
+    return NextResponse.json(
+      { message: "Story deleted successfully." },
+      { status: 200 },
+    );
   } catch {
     return NextResponse.json(
       { error: "An error occurred while deleting the story." },

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { jsPDF } from "jspdf";
+import DocumentationHelpTooltip from "@/components/features/documentation/DocumentationHelpTooltip";
 
 // ─── Markdown → HTML ──────────────────────────────────────────────────────────
 function markdownToHtml(md: string): string {
@@ -88,7 +88,6 @@ function markdownToHtml(md: string): string {
     }
     if (line.trim() === "") {
       closeList();
-      out.push("<p><br></p>");
       continue;
     }
     closeList();
@@ -102,72 +101,114 @@ function markdownToHtml(md: string): string {
 function htmlToMarkdown(html: string): string {
   const div = document.createElement("div");
   div.innerHTML = html;
+
   function proc(node: Node): string {
-    if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.textContent ?? "";
+    }
+
     if (node.nodeType !== Node.ELEMENT_NODE) return "";
+
     const el = node as HTMLElement;
     const tag = el.tagName.toLowerCase();
     const inner = Array.from(el.childNodes).map(proc).join("");
+
     switch (tag) {
       case "b":
-      case "strong":
-        return `**${inner}**`;
+      case "strong": {
+        const t = inner.replace(/\n/g, "");
+        return t ? `<strong>${t}</strong>` : "";
+      }
+
       case "i":
-      case "em":
-        return `*${inner}*`;
+      case "em": {
+        const t = inner.replace(/\n/g, "");
+        return t ? `<em>${t}</em>` : "";
+      }
+
       case "s":
-      case "del":
-        return `~~${inner}~~`;
-      case "code":
-        return `\`${inner}\``;
+      case "del": {
+        const t = inner.replace(/\n/g, "");
+        return t ? `~~${t}~~` : "";
+      }
+
+      case "code": {
+        const t = inner.replace(/\n/g, "");
+        return t ? `\`${t}\`` : "";
+      }
+
       case "pre":
-        return `\`\`\`\n${inner}\n\`\`\`\n`;
+        return `\`\`\`\n${el.textContent ?? ""}\n\`\`\`\n\n`;
+
       case "h1":
-        return `# ${inner}\n`;
+        return `# ${inner.trim()}\n\n`;
+
       case "h2":
-        return `## ${inner}\n`;
+        return `## ${inner.trim()}\n\n`;
+
       case "h3":
-        return `### ${inner}\n`;
+        return `### ${inner.trim()}\n\n`;
+
       case "p":
-        return inner ? `${inner}\n\n` : "\n";
+      case "div": {
+        const textContent = (el.textContent ?? "")
+          .replace(/\u00A0/g, " ")
+          .trim();
+        if (!textContent) return "";
+        return `${inner}\n\n`;
+      }
+
       case "br":
         return "\n";
+
       case "ul":
         return (
           Array.from(el.children)
-            .map((li) => `- ${proc(li)}`)
-            .join("\n") + "\n"
+            .map((li) => `- ${proc(li).trim()}`)
+            .join("\n") + "\n\n"
         );
+
       case "ol":
         return (
           Array.from(el.children)
-            .map((li, i) => `${i + 1}. ${proc(li)}`)
-            .join("\n") + "\n"
+            .map((li, i) => `${i + 1}. ${proc(li).trim()}`)
+            .join("\n") + "\n\n"
         );
+
       case "li":
         return inner;
-      case "blockquote":
-        return (
-          inner
-            .split("\n")
-            .filter(Boolean)
-            .map((l) => `> ${l}`)
-            .join("\n") + "\n"
-        );
+
+      case "blockquote": {
+        const text = inner
+          .split("\n")
+          .map((l) => l.trim())
+          .filter(Boolean)
+          .map((l) => `> ${l}`)
+          .join("\n");
+
+        return text ? `${text}\n\n` : "";
+      }
+
       case "a":
         return `[${inner}](${el.getAttribute("href") ?? ""})`;
+
       case "hr":
-        return "\n---\n";
+        return `---\n\n`;
+
       default:
         return inner;
     }
   }
+
   return proc(div)
+    .replace(/\u00A0/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
 // ─── HTML → plain text ────────────────────────────────────────────────────────
+
 function htmlToText(html: string): string {
   const div = document.createElement("div");
   div.innerHTML = html;
@@ -190,230 +231,14 @@ function htmlToText(html: string): string {
     if (tag === "br") return "\n";
     if (tag === "hr") return "\n---\n";
     const inner = Array.from(el.childNodes).map(proc).join("");
+    if (tag === "p") {
+      // Prazni <p> ali <p><br></p> → prazna vrstica, vsebinski → vsebina + \n
+      const content = inner.replace(/\n/g, " ").trim();
+      return content + "\n";
+    }
     return BLOCK.has(tag) ? inner.trimEnd() + "\n" : inner;
   }
-  return proc(div)
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-// ─── PDF renderer (no html2canvas needed) ─────────────────────────────────────
-type Run = { text: string; bold: boolean; italic: boolean };
-
-function collectRuns(node: Node, bold = false, italic = false): Run[] {
-  if (node.nodeType === Node.TEXT_NODE) {
-    const text = node.textContent ?? "";
-    return text ? [{ text, bold, italic }] : [];
-  }
-  if (node.nodeType !== Node.ELEMENT_NODE) return [];
-  const el = node as HTMLElement;
-  const tag = el.tagName.toLowerCase();
-  const b = bold || tag === "b" || tag === "strong";
-  const i = italic || tag === "i" || tag === "em";
-  return Array.from(el.childNodes).flatMap((c) => collectRuns(c, b, i));
-}
-
-function renderRunsToDoc(
-  doc: jsPDF,
-  runs: Run[],
-  x: number,
-  startY: number,
-  fontSize: number,
-  lineH: number,
-  maxW: number,
-  pageH: number,
-  margin: number,
-): number {
-  let y = startY;
-
-  // Build word tokens with their run metadata
-  type Token = { word: string; bold: boolean; italic: boolean };
-  const tokens: Token[] = [];
-  for (const run of runs) {
-    const words = run.text.split(/(\s+)/);
-    for (const w of words) {
-      if (w) tokens.push({ word: w, bold: run.bold, italic: run.italic });
-    }
-  }
-
-  let lineTokens: Token[] = [];
-  let lineW = 0;
-
-  const flushLine = () => {
-    if (!lineTokens.length) return;
-    let lx = x;
-    for (const t of lineTokens) {
-      const style =
-        t.bold && t.italic
-          ? "bolditalic"
-          : t.bold
-            ? "bold"
-            : t.italic
-              ? "italic"
-              : "normal";
-      doc.setFont("helvetica", style);
-      doc.setFontSize(fontSize);
-      doc.text(t.word, lx, y);
-      lx += doc.getTextWidth(t.word);
-    }
-    y += lineH;
-    if (y > pageH - margin) {
-      doc.addPage();
-      y = margin;
-    }
-    lineTokens = [];
-    lineW = 0;
-  };
-
-  for (const token of tokens) {
-    const style =
-      token.bold && token.italic
-        ? "bolditalic"
-        : token.bold
-          ? "bold"
-          : token.italic
-            ? "italic"
-            : "normal";
-    doc.setFont("helvetica", style);
-    doc.setFontSize(fontSize);
-    const w = doc.getTextWidth(token.word);
-
-    if (lineW + w > maxW && lineW > 0) flushLine();
-    lineTokens.push(token);
-    lineW += w;
-  }
-  flushLine();
-  return y;
-}
-
-function exportHtmlToPdf(editorEl: HTMLElement) {
-  const doc = new jsPDF({ unit: "pt", format: "a4" });
-  const margin = 50;
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  const maxW = pageW - margin * 2;
-  let y = margin;
-
-  const check = (needed: number) => {
-    if (y + needed > pageH - margin) {
-      doc.addPage();
-      y = margin;
-    }
-  };
-
-  for (const child of Array.from(editorEl.children)) {
-    const el = child as HTMLElement;
-    const tag = el.tagName.toLowerCase();
-
-    if (tag === "h1") {
-      check(32);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(22);
-      y = renderRunsToDoc(
-        doc,
-        collectRuns(el, true),
-        margin,
-        y,
-        22,
-        30,
-        maxW,
-        pageH,
-        margin,
-      );
-      y += 6;
-    } else if (tag === "h2") {
-      check(26);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(17);
-      y = renderRunsToDoc(
-        doc,
-        collectRuns(el, true),
-        margin,
-        y,
-        17,
-        24,
-        maxW,
-        pageH,
-        margin,
-      );
-      y += 4;
-    } else if (tag === "h3") {
-      check(22);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(13);
-      y = renderRunsToDoc(
-        doc,
-        collectRuns(el, true),
-        margin,
-        y,
-        13,
-        20,
-        maxW,
-        pageH,
-        margin,
-      );
-      y += 3;
-    } else if (tag === "p") {
-      const runs = collectRuns(el);
-      const text = runs
-        .map((r) => r.text)
-        .join("")
-        .trim();
-      if (!text) {
-        y += 8;
-        continue;
-      }
-      check(16);
-      y = renderRunsToDoc(doc, runs, margin, y, 11, 16, maxW, pageH, margin);
-      y += 3;
-    } else if (tag === "ul" || tag === "ol") {
-      Array.from(el.children).forEach((li, i) => {
-        check(16);
-        const bullet = tag === "ul" ? "• " : `${i + 1}. `;
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(11);
-        const bw = doc.getTextWidth(bullet);
-        doc.text(bullet, margin, y);
-        y = renderRunsToDoc(
-          doc,
-          collectRuns(li as HTMLElement),
-          margin + bw,
-          y,
-          11,
-          16,
-          maxW - bw,
-          pageH,
-          margin,
-        );
-      });
-      y += 4;
-    } else if (tag === "blockquote") {
-      check(16);
-      doc.setDrawColor(91, 141, 239);
-      doc.line(margin - 10, y - 11, margin - 10, y + 5);
-      doc.setDrawColor(0);
-      y = renderRunsToDoc(
-        doc,
-        collectRuns(el, false, true),
-        margin,
-        y,
-        11,
-        16,
-        maxW,
-        pageH,
-        margin,
-      );
-      y += 4;
-    } else if (tag === "hr") {
-      check(20);
-      doc.setDrawColor(180, 180, 180);
-      doc.line(margin, y, pageW - margin, y);
-      doc.setDrawColor(0);
-      y += 14;
-    }
-  }
-
-  doc.save("documentation.pdf");
+  return proc(div).trimEnd();
 }
 
 // ─── Toolbar button ───────────────────────────────────────────────────────────
@@ -579,12 +404,11 @@ export default function DocumentationPage() {
     setExportOpen(false);
   }
 
-  const handleExportMd = () =>
-    downloadBlob(
-      htmlToMarkdown(htmlRef.current),
-      "documentation.md",
-      "text/markdown;charset=utf-8",
-    );
+  const handleExportMd = () => {
+    const md = htmlToMarkdown(htmlRef.current);
+    console.log("RAW markdown:\n" + md); // ← zamenjaj obstoječi log
+    downloadBlob(md, "documentation.md", "text/markdown;charset=utf-8");
+  };
   const handleExportTxt = () =>
     downloadBlob(
       htmlToText(htmlRef.current),
@@ -592,7 +416,49 @@ export default function DocumentationPage() {
       "text/plain;charset=utf-8",
     );
   const handleExportPdf = () => {
-    if (editorRef.current) exportHtmlToPdf(editorRef.current);
+    const content = editorRef.current?.innerHTML ?? "";
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Documentation</title>
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 11pt; line-height: 1.65; color: #111; padding: 2.5cm; max-width: 21cm; }
+          h1 { font-size: 22pt; font-weight: 700; margin: 1rem 0 0.4rem; }
+          h2 { font-size: 17pt; font-weight: 700; margin: 0.9rem 0 0.3rem; }
+          h3 { font-size: 13pt; font-weight: 600; margin: 0.7rem 0 0.25rem; }
+          p  { margin: 0.25rem 0; }
+          ul { list-style: disc;    padding-left: 1.4rem; margin: 0.3rem 0; }
+          ol { list-style: decimal; padding-left: 1.4rem; margin: 0.3rem 0; }
+          li { margin: 0.1rem 0; }
+          blockquote { border-left: 3px solid #5b8def; padding-left: 0.85rem; margin: 0.5rem 0; color: #555; font-style: italic; }
+          code { font-family: "Courier New", monospace; font-size: 9.5pt; background: #f3f4f6; border-radius: 3px; padding: 0.1em 0.35em; }
+          pre  { font-family: "Courier New", monospace; font-size: 9.5pt; background: #f3f4f6; border-radius: 6px; padding: 0.75rem 1rem; margin: 0.5rem 0; white-space: pre-wrap; word-break: break-all; }
+          hr   { border: none; border-top: 1px solid #ddd; margin: 0.8rem 0; }
+          a    { color: #5b8def; }
+          strong { font-weight: 700; }
+          em { font-style: italic; }
+          @media print {
+            body { padding: 0; }
+            @page { margin: 2cm; }
+          }
+        </style>
+      </head>
+      <body>${content}</body>
+    </html>
+  `);
+    printWindow.document.close();
+    printWindow.focus();
+    // Počakaj da se naloži nato print
+    printWindow.onload = () => {
+      printWindow.print();
+      printWindow.close();
+    };
     setExportOpen(false);
   };
 
@@ -624,8 +490,10 @@ export default function DocumentationPage() {
         ext === "md"
           ? markdownToHtml(raw)
           : raw
-              .split(/\n\n+/)
-              .map((b: string) => `<p>${b.replace(/\n/g, "<br>")}</p>`)
+              .split("\n")
+              .map((line: string) =>
+                line.trim() ? `<p>${line}</p>` : "<p><br></p>",
+              )
               .join("");
 
       htmlRef.current = html;
@@ -672,9 +540,12 @@ export default function DocumentationPage() {
           <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">
             Project
           </p>
-          <h1 className="text-3xl font-bold text-foreground leading-tight">
-            Documentation
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold text-foreground leading-tight">
+              Documentation
+            </h1>
+            <DocumentationHelpTooltip />
+          </div>
           <p className="text-sm text-muted mt-1">
             Shared project wiki — all members can edit
           </p>

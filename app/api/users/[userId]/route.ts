@@ -53,7 +53,7 @@ async function requireAdmin(): Promise<
  *     description: >
  *       Updates a user's username, first name, last name, email, system role, and optionally password.
  *       Only system administrators can perform this action.
- *       Username and email must be unique (case-insensitive) across all users, excluding the target user.
+ *       Username and email must be unique (case-insensitive) across all active users, excluding the target user.
  *       If a new password is provided, it must be between 12 and 64 characters.
  *     tags:
  *       - Users
@@ -64,148 +64,21 @@ async function requireAdmin(): Promise<
  *         schema:
  *           type: string
  *           format: uuid
- *         description: The ID of the user to update
- *         example: "d5e8f1a2-3b4c-5d6e-7f8a-9b0c1d2e3f4a"
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - username
- *               - email
- *             properties:
- *               username:
- *                 type: string
- *                 description: Must be unique (case-insensitive), excluding the target user
- *                 example: "janez.novak"
- *               email:
- *                 type: string
- *                 format: email
- *                 description: Must be unique (case-insensitive), excluding the target user
- *                 example: "janez.novak@example.com"
- *               first_name:
- *                 type: string
- *                 nullable: true
- *                 example: "Janez"
- *               last_name:
- *                 type: string
- *                 nullable: true
- *                 example: "Novak"
- *               system_role:
- *                 type: string
- *                 enum: [admin, user]
- *                 example: "user"
- *               password:
- *                 type: string
- *                 format: password
- *                 nullable: true
- *                 description: Optional. If provided, must be between 12 and 64 characters.
- *                 example: "novo_varno_geslo_123"
  *     responses:
  *       200:
  *         description: User updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 id:
- *                   type: string
- *                   format: uuid
- *                   example: "d5e8f1a2-3b4c-5d6e-7f8a-9b0c1d2e3f4a"
- *                 email:
- *                   type: string
- *                   format: email
- *                   example: "janez.novak@example.com"
- *                 username:
- *                   type: string
- *                   example: "janez.novak"
- *                 first_name:
- *                   type: string
- *                   nullable: true
- *                   example: "Janez"
- *                 last_name:
- *                   type: string
- *                   nullable: true
- *                   example: "Novak"
- *                 system_role:
- *                   type: string
- *                   enum: [admin, user]
- *                   example: "user"
  *       400:
  *         description: Validation failed
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   examples:
- *                     missingFields:
- *                       value: "Uporabniško ime in e-pošta sta obvezni."
- *                     invalidEmail:
- *                       value: "Neveljaven format e-poštnega naslova."
- *                     passwordTooShort:
- *                       value: "Geslo mora imeti vsaj 12 znakov."
- *                     passwordTooLong:
- *                       value: "Geslo ne sme biti daljše od 64 znakov."
  *       401:
  *         description: User not authenticated
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Unauthorized"
  *       403:
  *         description: Caller is not an administrator
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Samo administratorji lahko upravljajo z uporabniki."
  *       404:
  *         description: Target user not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Uporabnik ne obstaja."
  *       409:
- *         description: Username or email already in use by another user
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   examples:
- *                     duplicateUsername:
- *                       value: "Uporabniško ime že obstaja."
- *                     duplicateEmail:
- *                       value: "E-poštni naslov že obstaja."
+ *         description: Username or email already in use
  *       500:
  *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Napaka pri posodabljanju uporabnika."
  */
 export async function PUT(req: NextRequest, { params }: RouteContext) {
   const { adminId, error: authError } = await requireAdmin();
@@ -221,7 +94,6 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
   const systemRole = body.system_role === "admin" ? "admin" : "user";
   const password = body.password?.trim() || null;
 
-  // Validation
   if (!username || !email) {
     return NextResponse.json(
       { error: "Uporabniško ime in e-pošta sta obvezni." },
@@ -252,11 +124,11 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
     }
   }
 
-  // Check target user exists
   const { data: targetUser } = await supabaseAdmin
     .from("users")
     .select("id")
     .eq("id", userId)
+    .is("deleted_at", null)
     .maybeSingle();
 
   if (!targetUser) {
@@ -266,7 +138,6 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
     );
   }
 
-  // Duplicate checks (exclude self)
   const [{ data: duplicateUsername }, { data: duplicateEmail }] =
     await Promise.all([
       supabaseAdmin
@@ -274,12 +145,14 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
         .select("id")
         .ilike("username", username)
         .neq("id", userId)
+        .is("deleted_at", null)
         .maybeSingle(),
       supabaseAdmin
         .from("users")
         .select("id")
         .ilike("email", email)
         .neq("id", userId)
+        .is("deleted_at", null)
         .maybeSingle(),
     ]);
 
@@ -296,7 +169,6 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
     );
   }
 
-  // Update Supabase Auth (email + optional password)
   const authPayload: { email?: string; password?: string } = { email };
   if (password) authPayload.password = password;
 
@@ -310,7 +182,6 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
     );
   }
 
-  // Update users table
   const { data, error: updateError } = await supabaseAdmin
     .from("users")
     .update({ username, email, first_name: firstName, last_name: lastName, system_role: systemRole })
@@ -333,9 +204,11 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
  * @swagger
  * /api/users/{userId}:
  *   delete:
- *     summary: Delete a user (admin only)
+ *     summary: Soft delete a user (admin only)
  *     description: >
- *       Permanently deletes a user from both the users table and Supabase Auth.
+ *       Soft deletes a user — sets deleted_at, bans them in Supabase Auth,
+ *       removes them from all project_members, and unassigns their tasks.
+ *       Historical data (time logs, comments, etc.) is preserved for reporting.
  *       Only system administrators can perform this action.
  *       An administrator cannot delete their own account.
  *     tags:
@@ -362,54 +235,14 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
  *                   example: "Uporabnik je bil uspešno izbrisan."
  *       400:
  *         description: Admin attempted to delete their own account
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Ne morete izbrisati lastnega računa."
  *       401:
  *         description: User not authenticated
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Unauthorized"
  *       403:
  *         description: Caller is not an administrator
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Samo administratorji lahko upravljajo z uporabniki."
  *       404:
  *         description: Target user not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Uporabnik ne obstaja."
  *       500:
  *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Napaka pri brisanju uporabnika."
  */
 export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const { adminId, error: authError } = await requireAdmin();
@@ -417,7 +250,6 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
 
   const { userId } = await params;
 
-  // Admin cannot delete themselves
   if (adminId === userId) {
     return NextResponse.json(
       { error: "Ne morete izbrisati lastnega računa." },
@@ -425,11 +257,11 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
     );
   }
 
-  // Check target user exists
   const { data: targetUser } = await supabaseAdmin
     .from("users")
     .select("id")
     .eq("id", userId)
+    .is("deleted_at", null)
     .maybeSingle();
 
   if (!targetUser) {
@@ -439,17 +271,48 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
     );
   }
 
-  // Delete from Supabase Auth (cascades to users table via DB trigger/FK)
-  const { error: deleteError } =
-    await supabaseAdmin.auth.admin.deleteUser(userId);
+  // 1. Soft delete — set deleted_at
+  const { error: softDeleteError } = await supabaseAdmin
+    .from("users")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", userId);
 
-  if (deleteError) {
-    console.error("DELETE /api/users/[userId] error:", deleteError);
+  if (softDeleteError) {
+    console.error("DELETE /api/users/[userId] soft delete error:", softDeleteError);
     return NextResponse.json(
       { error: "Napaka pri brisanju uporabnika." },
       { status: 500 },
     );
   }
+
+  // 2. Ban in Supabase Auth so they can't log in
+  const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(
+    userId,
+    { ban_duration: "876600h" }, // 100 years
+  );
+
+  if (banError) {
+    console.error("DELETE /api/users/[userId] ban error:", banError);
+    // Non-fatal — user is already soft deleted in our DB
+  }
+
+  // 3. Remove from all projects
+  await supabaseAdmin
+    .from("project_members")
+    .delete()
+    .eq("user_id", userId);
+
+  // 4. Unassign their tasks (preserve task history, just clear assignee)
+  await supabaseAdmin
+    .from("tasks")
+    .update({
+      assignee_id: null,
+      is_accepted: false,
+      status: "unassigned",
+    })
+    .eq("assignee_id", userId)
+    .is("deleted_at", null)
+    .neq("status", "completed");
 
   return NextResponse.json({ message: "Uporabnik je bil uspešno izbrisan." });
 }
