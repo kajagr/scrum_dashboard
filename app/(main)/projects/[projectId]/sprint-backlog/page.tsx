@@ -97,13 +97,6 @@ export default function SprintBoardPage() {
   const [editError, setEditError] = useState<string | null>(null);
   const [showHours, setShowHours] = useState(false);
 
-  // Reject modal state
-  const [rejectStory, setRejectStory] = useState<Story | null>(null);
-  const [rejectComment, setRejectComment] = useState("");
-  const [rejectLoading, setRejectLoading] = useState(false);
-  const [rejectError, setRejectError] = useState<string | null>(null);
-
-  // Per-story action loading/error
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionError, setActionError] = useState<Record<string, string>>({});
 
@@ -152,27 +145,6 @@ export default function SprintBoardPage() {
     });
   };
 
-  const handleConfirm = async (story: Story) => {
-    setActionLoading(story.id);
-    setActionError((prev) => ({ ...prev, [story.id]: "" }));
-    try {
-      const res = await fetch(`/api/stories/${story.id}/confirm`, {
-        method: "POST",
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setActionError((prev) => ({ ...prev, [story.id]: data.error || "Error confirming story." }));
-        return;
-      }
-      await fetchData();
-    } catch {
-      setActionError((prev) => ({ ...prev, [story.id]: "Server error." }));
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
   const handleMarkReady = async (story: Story) => {
     setActionLoading(story.id);
     setActionError((prev) => ({ ...prev, [story.id]: "" }));
@@ -193,32 +165,6 @@ export default function SprintBoardPage() {
       setActionError((prev) => ({ ...prev, [story.id]: "Server error." }));
     } finally {
       setActionLoading(null);
-    }
-  };
-
-  const handleRejectSubmit = async () => {
-    if (!rejectStory) return;
-    setRejectLoading(true);
-    setRejectError(null);
-    try {
-      const res = await fetch(`/api/stories/${rejectStory.id}/reject`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ comment: rejectComment || null }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setRejectError(data.error || "Error rejecting story.");
-        return;
-      }
-      setRejectStory(null);
-      setRejectComment("");
-      await fetchData();
-    } catch {
-      setRejectError("Server error.");
-    } finally {
-      setRejectLoading(false);
     }
   };
 
@@ -291,7 +237,6 @@ export default function SprintBoardPage() {
   const doneTasks = allTasks.filter((t) => getTaskCategory(t) === "done").length;
   const doneCount = stories.filter((s) => s.status === "done").length;
   const canAddTasks = userRole === "scrum_master" || userRole === "developer";
-  const isProductOwner = userRole === "product_owner";
   const canMarkReady = userRole === "scrum_master" || userRole === "developer";
 
   if (loading) {
@@ -308,7 +253,6 @@ export default function SprintBoardPage() {
 
   return (
     <div className="p-6">
-      {/* Header */}
       <div className="mb-6">
         <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Project</p>
         <div className="flex items-center gap-2">
@@ -408,13 +352,8 @@ export default function SprintBoardPage() {
                   done: storyTasks.filter((t) => getTaskCategory(t) === "done"),
                 };
 
-                const canConfirmReject = isProductOwner && story.status === "ready";
-
-                // Show "Mark as ready" for scrum_master/developer when story is in_progress
-                // and either has no tasks or all tasks are completed
                 const allTasksDone = storyTasks.length === 0 || storyTasks.every((t) => t.status === "completed");
                 const showMarkReady = canMarkReady && story.status === "in_progress" && allTasksDone;
-
                 const storyActionError = actionError[story.id];
 
                 return (
@@ -450,7 +389,6 @@ export default function SprintBoardPage() {
                               </span>
                             )}
 
-                            {/* Mark as ready — scrum_master/developer, in_progress, all tasks done or no tasks */}
                             {showMarkReady && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleMarkReady(story); }}
@@ -459,26 +397,6 @@ export default function SprintBoardPage() {
                               >
                                 {actionLoading === story.id ? "..." : "Mark as ready"}
                               </button>
-                            )}
-
-                            {/* Confirm / Reject — product owner, ready stories */}
-                            {canConfirmReject && (
-                              <>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleConfirm(story); }}
-                                  disabled={actionLoading === story.id}
-                                  className="px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors bg-[rgba(52,211,153,0.12)] text-[#34D399] border border-[rgba(52,211,153,0.25)] hover:bg-[rgba(52,211,153,0.2)] disabled:opacity-50"
-                                >
-                                  {actionLoading === story.id ? "..." : "✓ Confirm"}
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setRejectStory(story); setRejectComment(""); setRejectError(null); }}
-                                  disabled={actionLoading === story.id}
-                                  className="px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors bg-error-light text-error border border-error-border hover:bg-error/20 disabled:opacity-50"
-                                >
-                                  ✕ Reject
-                                </button>
-                              </>
                             )}
 
                             <button
@@ -609,62 +527,6 @@ export default function SprintBoardPage() {
           </div>
           <p className="font-semibold text-foreground mb-1">No active sprint</p>
           <p className="text-sm text-muted">Start a sprint from the Sprints page to see stories here.</p>
-        </div>
-      )}
-
-      {/* Reject modal */}
-      {rejectStory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 backdrop-blur-sm bg-foreground/20" onClick={() => !rejectLoading && setRejectStory(null)} />
-          <div className="relative w-full max-w-sm mx-4 rounded-2xl overflow-hidden shadow-2xl bg-surface">
-            <div className="h-1 w-full bg-gradient-to-r from-error to-error-border" />
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-xs font-semibold tracking-widest uppercase text-error mb-0.5">Story</p>
-                  <h3 className="text-lg font-bold text-foreground">Reject story</h3>
-                </div>
-                <button onClick={() => setRejectStory(null)} className="w-8 h-8 flex items-center justify-center rounded-full text-lg leading-none bg-background hover:bg-border text-muted">×</button>
-              </div>
-              <p className="text-sm text-foreground mb-4">
-                Rejecting <span className="font-semibold">{rejectStory.title}</span>. The story will be returned to the backlog.
-              </p>
-              <div className="mb-4">
-                <label className="block text-xs font-semibold tracking-widest uppercase text-primary mb-1">
-                  Comment <span className="normal-case font-normal tracking-normal text-muted">(optional)</span>
-                </label>
-                <textarea
-                  value={rejectComment}
-                  onChange={(e) => setRejectComment(e.target.value)}
-                  rows={3}
-                  placeholder="Why is this story being rejected?"
-                  className="mt-1 block w-full px-3 py-2.5 rounded-lg text-sm bg-background border border-border text-foreground placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
-                />
-              </div>
-              {rejectError && (
-                <div className="flex items-start gap-2.5 p-3 rounded-xl border border-error-border bg-error-light mb-4">
-                  <svg className="w-4 h-4 text-error mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                  </svg>
-                  <p className="text-sm text-error">{rejectError}</p>
-                </div>
-              )}
-              <div className="flex justify-end gap-3">
-                <button onClick={() => setRejectStory(null)} disabled={rejectLoading} className="px-4 py-2 text-sm font-medium rounded-lg transition-colors bg-background hover:bg-border text-muted disabled:opacity-50">Cancel</button>
-                <button onClick={handleRejectSubmit} disabled={rejectLoading} className="px-4 py-2 text-sm font-semibold text-white rounded-lg transition-colors shadow-sm disabled:opacity-50 bg-error hover:bg-error/90">
-                  {rejectLoading ? (
-                    <span className="flex items-center gap-2">
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                      </svg>
-                      Rejecting...
-                    </span>
-                  ) : "Reject story"}
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
