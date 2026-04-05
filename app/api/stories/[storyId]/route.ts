@@ -31,6 +31,8 @@ const ALLOWED_PRIORITIES = [
  *       **Actions:**
  *       - `mark_ready` — Scrum Master or Developer marks a story as ready for Product Owner review.
  *         Story must be in an active sprint and have status "in_progress".
+ *       - `unmark_ready` — Scrum Master reverts a ready story back to in_progress.
+ *         Story must have status "ready".
  *       - *(no action)* — Full story edit. Only Product Owners and Scrum Masters can edit stories.
  *         Stories assigned to a sprint or with status "done" cannot be edited.
  *         Story titles must remain unique within the project.
@@ -54,9 +56,12 @@ const ALLOWED_PRIORITIES = [
  *             properties:
  *               action:
  *                 type: string
- *                 enum: [mark_ready]
+ *                 enum: [mark_ready, unmark_ready]
  *                 nullable: true
- *                 description: Optional action to perform instead of a full edit.
+ *                 description: >
+ *                   Optional action to perform instead of a full edit.
+ *                   `mark_ready` marks story as ready for review.
+ *                   `unmark_ready` reverts a ready story back to in_progress.
  *                 example: "mark_ready"
  *               title:
  *                 type: string
@@ -107,6 +112,8 @@ const ALLOWED_PRIORITIES = [
  *                       value: "Completed stories cannot be edited."
  *                     notInProgress:
  *                       value: "Only in-progress stories can be marked as ready."
+ *                     notReady:
+ *                       value: "Story is not marked as ready."
  *                     notInSprint:
  *                       value: "Story is not assigned to any sprint."
  *                     notActiveSprint:
@@ -234,6 +241,39 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       const { data: updatedStory, error: updateError } = await supabaseAdmin
         .from("user_stories")
         .update({ status: "ready", updated_at: new Date().toISOString() })
+        .eq("id", storyId)
+        .select()
+        .maybeSingle();
+
+      if (updateError) {
+        return NextResponse.json(
+          { error: updateError.message },
+          { status: 500 },
+        );
+      }
+
+      return NextResponse.json(updatedStory, { status: 200 });
+    }
+
+    // --- action: unmark_ready ---
+    if (action === "unmark_ready") {
+      if (membership.role !== "scrum_master") {
+        return NextResponse.json(
+          { error: "Only Scrum Masters can undo ready status." },
+          { status: 403 },
+        );
+      }
+
+      if (story.status !== "ready") {
+        return NextResponse.json(
+          { error: "Story is not marked as ready." },
+          { status: 400 },
+        );
+      }
+
+      const { data: updatedStory, error: updateError } = await supabaseAdmin
+        .from("user_stories")
+        .update({ status: "in_progress", updated_at: new Date().toISOString() })
         .eq("id", storyId)
         .select()
         .maybeSingle();

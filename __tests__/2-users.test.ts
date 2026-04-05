@@ -107,10 +107,8 @@ describe("GET /api/users — seznam uporabnikov (#2)", () => {
       cnt++;
       if (cnt === 1)
         return makeReadChain({ data: { system_role: "admin" }, error: null });
-      return {
-        select: jest.fn().mockReturnThis(),
-        order: jest.fn().mockResolvedValue({ data: users, error: null }),
-      };
+      // GET — .select("*").order() → thenable
+      return makeReadChain({ data: users, error: null });
     });
 
     const res = await GET();
@@ -169,22 +167,22 @@ describe("PUT /api/users/:userId — urejanje uporabnika (#2)", () => {
     let cnt = 0;
     mockAdminFrom.mockImplementation(() => {
       cnt++;
-      // 1. requireAdmin — preveri system_role klicatelja
+      // 1. requireAdmin — system_role check
       if (cnt === 1)
         return makeReadChain({
           data: { system_role: isAdmin ? "admin" : "user" },
           error: null,
         });
-      // 2. target user exists check
+      // 2. target user exists (.is("deleted_at", null))
       if (cnt === 2)
         return makeReadChain({
           data: targetExists ? { id: "user-2" } : null,
           error: null,
         });
-      // 3. duplicate username check (Promise.all — prvi)
+      // 3. duplicate username (Promise.all — prvi)
       if (cnt === 3)
         return makeReadChain({ data: duplicateUsername, error: null });
-      // 4. duplicate email check (Promise.all — drugi)
+      // 4. duplicate email (Promise.all — drugi)
       if (cnt === 4)
         return makeReadChain({ data: duplicateEmail, error: null });
       // 5. update
@@ -261,7 +259,7 @@ describe("PUT /api/users/:userId — urejanje uporabnika (#2)", () => {
   it("400 — manjkajoče obvezno polje", async () => {
     setupPutMocks();
     const res = await PUT(
-      makePutRequest("user-2", { email: "test@test.com" }), // brez username
+      makePutRequest("user-2", { email: "test@test.com" }),
       makeContext("user-2"),
     );
     expect(res.status).toBe(400);
@@ -342,42 +340,60 @@ describe("DELETE /api/users/:userId — brisanje uporabnika (#2)", () => {
       data: { user: { id: "admin-1" } },
       error: null,
     });
-    mockAdminDeleteUser.mockResolvedValue({ error: null });
+    mockAdminUpdateUser.mockResolvedValue({ error: null });
   });
 
   function setupDeleteMocks(
     overrides: {
       isAdmin?: boolean;
       targetExists?: boolean;
-      deleteError?: any;
+      softDeleteError?: any;
     } = {},
   ) {
     const {
       isAdmin = true,
       targetExists = true,
-      deleteError = null,
+      softDeleteError = null,
     } = overrides;
 
     let cnt = 0;
     mockAdminFrom.mockImplementation(() => {
       cnt++;
-      // 1. requireAdmin — preveri system_role klicatelja
+      // 1. requireAdmin
       if (cnt === 1)
         return makeReadChain({
           data: { system_role: isAdmin ? "admin" : "user" },
           error: null,
         });
-      // 2. target user exists check
-      return makeReadChain({
-        data: targetExists ? { id: "user-2" } : null,
-        error: null,
-      });
+      // 2. target user exists (.is("deleted_at", null))
+      if (cnt === 2)
+        return makeReadChain({
+          data: targetExists ? { id: "user-2" } : null,
+          error: null,
+        });
+      // 3. soft delete — .update().eq()
+      if (cnt === 3)
+        return {
+          update: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockResolvedValue({ error: softDeleteError }),
+        };
+      // 4. project_members — .delete().eq()
+      if (cnt === 4)
+        return {
+          delete: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockResolvedValue({ error: null }),
+        };
+      // 5. tasks — .update().eq().is().neq()
+      return {
+        update: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        is: jest.fn().mockReturnThis(),
+        neq: jest.fn().mockResolvedValue({ error: null }),
+      };
     });
-
-    mockAdminDeleteUser.mockResolvedValue({ error: deleteError });
   }
 
-  it("200 — admin uspešno izbriše uporabnika", async () => {
+  it("200 — admin uspešno soft-delete uporabnika", async () => {
     setupDeleteMocks();
     const res = await DELETE(
       makeDeleteRequest("user-2"),
@@ -388,9 +404,21 @@ describe("DELETE /api/users/:userId — brisanje uporabnika (#2)", () => {
     expect(body.message).toMatch(/uspešno izbrisan/i);
   });
 
+  it("200 — po brisanju je user baniran v auth", async () => {
+    setupDeleteMocks();
+    const res = await DELETE(
+      makeDeleteRequest("user-2"),
+      makeContext("user-2"),
+    );
+    expect(res.status).toBe(200);
+    expect(mockAdminUpdateUser).toHaveBeenCalledWith(
+      "user-2",
+      expect.objectContaining({ ban_duration: expect.any(String) }),
+    );
+  });
+
   it("400 — admin ne more izbrisati samega sebe", async () => {
     setupDeleteMocks();
-    // admin-1 poskuša izbrisati admin-1
     const res = await DELETE(
       makeDeleteRequest("admin-1"),
       makeContext("admin-1"),
@@ -400,7 +428,7 @@ describe("DELETE /api/users/:userId — brisanje uporabnika (#2)", () => {
     expect(body.error).toMatch(/lastnega računa/i);
   });
 
-  it("404 — uporabnik ne obstaja", async () => {
+  it("404 — uporabnik ne obstaja ali je že izbrisan", async () => {
     setupDeleteMocks({ targetExists: false });
     const res = await DELETE(
       makeDeleteRequest("nonexistent"),
