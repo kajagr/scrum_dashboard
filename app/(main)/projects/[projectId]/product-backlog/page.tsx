@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import CreateStoryModal from "@/components/features/stories/CreateStoryModal";
 import BacklogHelpTooltip from "@/components/features/stories/BacklogHelpTooltip";
 import type { UserStory } from "@/lib/types";
@@ -58,12 +58,14 @@ function StoryCard({
   onComments,
   canEstimate,
   onEstimateSubmit,
-  // confirm/reject
   canConfirmReject,
   actionLoading,
   actionError,
   onConfirm,
   onReject,
+  onPoker,
+  onJoinPoker,
+  activeSessionId,
 }: {
   story: UserStory;
   selectable?: boolean;
@@ -79,6 +81,9 @@ function StoryCard({
   actionError?: string;
   onConfirm?: () => void;
   onReject?: () => void;
+  onPoker?: () => void;
+  onJoinPoker?: () => void;
+  activeSessionId?: string | null;
 }) {
   const [estimating, setEstimating] = useState(false);
   const [estimateVal, setEstimateVal] = useState("");
@@ -112,7 +117,7 @@ function StoryCard({
         ${selected ? "bg-primary-light border-primary-border shadow-sm" : "bg-background border-border hover:border-subtle"}`}
     >
       <div className="flex items-start gap-3 p-4">
-      {selectable && (
+        {selectable && (
           <div className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors
             ${missingPoints ? "border-subtle opacity-40" : selected ? "bg-primary border-primary" : "border-subtle"}`}>
             {selected && !missingPoints && (
@@ -126,7 +131,6 @@ function StoryCard({
           <div className="flex items-start justify-between gap-2 mb-2">
             <p className="text-sm font-semibold text-foreground leading-snug">{story.title}</p>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {/* Confirm / Reject for product owner on ready tab */}
               {canConfirmReject && (
                 <>
                   <button
@@ -182,6 +186,24 @@ function StoryCard({
               ) : selectable ? (
                 <span className="text-xs text-error bg-error-light border border-error-border px-2 py-0.5 rounded-lg">No SP</span>
               ) : null}
+              {canEstimate && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onPoker?.(); }}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg border border-primary-border text-primary bg-primary-light hover:bg-primary/20 transition-colors"
+                >
+                  🃏 Planning Poker
+                </button>
+              )}
+              {activeSessionId && !canEstimate && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onJoinPoker?.(); }}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg border border-accent-border text-accent-text bg-accent-light hover:bg-accent/20 transition-colors"
+                >
+                  🃏 Join Poker
+                </button>
+              )}
             </div>
           </div>
 
@@ -218,9 +240,6 @@ function StoryCard({
             <button type="button" onClick={handleEstimateSubmit} disabled={estimateLoading || !estimateVal} className="px-3 py-1.5 text-xs font-semibold text-white rounded-lg bg-primary hover:bg-primary-hover disabled:opacity-50 transition-colors">
               {estimateLoading ? "Saving..." : "Set estimate"}
             </button>
-            <button type="button" disabled title="Planning Poker — coming soon" className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-subtle cursor-not-allowed opacity-50">
-              🃏 Planning Poker
-            </button>
             <button type="button" onClick={() => { setEstimating(false); setEstimateVal(""); setEstimateError(null); }} className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-muted hover:text-foreground transition-colors">
               Cancel
             </button>
@@ -255,6 +274,7 @@ function useSorted(stories: UserStory[], sortBy: SortKey) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function BacklogPage() {
   const params = useParams();
+  const router = useRouter();
   const projectId = params.projectId as string;
 
   const [loading, setLoading] = useState(true);
@@ -272,6 +292,7 @@ export default function BacklogPage() {
   const [projectRole, setProjectRole] = useState<string | null>(null);
   const [editingStory, setEditingStory] = useState<UserStory | null>(null);
   const [commentingStory, setCommentingStory] = useState<UserStory | null>(null);
+  const [activePokerSessions, setActivePokerSessions] = useState<Record<string, string>>({});
 
   // Confirm/reject state
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -298,7 +319,9 @@ export default function BacklogPage() {
       setActiveSprint(data.activeSprint ?? null);
       setRealized(data.realized ?? []);
       setAssigned(data.assigned ?? []);
-      setUnassigned(data.unassigned ?? []);
+      const unassignedData = data.unassigned ?? [];
+      setUnassigned(unassignedData);
+      await loadPokerSessions(unassignedData);
       if (memberRes.ok) {
         const me = await memberRes.json();
         setProjectRole(me.role ?? null);
@@ -311,6 +334,24 @@ export default function BacklogPage() {
   };
 
   useEffect(() => { void loadBacklog(); }, [projectId]);
+
+  const loadPokerSessions = async (stories: UserStory[]) => {
+    const results = await Promise.all(
+      stories.map(async (s) => {
+        try {
+          const res = await fetch(`/api/stories/${s.id}/poker`, { credentials: "include" });
+          if (!res.ok) return null;
+          const data = await res.json();
+          return data.session ? { storyId: s.id, sessionId: data.session.id } : null;
+        } catch {
+          return null;
+        }
+      })
+    );
+    const map: Record<string, string> = {};
+    results.forEach((r) => { if (r) map[r.storyId] = r.sessionId; });
+    setActivePokerSessions(map);
+  };
 
   const handleEstimate = async (storyId: string, points: number): Promise<{ error?: string }> => {
     try {
@@ -327,6 +368,27 @@ export default function BacklogPage() {
     } catch {
       return { error: "Server connection error." };
     }
+  };
+
+  const handleStartPoker = async (storyId: string) => {
+    try {
+      const res = await fetch(`/api/stories/${storyId}/poker`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error ?? "Error starting Planning Poker.");
+        return;
+      }
+      router.push(`/projects/${projectId}/poker/${data.id}`);
+    } catch {
+      alert("Server connection error.");
+    }
+  };
+
+  const handleJoinPoker = (sessionId: string) => {
+    router.push(`/projects/${projectId}/poker/${sessionId}`);
   };
 
   const handleConfirm = async (story: UserStory) => {
@@ -672,8 +734,7 @@ export default function BacklogPage() {
               onComments={(s) => setCommentingStory(s)}
               canEstimate={
                 projectRole === "scrum_master" &&
-                (activeTab === "unassigned" || activeTab === "future") &&
-                story.story_points == null
+                (activeTab === "unassigned" || activeTab === "future")
               }
               onEstimateSubmit={(pts) => handleEstimate(story.id, pts)}
               canConfirmReject={activeTab === "ready" && isProductOwner && isLastDay}
@@ -681,6 +742,9 @@ export default function BacklogPage() {
               actionError={actionError[story.id]}
               onConfirm={() => handleConfirm(story)}
               onReject={() => { setRejectStory(story); setRejectComment(""); setRejectError(null); }}
+              onPoker={() => handleStartPoker(story.id)}
+              onJoinPoker={() => handleJoinPoker(activePokerSessions[story.id])}
+              activeSessionId={activePokerSessions[story.id] ?? null}
             />
           ))}
         </div>

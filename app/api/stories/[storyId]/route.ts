@@ -561,3 +561,70 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     );
   }
 }
+
+/**
+ * @swagger
+ * /api/stories/{storyId}:
+ *   get:
+ *     summary: Get a user story by ID
+ *     tags:
+ *       - Stories
+ *     parameters:
+ *       - in: path
+ *         name: storyId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: User story
+ *       401:
+ *         description: Not authenticated
+ *       403:
+ *         description: Not a project member
+ *       404:
+ *         description: Story not found
+ *       500:
+ *         description: Internal server error
+ */
+export async function GET(request: NextRequest, context: RouteContext) {
+  try {
+    const supabase = await createClient();
+    const { storyId } = await context.params;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    }
+
+    const { data: story } = await supabase
+      .from("user_stories")
+      .select("id, project_id, title, description, acceptance_criteria, status, priority, story_points, sprint_id")
+      .eq("id", storyId)
+      .maybeSingle();
+
+    if (!story) {
+      return NextResponse.json({ error: "Story not found." }, { status: 404 });
+    }
+
+    const { data: membership } = await supabase
+      .from("project_members")
+      .select("role")
+      .eq("project_id", story.project_id)
+      .eq("user_id", user.id)
+      .is("removed_at", null)
+      .maybeSingle();
+
+    if (!membership) {
+      return NextResponse.json({ error: "Nisi član projekta." }, { status: 403 });
+    }
+
+    return NextResponse.json(story);
+  } catch {
+    return NextResponse.json(
+      { error: "Napaka pri pridobivanju zgodbe." },
+      { status: 500 },
+    );
+  }
+}
