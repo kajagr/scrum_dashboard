@@ -74,5 +74,5 @@ export async function GET(
     return NextResponse.json({ error: "Not a member of this project" }, { status: 404 });
   }
 
-  return NextResponse.json({ role: data.role });
+  return NextResponse.json({ role: data.role, user_id: user.id });
 }
