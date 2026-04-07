@@ -101,10 +101,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .maybeSingle();
 
     if (activeSession) {
-      return NextResponse.json(
-        { error: "Za to zgodbo že poteka Planning Poker." },
-        { status: 400 },
-      );
+      return NextResponse.json(activeSession, { status: 200 });
     }
 
     const { data: session, error } = await supabaseAdmin
