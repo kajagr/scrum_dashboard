@@ -306,25 +306,37 @@ export default function BacklogPage() {
     try {
       setLoading(true);
       setError(null);
-      const [backlogRes, memberRes] = await Promise.all([
+      const [backlogRes, memberRes, pokerRes] = await Promise.all([
         fetch(`/api/projects/${projectId}/backlog`, { credentials: "include" }),
         fetch(`/api/projects/${projectId}/members/me`, { credentials: "include" }),
+        fetch(`/api/projects/${projectId}/poker`, { credentials: "include" }),
       ]);
+
       if (!backlogRes.ok) {
         const d = await backlogRes.json();
         setError(d.error || "Failed to load backlog.");
         return;
       }
-      const data: BacklogResponse = await backlogRes.json();
-      setActiveSprint(data.activeSprint ?? null);
-      setRealized(data.realized ?? []);
-      setAssigned(data.assigned ?? []);
-      const unassignedData = data.unassigned ?? [];
-      setUnassigned(unassignedData);
-      await loadPokerSessions(unassignedData);
-      if (memberRes.ok) {
-        const me = await memberRes.json();
-        setProjectRole(me.role ?? null);
+
+      const [backlogData, memberData, pokerData] = await Promise.all([
+        backlogRes.json(),
+        memberRes.ok ? memberRes.json() : null,
+        pokerRes.ok ? pokerRes.json() : null,
+      ]);
+
+      setActiveSprint(backlogData.activeSprint ?? null);
+      setRealized(backlogData.realized ?? []);
+      setAssigned(backlogData.assigned ?? []);
+      setUnassigned(backlogData.unassigned ?? []);
+
+      if (memberData?.role) setProjectRole(memberData.role);
+
+      if (pokerData?.sessions) {
+        const map: Record<string, string> = {};
+        pokerData.sessions.forEach((s: { user_story_id: string; id: string }) => {
+          map[s.user_story_id] = s.id;
+        });
+        setActivePokerSessions(map);
       }
     } catch {
       setError("Server connection error.");
