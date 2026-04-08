@@ -81,6 +81,7 @@ export interface Task {
   active_since: string | null;
   estimated_hours: number | null;
   logged_hours: number | null;
+  remaining_time: number | null;
   position: number;
   created_at: string;
   updated_at: string;
@@ -91,6 +92,7 @@ export interface TimeLog {
   task_id: string;
   user_id: string;
   hours: number;
+  date: string;
   description: string | null;
   logged_at: string;
 }
