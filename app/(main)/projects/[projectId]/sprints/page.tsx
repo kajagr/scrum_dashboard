@@ -115,7 +115,7 @@ export default function SprintsPage() {
               key={sprint.id}
               sprint={sprint}
               canEdit={isScrumMaster}
-              onEdit={(s) => { setEditSprint(s); }}
+              onEdit={(s) => { if (s.status !== "active") setEditSprint(s); }}
               onDelete={(s) => { setDeleteError(null); setDeleteSprint(s); }}
             />
           ))}

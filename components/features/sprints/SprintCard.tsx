@@ -42,7 +42,8 @@ export default function SprintCard({ sprint, onClick, canEdit, onEdit, onDelete 
   const cfg = statusConfig[status] ?? statusConfig.planned;
 
   const canModifyFull = canEdit && status === "planned";   // edit + delete
-  const canModifyVelocity = canEdit && status === "active"; // edit only (velocity)
+  // const canModifyVelocity = canEdit && status === "active"; // edit only (velocity)
+  const canModifyVelocity = false; // velocity editing disabled
 
   return (
     <div

@@ -276,7 +276,7 @@ export default function CreateSprintModal({
                     value={startDate}
                     min={today}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="absolute opacity-0 w-0 h-0 pointer-events-none"
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                     tabIndex={-1}
                   />
                   <svg
@@ -317,7 +317,7 @@ export default function CreateSprintModal({
                     value={endDate}
                     min={startDate || today}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="absolute opacity-0 w-0 h-0 pointer-events-none"
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                     tabIndex={-1}
                   />
                   <svg

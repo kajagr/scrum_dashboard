@@ -61,15 +61,16 @@ export default function EditSprintModal({
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(
-          isActive
-            ? { velocity: velocity ? Number(velocity) : null }
-            : {
-                name,
-                goal: goal || null,
-                start_date: startDate,
-                end_date: endDate,
-                velocity: velocity ? Number(velocity) : null,
-              }
+          // isActive
+          //   ? { velocity: velocity ? Number(velocity) : null }
+          //   : {
+          //       name,
+          //       goal: goal || null,
+          //       start_date: startDate,
+          //       end_date: endDate,
+          //       velocity: velocity ? Number(velocity) : null,
+          //     }
+          { name, goal: goal || null, start_date: startDate, end_date: endDate, velocity: velocity ? Number(velocity) : null }
         ),
       });
       const data = await res.json();
@@ -100,7 +101,7 @@ export default function EditSprintModal({
               {isActive && (
                 <p className="text-xs text-muted mt-1 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
-                  Active — only velocity can be changed
+                  Active — sprint cannot be edited
                 </p>
               )}
             </div>
@@ -134,11 +135,18 @@ export default function EditSprintModal({
               </>
             )}
 
-            {/* Velocity — always shown */}
+            {/* Velocity — always shown
             <div>
               <label className={labelClass}>Velocity <span className="text-subtle normal-case font-normal tracking-normal">(optional)</span></label>
               <input type="number" value={velocity} onChange={(e) => setVelocity(e.target.value)} min={1} max={100} className={inputClass} placeholder="e.g. 21" autoFocus={isActive} />
-            </div>
+            </div> */}
+            {/* Velocity — only for planned sprints */}
+            {!isActive && (
+              <div>
+                <label className={labelClass}>Velocity <span className="text-subtle normal-case font-normal tracking-normal">(optional)</span></label>
+                <input type="number" value={velocity} onChange={(e) => setVelocity(e.target.value)} min={1} max={100} className={inputClass} placeholder="e.g. 21" />
+              </div>
+            )}
 
             {error && (
               <div className="flex items-start gap-2.5 p-3.5 rounded-xl border border-error-border bg-error-light">
