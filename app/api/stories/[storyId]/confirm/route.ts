@@ -173,9 +173,9 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
     );
 
   const today = new Date().toISOString().split("T")[0];
-  const isActive = sprint.start_date <= today && sprint.end_date >= today;
+  const isActiveOrExpired = sprint.start_date <= today;
 
-  if (!isActive)
+  if (!isActiveOrExpired)
     return NextResponse.json(
       { error: "Zgodba ni v aktivnem sprintu." },
       { status: 400 },

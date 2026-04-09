@@ -51,9 +51,11 @@ const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
 const lastWeek = new Date(Date.now() - 7 * 86400000)
   .toISOString()
   .split("T")[0];
+const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
 
 const activeSprint = { start_date: yesterday, end_date: tomorrow };
-const inactiveSprint = { start_date: lastWeek, end_date: yesterday };
+// "inactive" for this endpoint means sprint hasn't started yet (start_date > today)
+const inactiveSprint = { start_date: tomorrow, end_date: nextWeek };
 
 const readyStory = {
   id: "story-1",

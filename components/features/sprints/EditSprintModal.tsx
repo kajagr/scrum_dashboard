@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Sprint } from "@/lib/types";
+import { formatDateDot } from "@/lib/datetime";
 
 interface EditSprintModalProps {
   isOpen: boolean;
@@ -26,6 +27,8 @@ export default function EditSprintModal({
   const [loading, setLoading] = useState(false);
 
   const isActive = sprint?.status === "active";
+  const startPickerRef = useRef<HTMLInputElement>(null);
+  const endPickerRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (sprint) {
@@ -44,14 +47,30 @@ export default function EditSprintModal({
 
     if (velocity) {
       const v = Number(velocity);
-      if (!Number.isFinite(v) || v <= 0) { setError("Hitrost mora biti pozitivno število."); return; }
-      if (v > 100) { setError("Hitrost je previsoka (max 100)."); return; }
+      if (!Number.isFinite(v) || v <= 0) {
+        setError("Velocity must be a positive number.");
+        return;
+      }
+      if (!Number.isInteger(v)) {
+        setError("Velocity must be a whole number (story points).");
+        return;
+      }
+      if (v > 100) {
+        setError("Velocity is too high (maximum 100).");
+        return;
+      }
     }
 
     if (!isActive) {
       const today = new Date().toISOString().split("T")[0];
-      if (startDate < today) { setError("Začetni datum ne sme biti v preteklosti."); return; }
-      if (endDate <= startDate) { setError("Končni datum mora biti po začetnem datumu."); return; }
+      if (startDate < today) {
+        setError("Start date cannot be in the past.");
+        return;
+      }
+      if (endDate <= startDate) {
+        setError("End date must be after the start date.");
+        return;
+      }
     }
 
     setLoading(true);
@@ -61,23 +80,25 @@ export default function EditSprintModal({
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(
-          // isActive
-          //   ? { velocity: velocity ? Number(velocity) : null }
-          //   : {
-          //       name,
-          //       goal: goal || null,
-          //       start_date: startDate,
-          //       end_date: endDate,
-          //       velocity: velocity ? Number(velocity) : null,
-          //     }
-          { name, goal: goal || null, start_date: startDate, end_date: endDate, velocity: velocity ? Number(velocity) : null }
+          isActive
+            ? { velocity: velocity ? Number(velocity) : null }
+            : {
+                name,
+                goal: goal || null,
+                start_date: startDate,
+                end_date: endDate,
+                velocity: velocity ? Number(velocity) : null,
+              },
         ),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || "Napaka pri posodabljanju sprinta."); return; }
+      if (!res.ok) {
+        setError(data.error || "Failed to update sprint.");
+        return;
+      }
       onClose();
     } catch {
-      setError("Napaka pri povezavi s strežnikom.");
+      setError("Server connection error.");
     } finally {
       setLoading(false);
     }
@@ -101,7 +122,7 @@ export default function EditSprintModal({
               {isActive && (
                 <p className="text-xs text-muted mt-1 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
-                  Active — sprint cannot be edited
+                  Active — only velocity can be edited
                 </p>
               )}
             </div>
@@ -125,11 +146,73 @@ export default function EditSprintModal({
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className={labelClass}>Start date <span className="text-error normal-case font-normal tracking-normal">*</span></label>
-                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required className={inputClass} />
+                    <div className="relative mt-1">
+                      <input
+                        type="text"
+                        readOnly
+                        value={startDate ? formatDateDot(startDate) : ""}
+                        placeholder="DD.MM.YYYY"
+                        onClick={() => startPickerRef.current?.showPicker()}
+                        className={`${inputClass} cursor-pointer pr-10`}
+                      />
+                      <input
+                        ref={startPickerRef}
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        tabIndex={-1}
+                        required
+                      />
+                      <svg
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                    </div>
                   </div>
                   <div>
                     <label className={labelClass}>End date <span className="text-error normal-case font-normal tracking-normal">*</span></label>
-                    <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required className={inputClass} />
+                    <div className="relative mt-1">
+                      <input
+                        type="text"
+                        readOnly
+                        value={endDate ? formatDateDot(endDate) : ""}
+                        placeholder="DD.MM.YYYY"
+                        onClick={() => endPickerRef.current?.showPicker()}
+                        className={`${inputClass} cursor-pointer pr-10`}
+                      />
+                      <input
+                        ref={endPickerRef}
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        tabIndex={-1}
+                        required
+                      />
+                      <svg
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                    </div>
                   </div>
                 </div>
               </>
@@ -140,13 +223,32 @@ export default function EditSprintModal({
               <label className={labelClass}>Velocity <span className="text-subtle normal-case font-normal tracking-normal">(optional)</span></label>
               <input type="number" value={velocity} onChange={(e) => setVelocity(e.target.value)} min={1} max={100} className={inputClass} placeholder="e.g. 21" autoFocus={isActive} />
             </div> */}
-            {/* Velocity — only for planned sprints */}
-            {!isActive && (
-              <div>
-                <label className={labelClass}>Velocity <span className="text-subtle normal-case font-normal tracking-normal">(optional)</span></label>
-                <input type="number" value={velocity} onChange={(e) => setVelocity(e.target.value)} min={1} max={100} className={inputClass} placeholder="e.g. 21" />
-              </div>
-            )}
+            {/* Velocity — planned + active (active is velocity-only) */}
+            <div>
+              <label className={labelClass}>
+                Velocity{" "}
+                <span className="text-subtle normal-case font-normal tracking-normal">
+                  (optional)
+                </span>
+              </label>
+              <input
+                type="number"
+                value={velocity}
+                onChange={(e) => setVelocity(e.target.value)}
+                min={1}
+                max={100}
+                step={1}
+                className={inputClass}
+                placeholder="e.g. 21"
+                autoFocus={isActive}
+              />
+              {isActive && (
+                <p className="mt-1 text-xs text-subtle">
+                  You can lower velocity only while no user stories are assigned to this
+                  sprint. If stories are assigned, velocity cannot be decreased.
+                </p>
+              )}
+            </div>
 
             {error && (
               <div className="flex items-start gap-2.5 p-3.5 rounded-xl border border-error-border bg-error-light">

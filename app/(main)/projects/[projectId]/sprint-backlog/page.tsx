@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import StoryDetailModal from "@/components/features/board/StoryDetailModal";
 import SprintBoardHelpTooltip from "@/components/features/board/SprintBoardHelpTooltip";
+import { formatDateDot } from "@/lib/datetime";
 
 type Story = {
   id: string;
@@ -208,7 +209,7 @@ export default function SprintBoardPage() {
       if (backlogRes.ok) {
         const data = await backlogRes.json();
         setActiveSprint(data.activeSprint);
-        const assigned = data.assigned ?? [];
+        const assigned = (data.assigned ?? []).filter((s: any) => !s.unfinished_sprint_info);
         setStories(assigned);
         if (assigned.length > 0)
           await fetchTasks(assigned.map((s: Story) => s.id));
@@ -468,16 +469,9 @@ export default function SprintBoardPage() {
               </span>
             </div>
             <span className="text-xs text-muted">
-              {new Date(activeSprint.start_date).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-              })}
+              {formatDateDot(activeSprint.start_date)}
               {" – "}
-              {new Date(activeSprint.end_date).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })}
+              {formatDateDot(activeSprint.end_date)}
             </span>
             <div className="ml-auto flex items-center gap-4 text-xs text-muted">
               <span>

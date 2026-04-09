@@ -101,6 +101,8 @@ function setupPutMocks(
     sprint?: any;
     overlapping?: any[];
     updateResult?: any;
+    /** When set on an active sprint, cnt=3 is user_stories count; cnt=4 is update (if count allows). */
+    activeStoryCount?: number;
   } = {},
 ) {
   const {
@@ -108,6 +110,7 @@ function setupPutMocks(
     sprint = plannedSprint,
     overlapping = [],
     updateResult = { data: { id: "sprint-1", ...validPutBody }, error: null },
+    activeStoryCount,
   } = overrides;
 
   // Determine sprint state the same way the route does
@@ -132,9 +135,17 @@ function setupPutMocks(
       });
     // 2. sprint fetch
     if (cnt === 2) return makeReadChain({ data: sprint, error: null });
-    // Active sprints skip the overlap check, so cnt=3 goes straight to update.
+    // Active: optional user_stories count (when lowering velocity with stories check)
+    if (isActive && cnt === 3 && activeStoryCount !== undefined) {
+      return {
+        select: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        is: jest.fn().mockResolvedValue({ count: activeStoryCount, error: null }),
+      };
+    }
+    // Active sprints skip the overlap check, so cnt=3 goes straight to update (unless count above).
     // Planned sprints do the overlap check at cnt=3, then update at cnt=4.
-    if (isActive) return updateChain; // cnt=3 for active
+    if (isActive) return updateChain; // cnt=3 or cnt=4 for active
     if (cnt === 3)
       // overlap for planned
       return makeReadChain({ data: overlapping, error: null });
@@ -202,6 +213,26 @@ describe("PUT /api/projects/:projectId/sprints/:sprintId — vzdrževanje sprint
     expect(res.status).toBe(200);
   });
 
+  it("200 — active sprint: can lower velocity when no stories assigned", async () => {
+    setupPutMocks({
+      sprint: { ...activeSprint, velocity: 20 },
+      activeStoryCount: 0,
+    });
+    const res = await PUT(makePutRequest({ velocity: 10 }), makeContext());
+    expect(res.status).toBe(200);
+  });
+
+  it("400 — active sprint: cannot lower velocity when stories are assigned", async () => {
+    setupPutMocks({
+      sprint: { ...activeSprint, velocity: 20 },
+      activeStoryCount: 2,
+    });
+    const res = await PUT(makePutRequest({ velocity: 10 }), makeContext());
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toMatch(/cannot be decreased|user stories/i);
+  });
+
   // ─── Validacija datumov ───────────────────────────────────────────────────
   it("400 — končni datum pred začetnim", async () => {
     setupPutMocks();
@@ -215,7 +246,7 @@ describe("PUT /api/projects/:projectId/sprints/:sprintId — vzdrževanje sprint
     );
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/končni datum/i);
+    expect(body.error).toMatch(/končni datum|end date/i);
   });
 
   it("400 — začetni datum v preteklosti", async () => {
@@ -230,7 +261,7 @@ describe("PUT /api/projects/:projectId/sprints/:sprintId — vzdrževanje sprint
     );
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/preteklosti/i);
+    expect(body.error).toMatch(/preteklosti|past/i);
   });
 
   it("400 — zaključenega sprinta ni mogoče urejati", async () => {
@@ -238,7 +269,7 @@ describe("PUT /api/projects/:projectId/sprints/:sprintId — vzdrževanje sprint
     const res = await PUT(makePutRequest(validPutBody), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/zaključenega/i);
+    expect(body.error).toMatch(/zaključenega|completed sprint/i);
   });
 
   // ─── Prekrivanje ──────────────────────────────────────────────────────────
@@ -247,7 +278,7 @@ describe("PUT /api/projects/:projectId/sprints/:sprintId — vzdrževanje sprint
     const res = await PUT(makePutRequest(validPutBody), makeContext());
     expect(res.status).toBe(409);
     const body = await res.json();
-    expect(body.error).toMatch(/prekriva/i);
+    expect(body.error).toMatch(/prekriva|overlaps/i);
   });
 
   // ─── Hitrost ──────────────────────────────────────────────────────────────
@@ -259,7 +290,7 @@ describe("PUT /api/projects/:projectId/sprints/:sprintId — vzdrževanje sprint
     );
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/hitrost/i);
+    expect(body.error).toMatch(/hitrost|velocity/i);
   });
 
   it("400 — hitrost previsoka (> 100)", async () => {
@@ -270,7 +301,7 @@ describe("PUT /api/projects/:projectId/sprints/:sprintId — vzdrževanje sprint
     );
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/previsoka/i);
+    expect(body.error).toMatch(/previsoka|too high/i);
   });
 
   // ─── Pravice ──────────────────────────────────────────────────────────────
@@ -287,7 +318,7 @@ describe("PUT /api/projects/:projectId/sprints/:sprintId — vzdrževanje sprint
     const res = await PUT(makePutRequest(validPutBody), makeContext());
     expect(res.status).toBe(404);
     const body = await res.json();
-    expect(body.error).toMatch(/ne obstaja/i);
+    expect(body.error).toMatch(/ne obstaja|does not exist/i);
   });
 
   it("401 — neprijavljen uporabnik", async () => {
@@ -312,7 +343,7 @@ describe("DELETE /api/projects/:projectId/sprints/:sprintId — brisanje sprinta
     const res = await DELETE(makeDeleteRequest(), makeContext());
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.message).toMatch(/uspešno izbrisan/i);
+    expect(body.message).toMatch(/uspešno izbrisan|successfully deleted/i);
   });
 
   it("400 — aktivnega sprinta ni mogoče izbrisati", async () => {
@@ -320,7 +351,7 @@ describe("DELETE /api/projects/:projectId/sprints/:sprintId — brisanje sprinta
     const res = await DELETE(makeDeleteRequest(), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/že začel/i);
+    expect(body.error).toMatch(/že začel|already started/i);
   });
 
   it("400 — zaključenega sprinta ni mogoče izbrisati", async () => {
@@ -328,7 +359,7 @@ describe("DELETE /api/projects/:projectId/sprints/:sprintId — brisanje sprinta
     const res = await DELETE(makeDeleteRequest(), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/že začel/i);
+    expect(body.error).toMatch(/že začel|already started/i);
   });
 
   it("403 — developer ne more brisati sprinta", async () => {
@@ -344,7 +375,7 @@ describe("DELETE /api/projects/:projectId/sprints/:sprintId — brisanje sprinta
     const res = await DELETE(makeDeleteRequest(), makeContext());
     expect(res.status).toBe(404);
     const body = await res.json();
-    expect(body.error).toMatch(/ne obstaja/i);
+    expect(body.error).toMatch(/ne obstaja|does not exist/i);
   });
 
   it("401 — neprijavljen uporabnik", async () => {

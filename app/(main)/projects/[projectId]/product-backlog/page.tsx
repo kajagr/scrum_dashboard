@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import CreateStoryModal from "@/components/features/stories/CreateStoryModal";
 import BacklogHelpTooltip from "@/components/features/stories/BacklogHelpTooltip";
 import type { UserStory } from "@/lib/types";
 import EditStoryModal from "@/components/features/stories/EditStoryModal";
 import CommentsModal from "@/components/features/stories/CommentsModal";
+import { formatDateDot } from "@/lib/datetime";
 
 type SortKey = "created_at" | "business_value" | "priority";
 type TabKey = "unassigned" | "assigned" | "ready" | "realized" | "future";
@@ -47,6 +48,99 @@ type BacklogResponse = {
   unassigned: UserStory[];
 };
 
+// Extended UserStory type with optional unfinished sprint info from backend
+type UserStoryWithSprintInfo = UserStory & {
+  unfinished_sprint_info?: {
+    sprint_name: string;
+    days_ago: number;
+  };
+  realized_sprint_info?: {
+    sprint_name: string;
+  };
+};
+
+// ── Sprint Filter Dropdown ───────────────────────────────────────────────────
+function SprintFilterDropdown({
+  sprints,
+  selected,
+  onChange,
+}: {
+  sprints: string[];
+  selected: Set<string>;
+  onChange: (s: Set<string>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const toggle = (name: string) => {
+    const next = new Set(selected);
+    next.has(name) ? next.delete(name) : next.add(name);
+    onChange(next);
+  };
+
+  const label = selected.size === 0
+    ? "All sprints"
+    : selected.size === 1
+    ? [...selected][0]
+    : `${selected.size} sprints selected`;
+
+  return (
+    <div className="relative mb-4" ref={ref}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-surface text-xs font-medium text-foreground hover:border-primary transition-colors"
+      >
+        <svg className="w-3.5 h-3.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+        </svg>
+        {label}
+        {selected.size > 0 && (
+          <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-primary text-white">{selected.size}</span>
+        )}
+        <svg className={`w-3 h-3 text-muted transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-1.5 z-50 w-52 rounded-xl border border-border bg-surface shadow-lg overflow-hidden">
+          <div className="px-3 py-2 border-b border-border flex items-center justify-between">
+            <span className="text-xs font-semibold text-muted uppercase tracking-widest">Filter by sprint</span>
+            {selected.size > 0 && (
+              <button onClick={() => onChange(new Set())} className="text-xs text-primary hover:underline ml-2">Clear</button>
+            )}
+          </div>
+          {sprints.map((name) => (
+            <button
+              key={name}
+              onClick={() => toggle(name)}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-medium text-left hover:bg-background transition-colors"
+            >
+              <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors
+                ${selected.has(name) ? "bg-primary border-primary" : "border-subtle"}`}>
+                {selected.has(name) && (
+                  <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </div>
+              <span className={selected.has(name) ? "text-foreground font-semibold" : "text-muted"}>{name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Story Card ────────────────────────────────────────────────────────────────
 function StoryCard({
   story,
@@ -67,7 +161,7 @@ function StoryCard({
   onJoinPoker,
   activeSessionId,
 }: {
-  story: UserStory;
+  story: UserStoryWithSprintInfo;
   selectable?: boolean;
   selected?: boolean;
   onToggle?: () => void;
@@ -219,6 +313,15 @@ function StoryCard({
             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.pill}`}>
               {status.label}
             </span>
+            {/* Shown when story was not confirmed/rejected before sprint ended */}
+            {story.realized_sprint_info && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[rgba(52,211,153,0.12)] text-[#34D399] border border-[rgba(52,211,153,0.25)]">
+                <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                {story.realized_sprint_info.sprint_name}
+              </span>
+            )}
           </div>
           {actionError && (
             <p className="text-xs text-error mt-1">{actionError}</p>
@@ -258,7 +361,7 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "priority", label: "Priority" },
 ];
 
-function useSorted(stories: UserStory[], sortBy: SortKey) {
+function useSorted(stories: UserStoryWithSprintInfo[], sortBy: SortKey) {
   return useMemo(
     () =>
       [...stories].sort((a, b) => {
@@ -280,9 +383,9 @@ export default function BacklogPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeSprint, setActiveSprint] = useState<SprintInfo | null>(null);
-  const [realized, setRealized] = useState<UserStory[]>([]);
-  const [assigned, setAssigned] = useState<UserStory[]>([]);
-  const [unassigned, setUnassigned] = useState<UserStory[]>([]);
+  const [realized, setRealized] = useState<UserStoryWithSprintInfo[]>([]);
+  const [assigned, setAssigned] = useState<UserStoryWithSprintInfo[]>([]);
+  const [unassigned, setUnassigned] = useState<UserStoryWithSprintInfo[]>([]);
   const [activeTab, setActiveTab] = useState<TabKey>("unassigned");
   const [sortBy, setSortBy] = useState<SortKey>("created_at");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -301,6 +404,7 @@ export default function BacklogPage() {
   const [rejectComment, setRejectComment] = useState("");
   const [rejectLoading, setRejectLoading] = useState(false);
   const [rejectError, setRejectError] = useState<string | null>(null);
+  const [filterSprints, setFilterSprints] = useState<Set<string>>(new Set());
 
   const loadBacklog = async () => {
     try {
@@ -501,13 +605,16 @@ export default function BacklogPage() {
 
   // Check if today is the last day of the active sprint
   const today = new Date().toISOString().split("T")[0];
-  const isLastDay = activeSprint?.end_date === today;
+  //const isLastDay = activeSprint?.end_date === today;
+  const isLastDay = true;
 
   const selectedPoints = selectedIds.reduce((sum, id) => {
     const story = unassigned.find((s) => s.id === id);
     return sum + (story?.story_points ?? 0);
   }, 0);
-  const assignedPoints = assigned.reduce((sum, s) => sum + (s.story_points ?? 0), 0);
+  const assignedPoints = assigned
+  .filter((s) => !s.unfinished_sprint_info)
+  .reduce((sum, s) => sum + (s.story_points ?? 0), 0);
   const remainingVelocity = activeSprint?.velocity != null ? activeSprint.velocity - assignedPoints : null;
   const exceedsVelocity = remainingVelocity != null && selectedPoints > remainingVelocity;
 
@@ -524,12 +631,22 @@ export default function BacklogPage() {
   const sortedReady = useSorted(readyStories, sortBy);
   const sortedRealized = useSorted(realized, sortBy);
 
+  const realizedSprints = [...new Set(
+    realized
+      .map((s) => (s as any).realized_sprint_info?.sprint_name)
+      .filter(Boolean) as string[]
+  )];
+
+  const filteredRealized = filterSprints.size > 0
+    ? sortedRealized.filter((s) => filterSprints.has((s as any).realized_sprint_info?.sprint_name))
+    : sortedRealized;
+
   const currentList =
     activeTab === "unassigned" ? sortedUnassigned
     : activeTab === "assigned" ? sortedInSprint
     : activeTab === "ready" ? sortedReady
     : activeTab === "future" ? sortedWontHave
-    : sortedRealized;
+    : filteredRealized;
 
   const totalStories = realized.length + assigned.length + unassigned.length;
 
@@ -615,9 +732,9 @@ export default function BacklogPage() {
             {activeSprint.velocity != null && (
               <span>Velocity: <span className="text-foreground font-medium">{assignedPoints}/{activeSprint.velocity} pts</span></span>
             )}
-            {new Date(activeSprint.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+            {formatDateDot(activeSprint.start_date)}
             {" – "}
-            {new Date(activeSprint.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+            {formatDateDot(activeSprint.end_date)}
           </span>
         </div>
       ) : (
@@ -641,54 +758,26 @@ export default function BacklogPage() {
       {/* Tabs + Sort */}
       <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
         <div className="flex items-center gap-1 p-1 rounded-xl bg-surface border border-border flex-wrap">
-          {/* Unassigned */}
-          <button
-            onClick={() => switchTab("unassigned")}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "unassigned" ? "bg-primary-light text-primary border border-primary-border shadow-sm" : "text-muted hover:text-foreground"}`}
-          >
+          <button onClick={() => switchTab("unassigned")} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "unassigned" ? "bg-primary-light text-primary border border-primary-border shadow-sm" : "text-muted hover:text-foreground"}`}>
             Unassigned
             <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${activeTab === "unassigned" ? "bg-primary text-white" : "bg-border text-muted"}`}>{unassignedRegular.length}</span>
           </button>
-
-          {/* In active sprint */}
-          <button
-            onClick={() => switchTab("assigned")}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "assigned" ? "bg-primary-light text-primary border border-primary-border shadow-sm" : "text-muted hover:text-foreground"}`}
-          >
+          <button onClick={() => switchTab("assigned")} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "assigned" ? "bg-primary-light text-primary border border-primary-border shadow-sm" : "text-muted hover:text-foreground"}`}>
             In active sprint
             <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${activeTab === "assigned" ? "bg-primary text-white" : "bg-border text-muted"}`}>{inSprintStories.length}</span>
           </button>
-
-          {/* Ready for review */}
-          <button
-            onClick={() => switchTab("ready")}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "ready" ? "bg-primary-light text-primary border border-primary-border shadow-sm" : "text-muted hover:text-foreground"}`}
-          >
+          <button onClick={() => switchTab("ready")} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "ready" ? "bg-primary-light text-primary border border-primary-border shadow-sm" : "text-muted hover:text-foreground"}`}>
             Ready for review
-            {readyStories.length > 0 && (
-              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${activeTab === "ready" ? "bg-primary text-white" : "bg-primary text-white"}`}>{readyStories.length}</span>
-            )}
-            {readyStories.length === 0 && (
-              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${activeTab === "ready" ? "bg-primary text-white" : "bg-border text-muted"}`}>0</span>
-            )}
+            {readyStories.length > 0 && <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${activeTab === "ready" ? "bg-primary text-white" : "bg-primary text-white"}`}>{readyStories.length}</span>}
+            {readyStories.length === 0 && <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${activeTab === "ready" ? "bg-primary text-white" : "bg-border text-muted"}`}>0</span>}
           </button>
-
-          {/* Done */}
-          <button
-            onClick={() => switchTab("realized")}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "realized" ? "bg-primary-light text-primary border border-primary-border shadow-sm" : "text-muted hover:text-foreground"}`}
-          >
+          <button onClick={() => switchTab("realized")} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "realized" ? "bg-primary-light text-primary border border-primary-border shadow-sm" : "text-muted hover:text-foreground"}`}>
             Done
             <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${activeTab === "realized" ? "bg-primary text-white" : "bg-border text-muted"}`}>{realized.length}</span>
           </button>
-
-          {/* Future releases */}
           <div className="flex items-center gap-1">
             <div className="w-px h-4 bg-border mx-1" />
-            <button
-              onClick={() => switchTab("future")}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "future" ? "bg-primary-light text-primary border border-primary-border shadow-sm" : "text-muted hover:text-foreground"}`}
-            >
+            <button onClick={() => switchTab("future")} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "future" ? "bg-primary-light text-primary border border-primary-border shadow-sm" : "text-muted hover:text-foreground"}`}>
               Future Releases
               <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${activeTab === "future" ? "bg-primary text-white" : "bg-border text-muted"}`}>{unassignedWontHave.length}</span>
             </button>
@@ -700,11 +789,7 @@ export default function BacklogPage() {
             <span className="text-xs text-subtle">Sort by:</span>
             <div className="flex items-center gap-1 p-1 rounded-xl bg-surface border border-border">
               {SORT_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => setSortBy(opt.value)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${sortBy === opt.value ? "bg-primary-light text-primary border border-primary-border shadow-sm" : "text-muted hover:text-foreground"}`}
-                >
+                <button key={opt.value} onClick={() => setSortBy(opt.value)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${sortBy === opt.value ? "bg-primary-light text-primary border border-primary-border shadow-sm" : "text-muted hover:text-foreground"}`}>
                   {opt.label}
                 </button>
               ))}
@@ -721,7 +806,7 @@ export default function BacklogPage() {
           </svg>
           {isLastDay
             ? <span className="text-primary font-medium">Today is the last day of the sprint — you can confirm or reject stories below.</span>
-            : <span>Confirm and reject buttons are available on the last day of the sprint ({new Date(activeSprint?.end_date ?? "").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}).</span>
+            : <span>Confirm and reject buttons are available on the last day of the sprint ({formatDateDot(activeSprint?.end_date ?? "")}).</span>
           }
         </div>
       )}
@@ -746,6 +831,15 @@ export default function BacklogPage() {
             </span>
           )}
         </div>
+      )}
+
+      {/* Sprint filter for Done tab — multi-select dropdown */}
+      {activeTab === "realized" && realizedSprints.length > 0 && (
+        <SprintFilterDropdown
+          sprints={realizedSprints}
+          selected={filterSprints}
+          onChange={setFilterSprints}
+        />
       )}
 
       {/* Story list */}

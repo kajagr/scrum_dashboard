@@ -45,6 +45,23 @@ const ROLES = [
   { value: "admin" as const, label: "Admin", desc: "Full system access", icon: "M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" },
 ] as const;
 
+// ── Password strength ─────────────────────────────────────────────────────────
+function getPasswordStrength(password: string): { score: number; label: string; color: string; bg: string } {
+  if (!password) return { score: 0, label: "", color: "", bg: "" };
+  let score = 0;
+  if (password.length >= 12) score++;
+  if (password.length >= 16) score++;
+  if (/[A-Z]/.test(password)) score++;
+  if (/[0-9]/.test(password)) score++;
+  if (/[^A-Za-z0-9]/.test(password)) score++;
+
+  if (score <= 1) return { score: 1, label: "Very weak", color: "bg-error", bg: "bg-error-light" };
+  if (score === 2) return { score: 2, label: "Weak", color: "bg-error", bg: "bg-error-light" };
+  if (score === 3) return { score: 3, label: "Fair", color: "bg-accent", bg: "bg-accent-light" };
+  if (score === 4) return { score: 4, label: "Strong", color: "bg-primary", bg: "bg-primary-light" };
+  return { score: 5, label: "Very strong", color: "bg-[#34D399]", bg: "bg-[rgba(52,211,153,0.12)]" };
+}
+
 export default function EditUserModal({ isOpen, onClose, user }: EditUserModalProps) {
   const [formData, setFormData] = useState<FormData>({
     username: "", firstName: "", lastName: "", email: "", systemRole: "user", password: "",
@@ -164,6 +181,8 @@ export default function EditUserModal({ isOpen, onClose, user }: EditUserModalPr
     }`;
   const labelClass = "block text-xs font-semibold tracking-widest uppercase text-primary";
 
+  const strength = getPasswordStrength(formData.password);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 backdrop-blur-sm bg-foreground/20" onClick={handleClose} />
@@ -258,6 +277,51 @@ export default function EditUserModal({ isOpen, onClose, user }: EditUserModalPr
                   <EyeIcon show={showPassword} />
                 </button>
               </div>
+
+              {/* Password strength meter */}
+              {formData.password.length > 0 && (
+                <div className="mt-2">
+                  <div className="flex gap-1 mb-1">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div
+                        key={i}
+                        className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+                          i <= strength.score ? strength.color : "bg-border"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className={`text-xs font-medium ${
+                      strength.score <= 2 ? "text-error" :
+                      strength.score === 3 ? "text-accent-text" :
+                      strength.score === 4 ? "text-primary" : "text-[#34D399]"
+                    }`}>
+                      {strength.label}
+                    </p>
+                    <p className="text-xs text-subtle">{formData.password.length} chars</p>
+                  </div>
+                  {/* Hints */}
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {[
+                      { ok: formData.password.length >= 12, label: "12+ chars" },
+                      { ok: /[A-Z]/.test(formData.password), label: "Uppercase" },
+                      { ok: /[0-9]/.test(formData.password), label: "Number" },
+                      { ok: /[^A-Za-z0-9]/.test(formData.password), label: "Symbol" },
+                    ].map(({ ok, label }) => (
+                      <span
+                        key={label}
+                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                          ok ? "bg-[rgba(52,211,153,0.12)] text-[#34D399] border border-[rgba(52,211,153,0.25)]" : "bg-border text-subtle border border-border"
+                        }`}
+                      >
+                        {ok ? "✓" : "·"} {label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {errors.password && <p className="text-xs text-error mt-1">{errors.password}</p>}
             </div>
 

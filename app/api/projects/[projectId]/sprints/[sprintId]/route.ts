@@ -110,17 +110,17 @@ async function requireScrumMaster(
  *                   type: string
  *                   examples:
  *                     completed:
- *                       value: "Zaključenega sprinta ni mogoče urejati."
+ *                       value: "A completed sprint cannot be edited."
  *                     missingFields:
- *                       value: "name, start_date in end_date so obvezni."
+ *                       value: "name, start_date and end_date are required."
  *                     pastStartDate:
- *                       value: "Začetni datum ne sme biti v preteklosti."
+ *                       value: "Start date must not be in the past."
  *                     invalidEndDate:
- *                       value: "Končni datum mora biti po začetnem datumu."
+ *                       value: "End date must be after start date."
  *                     invalidVelocity:
- *                       value: "Hitrost mora biti pozitivno število."
+ *                       value: "Velocity must be a positive number."
  *                     velocityTooHigh:
- *                       value: "Hitrost je previsoka."
+ *                       value: "Velocity is too high."
  *       401:
  *         description: User not authenticated
  *         content:
@@ -140,7 +140,7 @@ async function requireScrumMaster(
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Samo Scrum Master lahko ureja sprinte."
+ *                   example: "Only the Scrum Master can edit sprints."
  *       404:
  *         description: Sprint not found
  *         content:
@@ -150,7 +150,7 @@ async function requireScrumMaster(
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Sprint ne obstaja."
+ *                   example: "Sprint does not exist."
  *       409:
  *         description: Sprint dates overlap with another sprint
  *         content:
@@ -160,7 +160,7 @@ async function requireScrumMaster(
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Sprint se prekriva z obstoječim sprintom."
+ *                   example: "Sprint overlaps with an existing sprint."
  *       500:
  *         description: Internal server error
  *         content:
@@ -170,7 +170,7 @@ async function requireScrumMaster(
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Napaka pri posodabljanju sprinta."
+ *                   example: "Error updating sprint."
  */
 export async function PUT(req: NextRequest, { params }: RouteContext) {
   const supabase = await createClient();
@@ -185,19 +185,19 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
   const isScrumMaster = await requireScrumMaster(supabase, user.id, projectId);
   if (!isScrumMaster)
     return NextResponse.json(
-      { error: "Samo Scrum Master lahko ureja sprinte." },
+      { error: "Only the Scrum Master can edit sprints." },
       { status: 403 },
     );
 
   const { data: sprint } = await supabase
     .from("sprints")
-    .select("id, start_date, end_date")
+    .select("id, start_date, end_date, velocity")
     .eq("id", sprintId)
     .eq("project_id", projectId)
     .maybeSingle();
 
   if (!sprint)
-    return NextResponse.json({ error: "Sprint ne obstaja." }, { status: 404 });
+    return NextResponse.json({ error: "Sprint does not exist." }, { status: 404 });
 
   const today = getToday();
   const isActive = sprint.start_date <= today && sprint.end_date >= today;
@@ -205,7 +205,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
 
   if (isCompleted)
     return NextResponse.json(
-      { error: "Zaključenega sprinta ni mogoče urejati." },
+      { error: "A completed sprint cannot be edited." },
       { status: 400 },
     );
 
@@ -217,18 +217,50 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
     const velocityNumber = Number(velocity);
     if (!Number.isFinite(velocityNumber) || velocityNumber <= 0)
       return NextResponse.json(
-        { error: "Hitrost mora biti pozitivno število." },
+        { error: "Velocity must be a positive number." },
         { status: 400 },
       );
     if (velocityNumber > 100)
       return NextResponse.json(
-        { error: "Hitrost je previsoka." },
+        { error: "Velocity is too high." },
         { status: 400 },
       );
   }
 
-  // Active sprint — only velocity can change
+  // Active sprint — only velocity can change.
+  // Decreasing velocity is blocked only while the sprint has assigned user stories
+  // (nothing committed yet → lowering is allowed).
   if (isActive) {
+    if (velocity !== undefined && velocity !== null && velocity !== "") {
+      const v = Number(velocity);
+      const current = Number(sprint.velocity ?? 0);
+      if (Number.isFinite(v) && v < current) {
+        const { count, error: countError } = await supabase
+          .from("user_stories")
+          .select("id", { count: "exact", head: true })
+          .eq("sprint_id", sprintId)
+          .is("deleted_at", null);
+
+        if (countError) {
+          console.error("PUT /sprints/[sprintId] story count error:", countError);
+          return NextResponse.json(
+            { error: "Error checking sprint stories." },
+            { status: 500 },
+          );
+        }
+
+        if ((count ?? 0) > 0) {
+          return NextResponse.json(
+            {
+              error:
+                "Velocity cannot be decreased while the sprint has user stories assigned. Remove or reassign those stories first.",
+            },
+            { status: 400 },
+          );
+        }
+      }
+    }
+
     const { data, error } = await supabase
       .from("sprints")
       .update({ velocity: velocity ?? null })
@@ -239,7 +271,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
     if (error) {
       console.error("PUT /sprints/[sprintId] error:", error);
       return NextResponse.json(
-        { error: "Napaka pri posodabljanju sprinta." },
+        { error: "Error updating sprint." },
         { status: 500 },
       );
     }
@@ -251,19 +283,19 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
 
   if (!name || !start_date || !end_date)
     return NextResponse.json(
-      { error: "name, start_date in end_date so obvezni." },
+      { error: "name, start_date and end_date are required." },
       { status: 400 },
     );
 
   if (start_date < today)
     return NextResponse.json(
-      { error: "Začetni datum ne sme biti v preteklosti." },
+      { error: "Start date must not be in the past." },
       { status: 400 },
     );
 
   if (end_date <= start_date)
     return NextResponse.json(
-      { error: "Končni datum mora biti po začetnem datumu." },
+      { error: "End date must be after start date." },
       { status: 400 },
     );
 
@@ -281,7 +313,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
 
   if (overlapping && overlapping.length > 0)
     return NextResponse.json(
-      { error: "Sprint se prekriva z obstoječim sprintom." },
+      { error: "Sprint overlaps with an existing sprint." },
       { status: 409 },
     );
 
@@ -301,7 +333,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
   if (error) {
     console.error("PUT /sprints/[sprintId] error:", error);
     return NextResponse.json(
-      { error: "Napaka pri posodabljanju sprinta." },
+      { error: "Error updating sprint." },
       { status: 500 },
     );
   }
@@ -347,7 +379,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "Sprint je bil uspešno izbrisan."
+ *                   example: "Sprint was successfully deleted."
  *       400:
  *         description: Sprint has already started
  *         content:
@@ -357,7 +389,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Sprinta ni mogoče izbrisati, ker se je že začel."
+ *                   example: "Sprint cannot be deleted because it has already started."
  *       401:
  *         description: User not authenticated
  *         content:
@@ -377,7 +409,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Samo Scrum Master lahko briše sprinte."
+ *                   example: "Only the Scrum Master can delete sprints."
  *       404:
  *         description: Sprint not found
  *         content:
@@ -387,7 +419,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Sprint ne obstaja."
+ *                   example: "Sprint does not exist."
  *       500:
  *         description: Internal server error
  *         content:
@@ -397,7 +429,7 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: "Napaka pri brisanju sprinta."
+ *                   example: "Error deleting sprint."
  */
 export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const supabase = await createClient();
@@ -412,7 +444,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const isScrumMaster = await requireScrumMaster(supabase, user.id, projectId);
   if (!isScrumMaster)
     return NextResponse.json(
-      { error: "Samo Scrum Master lahko briše sprinte." },
+      { error: "Only the Scrum Master can delete sprints." },
       { status: 403 },
     );
 
@@ -424,12 +456,12 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
     .maybeSingle();
 
   if (!sprint)
-    return NextResponse.json({ error: "Sprint ne obstaja." }, { status: 404 });
+    return NextResponse.json({ error: "Sprint does not exist." }, { status: 404 });
 
   const today = getToday();
   if (sprint.start_date <= today)
     return NextResponse.json(
-      { error: "Sprinta ni mogoče izbrisati, ker se je že začel." },
+      { error: "Sprint cannot be deleted because it has already started." },
       { status: 400 },
     );
 
@@ -441,10 +473,10 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   if (error) {
     console.error("DELETE /sprints/[sprintId] error:", error);
     return NextResponse.json(
-      { error: "Napaka pri brisanju sprinta." },
+      { error: "Error deleting sprint." },
       { status: 500 },
     );
   }
 
-  return NextResponse.json({ message: "Sprint je bil uspešno izbrisan." });
+  return NextResponse.json({ message: "Sprint was successfully deleted." });
 }
