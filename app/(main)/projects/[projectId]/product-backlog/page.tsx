@@ -347,6 +347,26 @@ export default function BacklogPage() {
 
   useEffect(() => { void loadBacklog(); }, [projectId]);
 
+  const refreshPokerSessions = async () => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/poker`, { credentials: "include" });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.sessions) {
+        const map: Record<string, string> = {};
+        data.sessions.forEach((s: { user_story_id: string; id: string }) => {
+          map[s.user_story_id] = s.id;
+        });
+        setActivePokerSessions(map);
+      }
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => { void refreshPokerSessions(); }, 5000);
+    return () => clearInterval(interval);
+  }, [projectId]);
+
   const loadPokerSessions = async (stories: UserStory[]) => {
     const results = await Promise.all(
       stories.map(async (s) => {
