@@ -247,10 +247,8 @@ export default function PokerPage() {
       }
 
       setShowConfetti(true);
-
-      setTimeout(() => {
-        router.push(`/projects/${projectId}/product-backlog`);
-      }, 10000);
+      await fetchGameState();
+      setShowCompleteForm(false);
     } catch {
       setError("Napaka pri povezavi s strežnikom.");
     } finally {
@@ -264,6 +262,8 @@ export default function PokerPage() {
   const suggestedEstimate = gameState?.suggested_estimate ?? null;
   const isCompleted = gameState?.session.status === "completed";
   const currentRound = gameState?.session.current_round ?? 1;
+  const finalEstimate = gameState?.session.final_estimate ?? null;
+
   const canNextRound =
     isScrumMaster && allVoted && currentRound < 3 && suggestedEstimate === null;
   const canComplete =
@@ -300,6 +300,73 @@ export default function PokerPage() {
     );
   }
 
+  if (isCompleted) {
+    return (
+      <div className="p-6 relative min-h-[80vh] flex items-center justify-center">
+        {showConfetti && (
+          <div className="pointer-events-none fixed inset-0 z-50">
+            <Confetti
+              width={windowSize.width}
+              height={windowSize.height}
+              recycle={false}
+              numberOfPieces={500}
+              gravity={0.24}
+              tweenDuration={9000}
+              onConfettiComplete={() => setShowConfetti(false)}
+            />
+          </div>
+        )}
+
+        <div className="w-full max-w-2xl rounded-3xl border border-primary-border bg-surface shadow-xl p-8 text-center">
+          <p className="text-xs font-semibold tracking-[0.2em] uppercase text-primary mb-3">
+            Planning Poker Completed
+          </p>
+
+          <h1 className="text-3xl font-bold text-foreground mb-3">
+            Final Estimate
+          </h1>
+
+          <div className="mx-auto my-8 flex items-center justify-center">
+            <div className="min-w-[220px] min-h-[220px] rounded-full border-4 border-primary bg-primary-light flex items-center justify-center shadow-lg">
+              <span className="text-7xl md:text-8xl font-extrabold text-primary leading-none">
+                {finalEstimate ?? "-"}
+              </span>
+            </div>
+          </div>
+
+          <p className="text-base text-muted mb-6">
+            This story was completed with a final estimate of{" "}
+            <span className="font-bold text-foreground">
+              {finalEstimate ?? "-"} pts
+            </span>
+            .
+          </p>
+
+          {story && (
+            <div className="mb-6 rounded-2xl border border-border bg-background p-4 text-left">
+              <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-2">
+                Story
+              </p>
+              <h2 className="text-lg font-bold text-foreground mb-1">
+                {story.title}
+              </h2>
+              {story.description && (
+                <p className="text-sm text-muted">{story.description}</p>
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={() => router.push(`/projects/${projectId}/product-backlog`)}
+            className="px-6 py-3 text-sm font-semibold text-white rounded-xl bg-primary hover:bg-primary-hover transition-colors"
+          >
+            Back to backlog
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 relative">
       {showConfetti && (
@@ -325,9 +392,6 @@ export default function PokerPage() {
         </h1>
         <p className="text-sm text-muted mt-1">
           Round {currentRound} / 3
-          {isCompleted && (
-            <span className="ml-2 text-[#34D399]">· Completed</span>
-          )}
         </p>
       </div>
 
@@ -388,40 +452,36 @@ export default function PokerPage() {
             Glasovanje
           </p>
           <p className="text-sm text-muted mb-4">
-            {isCompleted
-              ? "Session completed."
-              : myVote !== null
-                ? "You voted. Waiting for other members."
-                : "Choose your estimate."}
+            {myVote !== null
+              ? "You voted. Waiting for other members."
+              : "Choose your estimate."}
           </p>
 
-          {!isCompleted && (
-            <div className="grid grid-cols-4 gap-2 mb-4">
-              {CARD_VALUES.map((val) => {
-                const isSelected = myVote === val;
+          <div className="grid grid-cols-4 gap-2 mb-4">
+            {CARD_VALUES.map((val) => {
+              const isSelected = myVote === val;
 
-                return (
-                  <button
-                    key={val}
-                    onClick={() => handleVote(val)}
-                    disabled={myVote !== null || voting}
-                    className={`
-                      aspect-[2/3] rounded-xl border-2 text-lg font-bold transition-all
-                      ${
-                        isSelected
-                          ? "border-primary bg-primary text-white shadow-lg scale-105"
-                          : myVote !== null
-                            ? "border-border bg-background text-muted opacity-50 cursor-not-allowed"
-                            : "border-border bg-background text-foreground hover:border-primary hover:bg-primary-light hover:text-primary cursor-pointer"
-                      }
-                    `}
-                  >
-                    {val === -1 ? "?" : val}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+              return (
+                <button
+                  key={val}
+                  onClick={() => handleVote(val)}
+                  disabled={myVote !== null || voting}
+                  className={`
+                    aspect-[2/3] rounded-xl border-2 text-lg font-bold transition-all
+                    ${
+                      isSelected
+                        ? "border-primary bg-primary text-white shadow-lg scale-105"
+                        : myVote !== null
+                          ? "border-border bg-background text-muted opacity-50 cursor-not-allowed"
+                          : "border-border bg-background text-foreground hover:border-primary hover:bg-primary-light hover:text-primary cursor-pointer"
+                    }
+                  `}
+                >
+                  {val === -1 ? "?" : val}
+                </button>
+              );
+            })}
+          </div>
 
           <div className="space-y-2">
             {myVote !== null && (
@@ -444,16 +504,12 @@ export default function PokerPage() {
             <div className="flex justify-between items-center p-3 rounded-lg bg-background border border-border">
               <span className="text-xs text-muted">Status</span>
               <span className="text-sm font-semibold text-foreground">
-                {isCompleted
-                  ? "Completed"
-                  : allVoted
-                    ? "All voted"
-                    : "Collecting votes"}
+                {allVoted ? "All voted" : "Collecting votes"}
               </span>
             </div>
           </div>
 
-          {canComplete && !isCompleted && (
+          {canComplete && (
             <div className="mt-4 p-4 rounded-xl border border-primary-border bg-primary-light">
               <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-2">
                 Suggested estimate
@@ -504,7 +560,7 @@ export default function PokerPage() {
             </div>
           )}
 
-          {canNextRound && !isCompleted && (
+          {canNextRound && (
             <div className="mt-4 p-4 rounded-xl border border-accent-border bg-accent-light">
               <p className="text-xs font-semibold tracking-widest uppercase text-accent-text mb-2">
                 All voted
