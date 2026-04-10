@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Confetti from "react-confetti";
 
@@ -68,9 +68,6 @@ export default function PokerPage() {
 
   const [showConfetti, setShowConfetti] = useState(false);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
-
-  const prevAllVotedRef = useRef(false);
-  const confettiTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchGameState = useCallback(async () => {
     try {
@@ -158,17 +155,6 @@ export default function PokerPage() {
   }, []);
 
   useEffect(() => {
-  const allVotedNow = !!gameState?.all_voted;
-  const justFinishedVoting = !prevAllVotedRef.current && allVotedNow;
-
-  if (justFinishedVoting) {
-    setShowConfetti(true);
-  }
-
-  prevAllVotedRef.current = allVotedNow;
-}, [gameState?.all_voted]);
-
-  useEffect(() => {
     const interval = setInterval(() => {
       void fetchGameState();
     }, 3000);
@@ -225,7 +211,6 @@ export default function PokerPage() {
       setFinalEstimateInput("");
       setShowCompleteForm(false);
       setShowConfetti(false);
-      prevAllVotedRef.current = false;
 
       await fetchGameState();
     } catch {
@@ -261,7 +246,11 @@ export default function PokerPage() {
         return;
       }
 
-      router.push(`/projects/${projectId}/product-backlog`);
+      setShowConfetti(true);
+
+      setTimeout(() => {
+        router.push(`/projects/${projectId}/product-backlog`);
+      }, 10000);
     } catch {
       setError("Napaka pri povezavi s strežnikom.");
     } finally {
@@ -314,20 +303,19 @@ export default function PokerPage() {
   return (
     <div className="p-6 relative">
       {showConfetti && (
-  <div className="pointer-events-none fixed inset-0 z-50">
-    <Confetti
-      width={windowSize.width}
-      height={windowSize.height}
-      recycle={false}
-      numberOfPieces={500}
-      gravity={0.24}
-      tweenDuration={9000}
-      onConfettiComplete={() => setShowConfetti(false)}
-    />
-  </div>
-)}
+        <div className="pointer-events-none fixed inset-0 z-50">
+          <Confetti
+            width={windowSize.width}
+            height={windowSize.height}
+            recycle={false}
+            numberOfPieces={500}
+            gravity={0.24}
+            tweenDuration={9000}
+            onConfettiComplete={() => setShowConfetti(false)}
+          />
+        </div>
+      )}
 
-      {/* Header */}
       <div className="mb-6">
         <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">
           Project
@@ -344,7 +332,6 @@ export default function PokerPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Leva kolona — člani */}
         <div className="rounded-xl border border-border bg-surface p-4">
           <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-3">
             Participants
@@ -396,7 +383,6 @@ export default function PokerPage() {
           </div>
         </div>
 
-        {/* Sredinska kolona — glasovanje */}
         <div className="rounded-xl border border-border bg-surface p-4">
           <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">
             Glasovanje
@@ -556,7 +542,6 @@ export default function PokerPage() {
           )}
         </div>
 
-        {/* Desna kolona — zgodba */}
         <div className="rounded-xl border border-border bg-surface p-4">
           <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-3">
             Story
