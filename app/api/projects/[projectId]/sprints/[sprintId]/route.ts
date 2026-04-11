@@ -234,27 +234,21 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
     if (velocity !== undefined && velocity !== null && velocity !== "") {
       const v = Number(velocity);
       const current = Number(sprint.velocity ?? 0);
-      if (Number.isFinite(v) && v < current) {
-        const { count, error: countError } = await supabase
+      
+      if (Number.isFinite(v)) {
+        const { data: sprintStories } = await supabase
           .from("user_stories")
-          .select("id", { count: "exact", head: true })
+          .select("story_points")
           .eq("sprint_id", sprintId)
           .is("deleted_at", null);
-
-        if (countError) {
-          console.error("PUT /sprints/[sprintId] story count error:", countError);
+      
+        const totalSP = (sprintStories ?? []).reduce(
+          (sum, s) => sum + (s.story_points ?? 0), 0
+        );
+      
+        if (v < totalSP) {
           return NextResponse.json(
-            { error: "Error checking sprint stories." },
-            { status: 500 },
-          );
-        }
-
-        if ((count ?? 0) > 0) {
-          return NextResponse.json(
-            {
-              error:
-                "Velocity cannot be decreased while the sprint has user stories assigned. Remove or reassign those stories first.",
-            },
+            { error: `Velocity cannot be lower than the total story points assigned to this sprint (${totalSP} pts).` },
             { status: 400 },
           );
         }

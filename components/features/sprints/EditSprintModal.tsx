@@ -30,6 +30,8 @@ export default function EditSprintModal({
   const startPickerRef = useRef<HTMLInputElement>(null);
   const endPickerRef = useRef<HTMLInputElement>(null);
 
+  const [minVelocity, setMinVelocity] = useState<number>(0);
+
   useEffect(() => {
     if (sprint) {
       setName(sprint.name);
@@ -38,6 +40,22 @@ export default function EditSprintModal({
       setEndDate(sprint.end_date);
       setVelocity(sprint.velocity?.toString() ?? "");
       setError(null);
+      setMinVelocity(0);
+
+      // Fetch assigned story points for active sprint
+      const today = new Date().toISOString().split("T")[0];
+      const isAct = sprint.start_date <= today && sprint.end_date >= today;
+      if (isAct) {
+        fetch(`/api/projects/${projectId}/backlog`, { credentials: "include" })
+          .then((r) => r.json())
+          .then((data) => {
+            const total = (data.assigned ?? [])
+              .filter((s: any) => !s.unfinished_sprint_info)
+              .reduce((sum: number, s: any) => sum + (s.story_points ?? 0), 0);
+            setMinVelocity(total);
+          })
+          .catch(() => {});
+      }
     }
   }, [sprint]);
 
@@ -242,10 +260,9 @@ export default function EditSprintModal({
                 placeholder="e.g. 21"
                 autoFocus={isActive}
               />
-              {isActive && (
+              {isActive && minVelocity > 0 && (
                 <p className="mt-1 text-xs text-subtle">
-                  You can lower velocity only while no user stories are assigned to this
-                  sprint. If stories are assigned, velocity cannot be decreased.
+                  Minimum velocity: {minVelocity} pts (total story points in sprint)
                 </p>
               )}
             </div>

@@ -812,15 +812,21 @@ export default function SprintBoardPage() {
                                             )}
                                             {task.assignee ? (
                                               <span className="flex items-center gap-1.5">
-                                                <span className="w-5 h-5 rounded-full bg-primary-light text-primary border border-primary-border flex items-center justify-center text-[9px] font-bold">
-                                                  {
-                                                    task.assignee
-                                                      .first_name?.[0]
-                                                  }
+                                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${
+                                                  (task.assignee as any).deleted_at
+                                                    ? "bg-border text-subtle border border-border"
+                                                    : "bg-primary-light text-primary border border-primary-border"
+                                                }`}>
+                                                  {task.assignee.first_name?.[0]}
                                                   {task.assignee.last_name?.[0]}
                                                 </span>
-                                                {task.assignee.first_name}{" "}
-                                                {task.assignee.last_name}
+                                                <span className={(task.assignee as any).deleted_at ? "text-subtle line-through" : ""}>
+                                                  {task.assignee.first_name}{" "}
+                                                  {task.assignee.last_name}
+                                                </span>
+                                                {(task.assignee as any).deleted_at && (
+                                                  <span className="text-[10px] text-subtle">(deleted)</span>
+                                                )}
                                               </span>
                                             ) : (
                                               <span className="flex items-center gap-1.5 text-subtle">
