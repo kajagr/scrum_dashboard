@@ -605,8 +605,8 @@ export default function BacklogPage() {
 
   // Check if today is the last day of the active sprint
   const today = new Date().toISOString().split("T")[0];
-  //const isLastDay = activeSprint?.end_date === today;
-  const isLastDay = true;
+  const isLastDay = activeSprint?.end_date === today;
+  // const isLastDay = true;
 
   const selectedPoints = selectedIds.reduce((sum, id) => {
     const story = unassigned.find((s) => s.id === id);
