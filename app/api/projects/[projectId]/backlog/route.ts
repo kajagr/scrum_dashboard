@@ -285,7 +285,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
     );
 
     const unfinishedFromPreviousSprint = (enrichedStories as any[]).filter(
-      (story) => story.unfinished_sprint_info && story.status !== "done",
+      (story) => story.unfinished_sprint_info && story.status === "ready",
+    );
+    
+    const unfinishedBacklog = (enrichedStories as any[]).filter(
+      (story) => story.unfinished_sprint_info && story.status !== "ready" && story.status !== "done",
     );
     
     const unassigned = (enrichedStories as any[]).filter(
@@ -295,7 +299,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         (!activeSprint ||
           !story.sprint_id ||
           story.sprint_id !== activeSprint.id),
-    );
+    ).concat(unfinishedBacklog);
 
     return NextResponse.json(
       {

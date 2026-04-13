@@ -112,7 +112,9 @@ export default function SprintCard({ sprint, onClick, canEdit, onEdit, onDelete 
             <span className="text-border">→</span>
             <span className="text-muted">{endDate}</span>
             <span className="text-border mx-1">·</span>
-            <span>{durationDays} days</span>
+            <span>
+              {durationDays} {durationDays === 1 ? "day" : "days"}
+            </span>
           </div>
 
           {sprint.velocity && (
