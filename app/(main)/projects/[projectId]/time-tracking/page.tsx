@@ -71,6 +71,7 @@ export default function TimeTrackingPage() {
   const [fromDate, setFromDate] = useState(() => getWeekRange(0).from);
   const [toDate, setToDate] = useState(() => getWeekRange(0).to);
   const [logs, setLogs] = useState<TimeLogEntry[]>([]);
+  const [assignedTasks, setAssignedTasks] = useState<TaskInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [weekOffset, setWeekOffsetState] = useState(0);
@@ -89,21 +90,28 @@ export default function TimeTrackingPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/users/me/timelogs?from_date=${fromDate}&to_date=${toDate}`,
-      );
-      if (!res.ok) {
-        const body = await res.json();
+      const [logsRes, tasksRes] = await Promise.all([
+        fetch(`/api/users/me/timelogs?from_date=${fromDate}&to_date=${toDate}`),
+        fetch(`/api/projects/${projectId}/my-tasks`),
+      ]);
+      if (!logsRes.ok) {
+        const body = await logsRes.json();
         setError(body.error ?? "Failed to load time logs.");
         return;
       }
-      setLogs(await res.json());
+      if (!tasksRes.ok) {
+        const body = await tasksRes.json();
+        setError(body.error ?? "Failed to load tasks.");
+        return;
+      }
+      setLogs(await logsRes.json());
+      setAssignedTasks(await tasksRes.json());
     } catch {
       setError("Failed to load time logs.");
     } finally {
       setLoading(false);
     }
-  }, [fromDate, toDate]);
+  }, [fromDate, toDate, projectId]);
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
@@ -112,6 +120,13 @@ export default function TimeTrackingPage() {
 
   const logMap = new Map<string, Map<string, TimeLogEntry>>();
   const taskMap = new Map<string, TaskInfo>();
+
+  // Seed taskMap with all assigned tasks so they always show
+  for (const t of assignedTasks) {
+    taskMap.set(t.id, t);
+  }
+
+  // Layer in log data (updates remaining_time from latest fetch and builds logMap)
   for (const log of logs) {
     if (!log.task) continue;
     taskMap.set(log.task_id, log.task);
@@ -309,8 +324,8 @@ export default function TimeTrackingPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
             </svg>
           </div>
-          <p className="font-semibold text-foreground mb-1">No time entries</p>
-          <p className="text-sm text-subtle">No hours logged in this period.</p>
+          <p className="font-semibold text-foreground mb-1">No tasks assigned</p>
+          <p className="text-sm text-subtle">You have no tasks assigned to you in this project.</p>
         </div>
       ) : (
         <div className="rounded-xl border border-border overflow-hidden">
@@ -346,7 +361,7 @@ export default function TimeTrackingPage() {
               <tbody>
                 {taskIds.map((taskId, i) => {
                   const task = taskMap.get(taskId)!;
-                  const taskLogs = logMap.get(taskId)!;
+                  const taskLogs = logMap.get(taskId) ?? new Map<string, TimeLogEntry>();
                   const rowTotal = Array.from(taskLogs.values()).reduce((s, l) => s + Number(l.hours), 0);
                   const isStoryDone = task.user_story?.status === "done";
                   const isEditingRem = editingRemaining === taskId;
