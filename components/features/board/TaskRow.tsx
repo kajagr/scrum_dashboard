@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import TaskTimeLogModal from "./TaskTimeLogModal";
 import type { Task } from "@/lib/types";
 
 export interface TaskWithAssignee extends Task {
@@ -46,6 +47,8 @@ interface TaskRowProps {
   locked?: boolean;
 }
 
+// ── Inline Time Log button — opens modal ────────────────────────────────────
+
 export default function TaskRow({
   task,
   currentUserId,
@@ -59,6 +62,7 @@ export default function TaskRow({
 }: TaskRowProps) {
   const [actionLoading, setActionLoading] = useState(false);
   const [resignConfirm, setResignConfirm] = useState(false);
+  const [timeLogOpen, setTimeLogOpen] = useState(false);
 
   const isMyTask = task.assignee_id === currentUserId && task.is_accepted;
   const isProposedToMe =
@@ -102,7 +106,8 @@ export default function TaskRow({
     }
   };
 
-  return (
+  const row = (
+
     <div
       className={`group flex items-start gap-3 p-3 rounded-xl border transition-all
         ${loading ? "opacity-50" : ""}
@@ -169,6 +174,15 @@ export default function TaskRow({
               {task.logged_hours ?? 0}h / {task.estimated_hours}h
             </span>
           )}
+          {task.remaining_time != null && !isDone && (
+            <span className="flex items-center gap-1 text-xs text-muted">
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" />
+                <circle cx="12" cy="12" r="9" />
+              </svg>
+              {task.remaining_time}h left
+            </span>
+          )}
           {isActive && (
             <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono font-medium bg-accent-light text-accent-text border border-accent-border">
               🔴 {elapsed}
@@ -208,9 +222,22 @@ export default function TaskRow({
             </span>
           )}
         </div>
+
+        {/* Time log button — only for my active/assigned tasks */}
+        {isMyTask && !isDone && !locked && (
+          <button
+            onClick={() => setTimeLogOpen(true)}
+            className="mt-2 flex items-center gap-1.5 text-xs font-medium text-muted hover:text-primary transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <circle cx="12" cy="12" r="9" /><path strokeLinecap="round" d="M12 7v5l3 3" />
+            </svg>
+            Log time / view history
+          </button>
+        )}
       </div>
 
-      {/* Action buttons — skrite ko je locked */}
+      {/* Action buttons */}
       {!locked && (
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {canAccept &&
@@ -275,5 +302,18 @@ export default function TaskRow({
         </div>
       )}
     </div>
+  );
+
+  return (
+    <>
+      {row}
+      {timeLogOpen && (
+        <TaskTimeLogModal
+          task={task}
+          onClose={() => setTimeLogOpen(false)}
+          onRefresh={onRefresh}
+        />
+      )}
+    </>
   );
 }

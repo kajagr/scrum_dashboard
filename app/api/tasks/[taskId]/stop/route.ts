@@ -110,7 +110,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const { data: task, error: taskError } = await supabase
       .from("tasks")
       .select(
-        "id, user_story_id, status, assignee_id, is_accepted, is_active, active_since",
+        "id, user_story_id, status, assignee_id, is_accepted, is_active, active_since, remaining_time",
       )
       .eq("id", taskId)
       .is("deleted_at", null)
@@ -191,6 +191,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
       ? allLogs.reduce((sum, log) => sum + Number(log.hours), 0)
       : 0;
 
+    const newRemaining =
+      task.remaining_time != null
+        ? Math.max(0, Number(task.remaining_time) - roundedHours)
+        : null;
+
     const { data: updatedTask, error: updateError } = await supabase
       .from("tasks")
       .update({
@@ -198,6 +203,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         active_since: null,
         status: "assigned",
         logged_hours: totalLoggedHours,
+        remaining_time: newRemaining,
         updated_at: now.toISOString(),
       })
       .eq("id", taskId)
