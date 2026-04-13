@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import ProfileModal from "@/components/features/profile/ProfileModal";
+import { formatDateDot, formatDateTimeDot } from "@/lib/datetime";
 
 interface UserProfile {
   first_name: string | null;
@@ -119,28 +120,14 @@ export default function Navbar() {
 
           <div className="text-right">
             <div className="text-sm text-[var(--color-muted)]">
-              {new Date().toLocaleDateString("en-US", {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
+              {new Date().toLocaleDateString("en-US", { weekday: "long" })},{" "}
+              {formatDateDot(new Date())}
             </div>
 
             {user && (
               <div className="text-xs text-[var(--color-subtle)] mt-0.5">
                 {user.last_login_at
-                  ? `Last login: ${new Date(user.last_login_at).toLocaleString(
-                      "sl-SI",
-                      {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        hour12: false,
-                      },
-                    )}`
+                  ? `Last login: ${formatDateTimeDot(user.last_login_at)}`
                   : "First login"}
               </div>
             )}

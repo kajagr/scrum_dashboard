@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRef, useState, useEffect } from "react";
 import type { Project } from "@/lib/types";
+import { formatDateDot } from "@/lib/datetime";
 
 type ProjectStatus = "active" | "on_hold" | "completed";
 
@@ -153,9 +154,7 @@ export default function ProjectCard({ project, onStatusChange }: ProjectCardProp
               <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
             <span>
-              Created {new Date(project.created_at).toLocaleDateString("sl-SI", {
-                day: "numeric", month: "short", year: "numeric",
-              })}
+              Created {formatDateDot(project.created_at)}
             </span>
           </div>
           <Link

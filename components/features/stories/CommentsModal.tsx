@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { formatDateTimeDot } from "@/lib/datetime";
 
 interface Author {
   id: string;
@@ -90,16 +91,6 @@ export default function CommentsModal({
     }
   }
 
-  function formatDate(iso: string) {
-    return new Date(iso).toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
@@ -180,7 +171,7 @@ export default function CommentsModal({
                         : "Unknown"}
                     </span>
                     <span className="text-[10px] text-subtle">
-                      {formatDate(c.created_at)}
+                      {formatDateTimeDot(c.created_at)}
                     </span>
                   </div>
                   <p className="text-sm text-foreground whitespace-pre-wrap break-words">

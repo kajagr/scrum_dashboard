@@ -1,4 +1,5 @@
 import type { Sprint } from "@/lib/types";
+import { formatDateDot } from "@/lib/datetime";
 
 interface SprintCardProps {
   sprint: Sprint;
@@ -27,12 +28,8 @@ const statusConfig = {
 };
 
 export default function SprintCard({ sprint, onClick, canEdit, onEdit, onDelete }: SprintCardProps) {
-  const startDate = new Date(sprint.start_date).toLocaleDateString("en-GB", {
-    day: "numeric", month: "short", year: "numeric",
-  });
-  const endDate = new Date(sprint.end_date).toLocaleDateString("en-GB", {
-    day: "numeric", month: "short", year: "numeric",
-  });
+  const startDate = formatDateDot(sprint.start_date);
+  const endDate = formatDateDot(sprint.end_date);
   const durationDays = Math.ceil(
     (new Date(sprint.end_date).getTime() - new Date(sprint.start_date).getTime()) /
     (1000 * 60 * 60 * 24)
@@ -42,8 +39,7 @@ export default function SprintCard({ sprint, onClick, canEdit, onEdit, onDelete 
   const cfg = statusConfig[status] ?? statusConfig.planned;
 
   const canModifyFull = canEdit && status === "planned";   // edit + delete
-  // const canModifyVelocity = canEdit && status === "active"; // edit only (velocity)
-  const canModifyVelocity = false; // velocity editing disabled
+  const canModifyVelocity = canEdit && status === "active"; // edit only (velocity)
 
   return (
     <div
@@ -116,7 +112,9 @@ export default function SprintCard({ sprint, onClick, canEdit, onEdit, onDelete 
             <span className="text-border">→</span>
             <span className="text-muted">{endDate}</span>
             <span className="text-border mx-1">·</span>
-            <span>{durationDays} days</span>
+            <span>
+              {durationDays} {durationDays === 1 ? "day" : "days"}
+            </span>
           </div>
 
           {sprint.velocity && (

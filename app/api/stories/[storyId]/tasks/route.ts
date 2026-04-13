@@ -442,7 +442,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .select(
         `
         *,
-        assignee:users(id, first_name, last_name, email)
+        assignee:users!assignee_id(id, first_name, last_name, email, deleted_at)
       `,
       )
       .single();

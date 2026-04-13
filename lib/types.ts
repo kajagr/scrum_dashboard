@@ -67,6 +67,10 @@ export interface UserStory {
   created_at: string;
   updated_at: string;
   business_value: number | null;
+  unfinished_sprint_info?: {
+    sprint_name: string;
+    days_ago: number;
+  };
 }
 
 export interface Task {
