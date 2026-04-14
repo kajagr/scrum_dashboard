@@ -92,7 +92,12 @@ export async function GET(_request: NextRequest, context: RouteContext) {
         id,
         title,
         status,
-        project_id
+        project_id,
+        sprint:sprints(
+          id,
+          start_date,
+          end_date
+        )
       )
     `)
     .eq("assignee_id", user.id)

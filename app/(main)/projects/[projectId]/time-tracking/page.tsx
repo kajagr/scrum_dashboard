@@ -3,10 +3,17 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 
+type SprintRange = {
+  id: string;
+  start_date: string;
+  end_date: string;
+};
+
 type Story = {
   id: string;
   title: string;
   status: string;
+  sprint: SprintRange | null;
 };
 
 type TaskInfo = {
@@ -159,6 +166,12 @@ export default function TimeTrackingPage() {
     const hours = Number(value);
     if (!value || isNaN(hours) || hours <= 0) { setCellError("Must be > 0"); return; }
     if (date > today) { setCellError("Can't log future hours"); return; }
+    const task = taskMap.get(taskId);
+    const sprint = task?.user_story?.sprint;
+    if (sprint && (date < sprint.start_date || date > sprint.end_date)) {
+      setCellError(`Only dates within sprint (${sprint.start_date} – ${sprint.end_date})`);
+      return;
+    }
     setCellError(null);
     const existing = logMap.get(taskId)?.get(date);
     if (existing) {
@@ -399,16 +412,20 @@ export default function TimeTrackingPage() {
                         const key = `${taskId}|${d}`;
                         const isEditing = editingCell === key;
                         const isFuture = d > today;
+                        const sprint = task.user_story?.sprint;
+                        const isOutsideSprint = sprint != null && (d < sprint.start_date || d > sprint.end_date);
+                        const isBlocked = isStoryDone || isFuture || isOutsideSprint;
 
                         return (
                           <td
                             key={d}
                             className="text-center px-2 py-2 border-l border-border"
                             style={{
-                              cursor: isStoryDone || isFuture ? "default" : "pointer",
-                              background: d === today ? "var(--color-primary-light)" : undefined,
+                              cursor: isBlocked ? "default" : "pointer",
+                              background: d === today ? "var(--color-primary-light)" : isOutsideSprint ? "var(--color-surface)" : undefined,
+                              opacity: isOutsideSprint ? 0.35 : undefined,
                             }}
-                            onClick={() => { if (!isStoryDone && !isFuture) startEditCell(taskId, d); }}
+                            onClick={() => { if (!isBlocked) startEditCell(taskId, d); }}
                           >
                             {isEditing ? (
                               <div>
@@ -432,7 +449,7 @@ export default function TimeTrackingPage() {
               				        </span>
                             ) : (
                               <span className="text-xs text-subtle opacity-0 group-hover:opacity-100 transition-opacity">
-                                {isFuture ? "—" : "+"}
+                                {isFuture || isOutsideSprint ? "—" : "+"}
                               </span>
                             )}
                           </td>

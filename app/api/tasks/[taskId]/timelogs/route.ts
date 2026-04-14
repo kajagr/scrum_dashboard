@@ -161,7 +161,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const { data: story, error: storyError } = await supabase
       .from("user_stories")
-      .select("id, status")
+      .select("id, status, sprint_id")
       .eq("id", task.user_story_id)
       .maybeSingle();
 
@@ -170,6 +170,20 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     if (story.status === "done")
       return NextResponse.json({ error: "Vnos časa ni dovoljen: zgodba je že zaključena." }, { status: 400 });
+
+    if (story.sprint_id) {
+      const { data: sprint } = await supabase
+        .from("sprints")
+        .select("start_date, end_date")
+        .eq("id", story.sprint_id)
+        .maybeSingle();
+
+      if (sprint && (date < sprint.start_date || date > sprint.end_date))
+        return NextResponse.json(
+          { error: `Datum mora biti znotraj sprinta (${sprint.start_date} – ${sprint.end_date}).` },
+          { status: 400 },
+        );
+    }
 
     const { data: existingLog } = await supabase
       .from("time_logs")
