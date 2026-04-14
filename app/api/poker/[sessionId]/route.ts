@@ -47,7 +47,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const { data: session } = await supabase
       .from("poker_sessions")
-      .select("id, project_id, user_story_id, status, current_round, final_estimate, created_by, created_at, completed_at")
+      .select("id, project_id, user_story_id, status, current_round, final_estimate, created_by, created_at, completed_at, absent_member_ids")
       .eq("id", sessionId)
       .maybeSingle();
 
@@ -76,6 +76,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       .is("removed_at", null);
 
     const members = allMembers ?? [];
+    const absentSet = new Set<string>(session.absent_member_ids ?? []);
 
     // Glasovi trenutnega kroga
     const { data: currentVotes } = await supabase
@@ -86,7 +87,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const votes = currentVotes ?? [];
     const votedUserIds = new Set(votes.map((v) => v.user_id));
-    const allVoted = members.length > 0 && members.every((m) => votedUserIds.has(m.user_id));
+    const activeMembers = members.filter((m) => !absentSet.has(m.user_id));
+    const allVoted = activeMembers.length > 0 && activeMembers.every((m) => votedUserIds.has(m.user_id));
 
     // Ocene so vidne samo ko so vsi glasovali
     const membersWithVotes = members.map((m) => {
@@ -97,6 +99,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         user: m.user,
         has_voted: votedUserIds.has(m.user_id),
         estimate: allVoted ? (vote?.estimate ?? null) : null,
+        is_absent: absentSet.has(m.user_id),
       };
     });
 
@@ -129,6 +132,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         current_round: session.current_round,
         final_estimate: session.final_estimate,
         completed_at: session.completed_at,
+        absent_member_ids: session.absent_member_ids ?? [],
       },
       members: membersWithVotes,
       all_voted: allVoted,
