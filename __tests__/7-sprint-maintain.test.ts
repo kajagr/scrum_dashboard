@@ -101,7 +101,7 @@ function setupPutMocks(
     sprint?: any;
     overlapping?: any[];
     updateResult?: any;
-    /** When set on an active sprint, cnt=3 is user_stories count; cnt=4 is update (if count allows). */
+    /** Story count for active sprint velocity check. Defaults to 0 (no stories). */
     activeStoryCount?: number;
   } = {},
 ) {
@@ -110,7 +110,7 @@ function setupPutMocks(
     sprint = plannedSprint,
     overlapping = [],
     updateResult = { data: { id: "sprint-1", ...validPutBody }, error: null },
-    activeStoryCount,
+    activeStoryCount = 0,
   } = overrides;
 
   // Determine sprint state the same way the route does
@@ -135,21 +135,26 @@ function setupPutMocks(
       });
     // 2. sprint fetch
     if (cnt === 2) return makeReadChain({ data: sprint, error: null });
-    // Active: optional user_stories count (when lowering velocity with stories check)
-    if (isActive && cnt === 3 && activeStoryCount !== undefined) {
-      return {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        is: jest.fn().mockResolvedValue({ count: activeStoryCount, error: null }),
-      };
+
+    if (isActive) {
+      // 3. user_stories fetch — ALWAYS needed for active sprints (route always reads story points)
+      //    Each story gets story_points: 6 so 2 stories = 12 SP > velocity 10 → triggers 400
+      if (cnt === 3)
+        return {
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          is: jest.fn().mockResolvedValue({
+            data: Array(activeStoryCount).fill({ story_points: 6 }),
+            error: null,
+          }),
+        };
+      // 4. update
+      return updateChain;
     }
-    // Active sprints skip the overlap check, so cnt=3 goes straight to update (unless count above).
-    // Planned sprints do the overlap check at cnt=3, then update at cnt=4.
-    if (isActive) return updateChain; // cnt=3 or cnt=4 for active
-    if (cnt === 3)
-      // overlap for planned
-      return makeReadChain({ data: overlapping, error: null });
-    return updateChain; // cnt=4 for planned
+
+    // Planned sprint:
+    if (cnt === 3) return makeReadChain({ data: overlapping, error: null }); // overlap check
+    return updateChain; // cnt=4
   });
 }
 
@@ -230,7 +235,7 @@ describe("PUT /api/projects/:projectId/sprints/:sprintId — vzdrževanje sprint
     const res = await PUT(makePutRequest({ velocity: 10 }), makeContext());
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/cannot be decreased|user stories/i);
+    expect(body.error).toMatch(/cannot be lower|story points/i);
   });
 
   // ─── Validacija datumov ───────────────────────────────────────────────────
