@@ -5,6 +5,51 @@ type RouteContext = {
   params: Promise<{ projectId: string }>;
 };
 
+/**
+ * @swagger
+ * /api/projects/{projectId}/poker:
+ *   get:
+ *     summary: Get active poker sessions for a project
+ *     description: Returns all active Planning Poker sessions for the given project. The user must be a member of the project.
+ *     tags:
+ *       - Planning Poker
+ *     parameters:
+ *       - in: path
+ *         name: projectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: List of active poker sessions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 sessions:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         format: uuid
+ *                       user_story_id:
+ *                         type: string
+ *                         format: uuid
+ *                       status:
+ *                         type: string
+ *                       current_round:
+ *                         type: integer
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Not a member of the project
+ *       500:
+ *         description: Internal server error
+ */
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { projectId } = await context.params;
