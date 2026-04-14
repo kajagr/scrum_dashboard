@@ -15,9 +15,11 @@ type RouteContext = {
  * @swagger
  * /api/projects/{projectId}/burndown:
  *   get:
- *     summary: Get burndown chart data for the active sprint
+ *     summary: Get burndown chart data for a sprint
  *     description: >
- *       Returns burndown data for the currently active sprint of a project.
+ *       Returns burndown data for a sprint of a project.
+ *       If sprintId is provided, returns data for that sprint.
+ *       Otherwise returns the active sprint, or falls back to the most recently ended one.
  *       Includes ideal line, actual remaining work, and logged work per day.
  *       Uses estimated_hours from tasks and hours from time_logs.
  *     tags:
@@ -29,6 +31,13 @@ type RouteContext = {
  *         schema:
  *           type: string
  *           format: uuid
+ *       - in: query
+ *         name: sprintId
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID of the sprint to show. Defaults to the active or most recent sprint.
  *     responses:
  *       200:
  *         description: Burndown data
@@ -84,31 +93,42 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const today = new Date().toISOString().split("T")[0];
+    const sprintId = request.nextUrl.searchParams.get("sprintId");
 
-    // Find active sprint (or most recent if none active)
+    // Find the requested sprint, active sprint, or most recently ended sprint
     let sprint: { id: string; name: string; start_date: string; end_date: string } | null = null;
 
-    const { data: activeSprint } = await supabase
-      .from("sprints")
-      .select("id, name, start_date, end_date")
-      .eq("project_id", projectId)
-      .lte("start_date", today)
-      .gte("end_date", today)
-      .maybeSingle();
-
-    if (activeSprint) {
-      sprint = activeSprint;
-    } else {
-      // Fall back to most recently ended sprint
-      const { data: lastSprint } = await supabase
+    if (sprintId) {
+      const { data: requestedSprint } = await supabase
         .from("sprints")
         .select("id, name, start_date, end_date")
         .eq("project_id", projectId)
-        .lt("end_date", today)
-        .order("end_date", { ascending: false })
-        .limit(1)
+        .eq("id", sprintId)
         .maybeSingle();
-      sprint = lastSprint;
+      sprint = requestedSprint;
+    } else {
+      const { data: activeSprint } = await supabase
+        .from("sprints")
+        .select("id, name, start_date, end_date")
+        .eq("project_id", projectId)
+        .lte("start_date", today)
+        .gte("end_date", today)
+        .maybeSingle();
+
+      if (activeSprint) {
+        sprint = activeSprint;
+      } else {
+        // Fall back to most recently ended sprint
+        const { data: lastSprint } = await supabase
+          .from("sprints")
+          .select("id, name, start_date, end_date")
+          .eq("project_id", projectId)
+          .lt("end_date", today)
+          .order("end_date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        sprint = lastSprint;
+      }
     }
 
     if (!sprint)

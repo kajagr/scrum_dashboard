@@ -28,6 +28,14 @@ type BurndownData = {
   days: BurndownDay[];
 };
 
+type Sprint = {
+  id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+};
+
 function formatDate(d: string) {
   return new Date(d + "T12:00:00").toLocaleDateString("en-GB", {
     month: "short",
@@ -55,17 +63,37 @@ export default function BurndownChart({ projectId }: { projectId: string }) {
   const [data, setData] = useState<BurndownData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sprints, setSprints] = useState<Sprint[]>([]);
+  const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
 
+  // Fetch the sprint list once on mount
   useEffect(() => {
-    fetch(`/api/projects/${projectId}/burndown`, { credentials: "include" })
+    fetch(`/api/projects/${projectId}/sprints`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => { if (Array.isArray(d)) setSprints(d); })
+      .catch(() => {});
+  }, [projectId]);
+
+  // Fetch burndown data whenever the selected sprint changes
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    const url = selectedSprintId
+      ? `/api/projects/${projectId}/burndown?sprintId=${selectedSprintId}`
+      : `/api/projects/${projectId}/burndown`;
+    fetch(url, { credentials: "include" })
       .then((r) => r.json())
       .then((d) => {
         if (d.error) setError(d.error);
-        else setData(d);
+        else {
+          setData(d);
+          // Sync dropdown to whichever sprint the API auto-selected
+          if (!selectedSprintId) setSelectedSprintId(d.sprint.id);
+        }
       })
       .catch(() => setError("Failed to load burndown data."))
       .finally(() => setLoading(false));
-  }, [projectId]);
+  }, [projectId, selectedSprintId]);
 
   if (loading) {
     return (
@@ -122,6 +150,19 @@ export default function BurndownChart({ projectId }: { projectId: string }) {
             {" – "}
             {new Date(data.sprint.end_date + "T12:00:00").toLocaleDateString("en-GB", { month: "short", day: "numeric", year: "numeric" })}
           </p>
+          {sprints.length > 1 && (
+            <select
+              className="mt-3 text-sm rounded-lg border border-border bg-surface text-foreground px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary"
+              value={selectedSprintId ?? ""}
+              onChange={(e) => setSelectedSprintId(e.target.value)}
+            >
+              {sprints.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.status})
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         <div className="flex items-center gap-4 flex-wrap">
           <div className="text-center">
