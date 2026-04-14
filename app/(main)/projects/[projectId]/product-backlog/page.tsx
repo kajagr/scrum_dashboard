@@ -160,6 +160,7 @@ function StoryCard({
   onPoker,
   onJoinPoker,
   activeSessionId,
+  reviewSprintName,
 }: {
   story: UserStoryWithSprintInfo;
   selectable?: boolean;
@@ -178,6 +179,7 @@ function StoryCard({
   onPoker?: () => void;
   onJoinPoker?: () => void;
   activeSessionId?: string | null;
+  reviewSprintName?: string;
 }) {
   const [estimating, setEstimating] = useState(false);
   const [estimateVal, setEstimateVal] = useState("");
@@ -313,13 +315,22 @@ function StoryCard({
             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.pill}`}>
               {status.label}
             </span>
-            {/* Shown when story was not confirmed/rejected before sprint ended */}
+            {/* Shown on done stories — which sprint confirmed them */}
             {story.realized_sprint_info && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[rgba(52,211,153,0.12)] text-[#34D399] border border-[rgba(52,211,153,0.25)]">
                 <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
                 {story.realized_sprint_info.sprint_name}
+              </span>
+            )}
+            {/* Shown on ready-for-review stories — which sprint they came from */}
+            {reviewSprintName && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-light text-primary border border-primary-border">
+                <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                {reviewSprintName}
               </span>
             )}
           </div>
@@ -800,14 +811,11 @@ export default function BacklogPage() {
 
       {/* Ready for review info banner */}
       {activeTab === "ready" && isProductOwner && (
-        <div className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border mb-4 text-sm ${isLastDay ? "border-primary-border bg-primary-light" : "border-border bg-surface text-muted"}`}>
-          <svg className={`w-4 h-4 flex-shrink-0 ${isLastDay ? "text-primary" : "text-muted"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-primary-border bg-primary-light mb-4 text-sm">
+          <svg className="w-4 h-4 flex-shrink-0 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          {isLastDay
-            ? <span className="text-primary font-medium">Today is the last day of the sprint — you can confirm or reject stories below.</span>
-            : <span>Confirm and reject buttons are available on the last day of the sprint ({formatDateDot(activeSprint?.end_date ?? "")}).</span>
-          }
+          <span className="text-primary font-medium">You can confirm or reject stories below.</span>
         </div>
       )}
 
@@ -863,7 +871,7 @@ export default function BacklogPage() {
                 (activeTab === "unassigned" || activeTab === "future")
               }
               onEstimateSubmit={(pts) => handleEstimate(story.id, pts)}
-              canConfirmReject={activeTab === "ready" && isProductOwner && isLastDay}
+              canConfirmReject={activeTab === "ready" && isProductOwner}
               actionLoading={actionLoading}
               actionError={actionError[story.id]}
               onConfirm={() => handleConfirm(story)}
@@ -871,6 +879,7 @@ export default function BacklogPage() {
               onPoker={() => handleStartPoker(story.id)}
               onJoinPoker={() => handleJoinPoker(activePokerSessions[story.id])}
               activeSessionId={activePokerSessions[story.id] ?? null}
+              reviewSprintName={activeTab === "ready" ? (story.unfinished_sprint_info?.sprint_name ?? activeSprint?.name) : undefined}
             />
           ))}
         </div>

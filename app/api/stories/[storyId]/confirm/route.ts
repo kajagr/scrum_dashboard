@@ -153,34 +153,6 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
       { status: 400 },
     );
 
-  // Check sprint is active
-  if (!story.sprint_id)
-    return NextResponse.json(
-      { error: "Zgodba ni dodeljena nobenemu sprintu." },
-      { status: 400 },
-    );
-
-  const { data: sprint } = await supabase
-    .from("sprints")
-    .select("start_date, end_date")
-    .eq("id", story.sprint_id)
-    .maybeSingle();
-
-  if (!sprint)
-    return NextResponse.json(
-      { error: "Sprint zgodbe ne obstaja." },
-      { status: 400 },
-    );
-
-  const today = new Date().toISOString().split("T")[0];
-  const isActiveOrExpired = sprint.start_date <= today;
-
-  if (!isActiveOrExpired)
-    return NextResponse.json(
-      { error: "Zgodba ni v aktivnem sprintu." },
-      { status: 400 },
-    );
-
   // Confirm
   const { data, error } = await supabase
     .from("user_stories")
