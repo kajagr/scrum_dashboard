@@ -275,6 +275,42 @@ export default function BurndownChart({ projectId }: { projectId: string }) {
           Logged — cumulative hours spent
         </span>
       </div>
+
+      {/* Tabular view */}
+      <div className="mt-6 overflow-x-auto">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="border-b border-border text-xs font-semibold tracking-wide uppercase text-muted">
+              <th className="text-left py-2 pr-4">Day</th>
+              <th className="text-right py-2 px-4">Ideal Remaining Work</th>
+              <th className="text-right py-2 px-4">Actual Remaining Work</th>
+              <th className="text-right py-2 pl-4">Committed Work</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.days.map((d) => (
+              <tr
+                key={d.date}
+                className={`border-b border-border last:border-0 transition-colors ${
+                  d.isToday ? "bg-primary/5 font-semibold" : "hover:bg-surface/60"
+                }`}
+              >
+                <td className="py-2 pr-4 text-foreground">
+                  {formatDate(d.date)}
+                  {d.isToday && (
+                    <span className="ml-2 text-xs font-medium text-primary">(today)</span>
+                  )}
+                </td>
+                <td className="py-2 px-4 text-right text-foreground">{d.ideal.toFixed(1)}h</td>
+                <td className="py-2 px-4 text-right text-foreground">
+                  {d.remaining != null ? `${d.remaining.toFixed(1)}h` : "—"}
+                </td>
+                <td className="py-2 pl-4 text-right text-foreground">{d.logged.toFixed(1)}h</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
