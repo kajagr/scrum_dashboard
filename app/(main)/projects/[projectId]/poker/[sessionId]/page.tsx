@@ -179,13 +179,13 @@ export default function PokerPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error ?? "Napaka pri glasovanju.");
+        setError(data.error ?? "Voting error.");
         return;
       }
 
       await fetchGameState();
     } catch {
-      setError("Napaka pri povezavi s strežnikom.");
+      setError("Error connecting to server.");
     } finally {
       setVoting(false);
     }
@@ -204,7 +204,7 @@ export default function PokerPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error ?? "Napaka.");
+        setError(data.error ?? "Error.");
         return;
       }
 
@@ -214,7 +214,7 @@ export default function PokerPage() {
 
       await fetchGameState();
     } catch {
-      setError("Napaka pri povezavi s strežnikom.");
+      setError("Error connecting to server.");
     } finally {
       setActionLoading(false);
     }
@@ -224,7 +224,7 @@ export default function PokerPage() {
     const estimate = Number(finalEstimateInput);
 
     if (isNaN(estimate) || estimate < 0) {
-      setError("Vnesite veljavno oceno.");
+      setError("Pick valid grade.");
       return;
     }
 
@@ -242,7 +242,7 @@ export default function PokerPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error ?? "Napaka.");
+        setError(data.error ?? "Error.");
         return;
       }
 
@@ -250,7 +250,7 @@ export default function PokerPage() {
       await fetchGameState();
       setShowCompleteForm(false);
     } catch {
-      setError("Napaka pri povezavi s strežnikom.");
+      setError("Error connecting to server.");
     } finally {
       setActionLoading(false);
     }
@@ -416,14 +416,14 @@ export default function PokerPage() {
                       {member.user?.first_name} {member.user?.last_name}
                       {member.user_id === myUserId && (
                         <span className="ml-1.5 text-[10px] font-bold text-primary bg-primary-light border border-primary-border px-1.5 py-0.5 rounded-full">
-                          Ti
+                          You
                         </span>
                       )}
                     </p>
                     <p className="text-xs text-muted capitalize">
                       {member.role === "scrum_master"
                         ? "Scrum Master"
-                        : "Developer"}
+                        : "Team member"}
                     </p>
                   </div>
                 </div>
@@ -449,7 +449,7 @@ export default function PokerPage() {
 
         <div className="rounded-xl border border-border bg-surface p-4">
           <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">
-            Glasovanje
+            Voting
           </p>
           <p className="text-sm text-muted mb-4">
             {myVote !== null
