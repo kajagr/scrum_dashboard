@@ -67,7 +67,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const { data: session } = await supabase
       .from("poker_sessions")
-      .select("id, project_id, user_story_id, status, current_round")
+      .select("id, project_id, user_story_id, status, current_round, absent_member_ids")
       .eq("id", sessionId)
       .maybeSingle();
 
@@ -108,9 +108,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .eq("session_id", sessionId)
       .eq("round_number", session.current_round);
 
-    const memberIds = new Set(allMembers?.map((m) => m.user_id) ?? []);
+    const absentSet = new Set<string>(session.absent_member_ids ?? []);
+    const activeMemberIds = (allMembers ?? [])
+      .map((m) => m.user_id)
+      .filter((id) => !absentSet.has(id));
     const votedIds = new Set(currentVotes?.map((v) => v.user_id) ?? []);
-    const allVoted = [...memberIds].every((id) => votedIds.has(id));
+    const allVoted = activeMemberIds.every((id) => votedIds.has(id));
 
     if (!allVoted) {
       return NextResponse.json(

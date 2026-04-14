@@ -12,6 +12,7 @@ type Member = {
   role: string;
   has_voted: boolean;
   estimate: number | null;
+  is_absent: boolean;
   user: {
     id: string;
     first_name: string;
@@ -28,6 +29,7 @@ type Session = {
   current_round: number;
   final_estimate: number | null;
   completed_at: string | null;
+  absent_member_ids: string[];
 };
 
 type Story = {
@@ -256,6 +258,26 @@ export default function PokerPage() {
     }
   };
 
+  const handleToggleAbsent = async (userId: string) => {
+    if (!gameState) return;
+    const current = gameState.session.absent_member_ids ?? [];
+    const updated = current.includes(userId)
+      ? current.filter((id) => id !== userId)
+      : [...current, userId];
+
+    try {
+      await fetch(`/api/poker/${sessionId}/absent`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ absent_member_ids: updated }),
+      });
+      await fetchGameState();
+    } catch {
+      /* ignore */
+    }
+  };
+
   const isScrumMaster = myRole === "scrum_master";
   const myVote = gameState?.my_vote ?? null;
   const allVoted = gameState?.all_voted ?? false;
@@ -404,10 +426,20 @@ export default function PokerPage() {
             {gameState.members.map((member) => (
               <div
                 key={member.user_id}
-                className="flex items-center justify-between p-2.5 rounded-lg bg-background border border-border"
+                className={`flex items-center justify-between p-2.5 rounded-lg border ${
+                  member.is_absent
+                    ? "bg-background/50 border-border opacity-60"
+                    : "bg-background border-border"
+                }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-primary-light text-primary border border-primary-border flex items-center justify-center text-xs font-bold flex-shrink-0">
+                  <div
+                    className={`w-8 h-8 rounded-full border flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                      member.is_absent
+                        ? "bg-muted/20 text-muted border-border"
+                        : "bg-primary-light text-primary border-primary-border"
+                    }`}
+                  >
                     {member.user?.first_name?.[0]}
                     {member.user?.last_name?.[0]}
                   </div>
@@ -421,14 +453,16 @@ export default function PokerPage() {
                       )}
                     </p>
                     <p className="text-xs text-muted capitalize">
-                      {member.role === "scrum_master"
-                        ? "Scrum Master"
-                        : "Team member"}
+                      {member.role === "scrum_master" ? "Scrum Master" : "Team member"}
                     </p>
                   </div>
                 </div>
-                <div>
-                  {allVoted && member.estimate !== null ? (
+                <div className="flex items-center gap-1.5">
+                  {member.is_absent ? (
+                    <span className="text-xs font-semibold text-muted bg-background border border-border px-2 py-0.5 rounded-full">
+                      Absent
+                    </span>
+                  ) : allVoted && member.estimate !== null ? (
                     <span className="text-sm font-bold text-primary bg-primary-light border border-primary-border px-2.5 py-1 rounded-lg">
                       {member.estimate === -1 ? "?" : member.estimate}
                     </span>
@@ -440,6 +474,23 @@ export default function PokerPage() {
                     <span className="text-xs font-semibold text-muted bg-background border border-border px-2 py-0.5 rounded-full">
                       Waiting
                     </span>
+                  )}
+                  {isScrumMaster && (
+                    <button
+                      onClick={() => handleToggleAbsent(member.user_id)}
+                      title={member.is_absent ? "Mark present" : "Mark absent"}
+                      className="text-muted hover:text-foreground transition-colors p-1 rounded"
+                    >
+                      {member.is_absent ? (
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zm8-4h6" />
+                        </svg>
+                      )}
+                    </button>
                   )}
                 </div>
               </div>
@@ -496,8 +547,8 @@ export default function PokerPage() {
             <div className="flex justify-between items-center p-3 rounded-lg bg-background border border-border">
               <span className="text-xs text-muted">Team progress</span>
               <span className="text-sm font-semibold text-foreground">
-                {gameState.members.filter((m) => m.has_voted).length} /{" "}
-                {gameState.members.length}
+                {gameState.members.filter((m) => !m.is_absent && m.has_voted).length} /{" "}
+                {gameState.members.filter((m) => !m.is_absent).length}
               </span>
             </div>
 
