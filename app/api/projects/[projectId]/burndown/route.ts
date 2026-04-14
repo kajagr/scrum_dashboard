@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
+
+const supabaseAdmin = createAdminClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
 
 type RouteContext = {
   params: Promise<{ projectId: string }>;
@@ -134,7 +140,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // Get all time logs for these tasks within sprint range
     let logsByDate: Record<string, number> = {};
     if (taskIds.length > 0) {
-      const { data: logs } = await supabase
+      const { data: logs } = await supabaseAdmin
         .from("time_logs")
         .select("date, hours")
         .in("task_id", taskIds)
