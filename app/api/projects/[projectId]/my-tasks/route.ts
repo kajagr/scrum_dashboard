@@ -91,18 +91,13 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       user_story:user_stories!inner(
         id,
         title,
-        project_id,
-        sprint:sprints!inner(
-          id,
-          name,
-          status
-        )
+        status,
+        project_id
       )
     `)
     .eq("assignee_id", user.id)
     .eq("user_story.project_id", projectId)
-    .eq("user_story.sprint.status", "active") // 👈 ključni del
-    .neq("status", "completed");              // 👈 filter za DONE
+    .neq("status", "completed");
 
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });
