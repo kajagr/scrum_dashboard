@@ -91,7 +91,7 @@ export default function TimeTrackingPage() {
     setError(null);
     try {
       const [logsRes, tasksRes] = await Promise.all([
-        fetch(`/api/users/me/timelogs?from_date=${fromDate}&to_date=${toDate}`),
+        fetch(`/api/users/me/timelogs?from_date=${fromDate}&to_date=${toDate}&project_id=${projectId}`),
         fetch(`/api/projects/${projectId}/my-tasks`),
       ]);
       if (!logsRes.ok) {
@@ -126,9 +126,9 @@ export default function TimeTrackingPage() {
     taskMap.set(t.id, t);
   }
 
-  // Layer in log data (updates remaining_time from latest fetch and builds logMap)
+  // Layer in log data — only for tasks already in taskMap (current project, not completed)
   for (const log of logs) {
-    if (!log.task) continue;
+    if (!log.task || !taskMap.has(log.task_id)) continue;
     taskMap.set(log.task_id, log.task);
     if (!logMap.has(log.task_id)) logMap.set(log.task_id, new Map());
     logMap.get(log.task_id)!.set(log.date, log);

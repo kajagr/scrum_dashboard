@@ -112,17 +112,21 @@ export async function GET(request: NextRequest) {
     const fromDate = searchParams.get("from_date");
     const toDate = searchParams.get("to_date");
 
+    const projectId = searchParams.get("project_id");
+
     let query = supabase
       .from("time_logs")
       .select(
-        "id, task_id, hours, date, logged_at, task:tasks(id, title, description, remaining_time, user_story:user_stories(id, title, status))",
+        "id, task_id, hours, date, logged_at, task:tasks!inner(id, title, description, remaining_time, status, user_story:user_stories!inner(id, title, status, project_id))",
       )
       .eq("user_id", user.id)
+      .neq("task.status", "completed")
       .order("date", { ascending: false })
       .order("logged_at", { ascending: false });
 
     if (fromDate) query = query.gte("date", fromDate);
     if (toDate) query = query.lte("date", toDate);
+    if (projectId) query = query.eq("task.user_story.project_id", projectId);
 
     const { data, error } = await query;
 

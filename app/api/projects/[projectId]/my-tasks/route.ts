@@ -7,10 +7,10 @@ type RouteContext = {
 
 /**
  * @swagger
- * /api/projects/{projectId}/my-tasks:
+ * /api/projects/{projectId}/my-active-tasks:
  *   get:
- *     summary: Get tasks assigned to the current user in a project
- *     description: Returns all tasks assigned to the authenticated user that belong to user stories in the given project.
+ *     summary: Get current user's tasks in the active sprint
+ *     description: Returns all tasks assigned to the authenticated user that belong to the active sprint in the given project and are not completed.
  *     tags:
  *       - Tasks
  *     parameters:
@@ -22,7 +22,7 @@ type RouteContext = {
  *           format: uuid
  *     responses:
  *       200:
- *         description: List of tasks assigned to the current user
+ *         description: List of tasks in the active sprint assigned to the current user
  *         content:
  *           application/json:
  *             schema:
@@ -39,6 +39,9 @@ type RouteContext = {
  *                     type: string
  *                   remaining_time:
  *                     type: number
+ *                   status:
+ *                     type: string
+ *                     enum: [unassigned, assigned, in_progress, completed]
  *                   user_story:
  *                     type: object
  *                     properties:
@@ -47,11 +50,20 @@ type RouteContext = {
  *                         format: uuid
  *                       title:
  *                         type: string
- *                       status:
- *                         type: string
  *                       project_id:
  *                         type: string
  *                         format: uuid
+ *                       sprint:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                             format: uuid
+ *                           name:
+ *                             type: string
+ *                           status:
+ *                             type: string
+ *                             enum: [planned, active, completed]
  *       401:
  *         description: Unauthorized
  *       500:
@@ -64,18 +76,28 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Fetch all tasks assigned to the current user in this project,
-  // via user_stories that belong to the project
   const { data, error } = await supabase
     .from("tasks")
-    .select(
-      "id, title, description, remaining_time, user_story:user_stories!inner(id, title, status, project_id)",
-    )
+    .select(`
+      id,
+      title,
+      description,
+      remaining_time,
+      status,
+      user_story:user_stories!inner(
+        id,
+        title,
+        status,
+        project_id
+      )
+    `)
     .eq("assignee_id", user.id)
-    .eq("user_story.project_id", projectId);
+    .eq("user_story.project_id", projectId)
+    .neq("status", "completed");
 
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });
