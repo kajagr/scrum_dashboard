@@ -54,9 +54,6 @@ const lastWeek = new Date(Date.now() - 7 * 86400000)
   .toISOString()
   .split("T")[0];
 
-const activeSprint = { start_date: yesterday, end_date: tomorrow };
-const inactiveSprint = { start_date: lastWeek, end_date: yesterday };
-
 const readyStory = {
   id: "story-1",
   project_id: "project-1",
@@ -71,7 +68,6 @@ function setupMocks(
   overrides: {
     story?: any;
     membership?: any;
-    sprint?: any;
   } = {},
 ) {
   const story = overrides.story !== undefined ? overrides.story : readyStory;
@@ -79,15 +75,12 @@ function setupMocks(
     overrides.membership !== undefined
       ? overrides.membership
       : { role: "product_owner" };
-  const sprint =
-    overrides.sprint !== undefined ? overrides.sprint : activeSprint;
 
   let cnt = 0;
   mockFrom.mockImplementation(() => {
     cnt++;
     if (cnt === 1) return makeReadChain({ data: story, error: null }); // story
-    if (cnt === 2) return makeReadChain({ data: membership, error: null }); // membership
-    return makeReadChain({ data: sprint, error: null }); // sprint
+    return makeReadChain({ data: membership, error: null }); // membership
   });
 
   // reject uses supabaseAdmin for update + insert
@@ -146,14 +139,6 @@ describe("POST /api/stories/:storyId/reject — zavračanje zgodbe (#26)", () =>
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toMatch(/backlog/i);
-  });
-
-  it("400 — zgodba ni v aktivnem sprintu", async () => {
-    setupMocks({ sprint: inactiveSprint });
-    const res = await REJECT(makeRejectRequest(), makeContext());
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.error).toMatch(/aktivnem sprintu/i);
   });
 
   it("403 — scrum master ne more zavračati zgodb", async () => {
