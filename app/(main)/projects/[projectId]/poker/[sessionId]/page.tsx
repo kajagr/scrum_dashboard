@@ -1,5 +1,5 @@
 "use client";
-
+import PlanningPokerHelpTooltip from "@/components/features/poker/PlanningPokerHelpTooltip";
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Confetti from "react-confetti";
@@ -406,16 +406,21 @@ export default function PokerPage() {
       )}
 
       <div className="mb-6">
-        <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">
-          Project
-        </p>
-        <h1 className="text-3xl font-bold text-foreground leading-tight">
-          Planning Poker
-        </h1>
-        <p className="text-sm text-muted mt-1">
-          Round {currentRound} / 3
-        </p>
-      </div>
+  <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">
+    Project
+  </p>
+
+  <div className="flex items-center gap-2">
+    <h1 className="text-3xl font-bold text-foreground leading-tight">
+      Planning Poker
+    </h1>
+    <PlanningPokerHelpTooltip />
+  </div>
+
+  <p className="text-sm text-muted mt-1">
+    Round {currentRound} / 3
+  </p>
+</div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="rounded-xl border border-border bg-surface p-4">
