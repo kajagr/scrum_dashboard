@@ -51,11 +51,9 @@ const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
 const lastWeek = new Date(Date.now() - 7 * 86400000)
   .toISOString()
   .split("T")[0];
-const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
-
-const activeSprint = { start_date: yesterday, end_date: tomorrow };
-// "inactive" for this endpoint means sprint hasn't started yet (start_date > today)
-const inactiveSprint = { start_date: tomorrow, end_date: nextWeek };
+const nextWeek = new Date(Date.now() + 7 * 86400000)
+  .toISOString()
+  .split("T")[0];
 
 const readyStory = {
   id: "story-1",
@@ -72,7 +70,6 @@ function setupMocks(
   overrides: {
     story?: any;
     membership?: any;
-    sprint?: any;
   } = {},
 ) {
   const story = overrides.story !== undefined ? overrides.story : readyStory;
@@ -80,15 +77,12 @@ function setupMocks(
     overrides.membership !== undefined
       ? overrides.membership
       : { role: "product_owner" };
-  const sprint =
-    overrides.sprint !== undefined ? overrides.sprint : activeSprint;
 
   let cnt = 0;
   mockFrom.mockImplementation(() => {
     cnt++;
     if (cnt === 1) return makeReadChain({ data: story, error: null }); // story
     if (cnt === 2) return makeReadChain({ data: membership, error: null }); // membership
-    if (cnt === 3) return makeReadChain({ data: sprint, error: null }); // sprint
     // update — confirm uses supabase (not admin)
     return {
       update: jest.fn().mockReturnThis(),
@@ -142,14 +136,6 @@ describe("POST /api/stories/:storyId/confirm — potrjevanje zgodbe (#25)", () =
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toMatch(/sprintu/i);
-  });
-
-  it("400 — zgodba ni v aktivnem sprintu", async () => {
-    setupMocks({ sprint: inactiveSprint });
-    const res = await CONFIRM(makePostRequest(), makeContext());
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.error).toMatch(/aktivnem sprintu/i);
   });
 
   it("403 — scrum master ne more potrjevati zgodb", async () => {

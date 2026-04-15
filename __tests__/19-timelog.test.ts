@@ -20,6 +20,15 @@ jest.mock("@/lib/supabase/server", () => ({
   ),
 }));
 
+// ─── Mock @supabase/supabase-js (admin client) ────────────────────────────────
+const mockAdminFrom = jest.fn<any, any>();
+
+jest.mock("@supabase/supabase-js", () => ({
+  createClient: jest.fn(() => ({
+    from: (...args: any[]) => mockAdminFrom(...args),
+  })),
+}));
+
 // ─── Helper: universal fluent chain ──────────────────────────────────────────
 // Handles read chains (select/eq/is/order/maybeSingle/single)
 // AND write chains (update/insert/eq/select/single)
@@ -28,6 +37,7 @@ function makeChain(resolvedValue: { data: any; error: any }) {
   const chain: any = {
     select: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
+    neq: jest.fn().mockReturnThis(),
     gte: jest.fn().mockReturnThis(),
     lte: jest.fn().mockReturnThis(),
     is: jest.fn().mockReturnThis(),
@@ -127,7 +137,7 @@ describe("GET /api/users/me/timelogs — pregled časovnih vnosov trenutnega upo
     });
   });
 
-  // DB calls: cnt=1 → time_logs select with join (thenable)
+  // DB calls: server client → time_logs select with join (thenable)
   function setupGetMeTimelogs(overrides: { logs?: any[]; dbError?: any } = {}) {
     const { logs = [], dbError = null } = overrides;
     mockFrom.mockImplementation(() =>
