@@ -2,6 +2,7 @@
 import PlanningPokerHelpTooltip from "@/components/features/poker/PlanningPokerHelpTooltip";
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import Confetti from "react-confetti";
 
 const FIBONACCI = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89];
@@ -52,6 +53,7 @@ type GameState = {
 };
 
 export default function PokerPage() {
+  const t = useTranslations("poker");
   const params = useParams();
   const router = useRouter();
   const projectId = params.projectId as string;
@@ -309,7 +311,7 @@ export default function PokerPage() {
             d="M4 12a8 8 0 018-8v8H4z"
           />
         </svg>
-        <span className="text-sm">Loading Planning Poker...</span>
+        <span className="text-sm">{t("loading")}</span>
       </div>
     );
   }
@@ -317,7 +319,7 @@ export default function PokerPage() {
   if (!gameState) {
     return (
       <div className="p-6 text-center text-muted">
-        <p>Session does not exist or you do not have access.</p>
+        <p>{t("noAccess")}</p>
       </div>
     );
   }
@@ -341,11 +343,11 @@ export default function PokerPage() {
 
         <div className="w-full max-w-2xl rounded-3xl border border-primary-border bg-surface shadow-xl p-8 text-center">
           <p className="text-xs font-semibold tracking-[0.2em] uppercase text-primary mb-3">
-            Planning Poker Completed
+            {t("completedTitle")}
           </p>
 
           <h1 className="text-3xl font-bold text-foreground mb-3">
-            Final Estimate
+            {t("finalEstimate")}
           </h1>
 
           <div className="mx-auto my-8 flex items-center justify-center">
@@ -357,17 +359,13 @@ export default function PokerPage() {
           </div>
 
           <p className="text-base text-muted mb-6">
-            This story was completed with a final estimate of{" "}
-            <span className="font-bold text-foreground">
-              {finalEstimate ?? "-"} pts
-            </span>
-            .
+            {t("completedWith", { points: finalEstimate ?? "-" })}
           </p>
 
           {story && (
             <div className="mb-6 rounded-2xl border border-border bg-background p-4 text-left">
               <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-2">
-                Story
+                {t("story")}
               </p>
               <h2 className="text-lg font-bold text-foreground mb-1">
                 {story.title}
@@ -382,7 +380,7 @@ export default function PokerPage() {
             onClick={() => router.push(`/projects/${projectId}/product-backlog`)}
             className="px-6 py-3 text-sm font-semibold text-white rounded-xl bg-primary hover:bg-primary-hover transition-colors"
           >
-            Back to backlog
+            {t("backToBacklog")}
           </button>
         </div>
       </div>
@@ -407,25 +405,25 @@ export default function PokerPage() {
 
       <div className="mb-6">
   <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">
-    Project
+    {t("section")}
   </p>
 
   <div className="flex items-center gap-2">
     <h1 className="text-3xl font-bold text-foreground leading-tight">
-      Planning Poker
+      {t("title")}
     </h1>
     <PlanningPokerHelpTooltip />
   </div>
 
   <p className="text-sm text-muted mt-1">
-    Round {currentRound} / 3
+    {t("round", { round: currentRound })}
   </p>
 </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="rounded-xl border border-border bg-surface p-4">
           <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-3">
-            Participants
+            {t("participants")}
           </p>
           <div className="space-y-2">
             {gameState.members.map((member) => (
@@ -453,19 +451,19 @@ export default function PokerPage() {
                       {member.user?.first_name} {member.user?.last_name}
                       {member.user_id === myUserId && (
                         <span className="ml-1.5 text-[10px] font-bold text-primary bg-primary-light border border-primary-border px-1.5 py-0.5 rounded-full">
-                          You
+                          {t("you")}
                         </span>
                       )}
                     </p>
                     <p className="text-xs text-muted capitalize">
-                      {member.role === "scrum_master" ? "Scrum Master" : "Team member"}
+                      {member.role === "scrum_master" ? t("scrumMaster") : t("teamMember")}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
                   {member.is_absent ? (
                     <span className="text-xs font-semibold text-muted bg-background border border-border px-2 py-0.5 rounded-full">
-                      Absent
+                      {t("absent")}
                     </span>
                   ) : allVoted && member.estimate !== null ? (
                     <span className="text-sm font-bold text-primary bg-primary-light border border-primary-border px-2.5 py-1 rounded-lg">
@@ -473,17 +471,17 @@ export default function PokerPage() {
                     </span>
                   ) : member.has_voted ? (
                     <span className="text-xs font-semibold text-[#34D399] bg-[rgba(52,211,153,0.12)] border border-[rgba(52,211,153,0.25)] px-2 py-0.5 rounded-full">
-                      Voted
+                      {t("voted")}
                     </span>
                   ) : (
                     <span className="text-xs font-semibold text-muted bg-background border border-border px-2 py-0.5 rounded-full">
-                      Waiting
+                      {t("waiting")}
                     </span>
                   )}
                   {isScrumMaster && (
                     <button
                       onClick={() => handleToggleAbsent(member.user_id)}
-                      title={member.is_absent ? "Mark present" : "Mark absent"}
+                      title={member.is_absent ? t("markPresent") : t("markAbsent")}
                       className="text-muted hover:text-foreground transition-colors p-1 rounded"
                     >
                       {member.is_absent ? (
@@ -505,12 +503,12 @@ export default function PokerPage() {
 
         <div className="rounded-xl border border-border bg-surface p-4">
           <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">
-            Voting
+            {t("voting")}
           </p>
           <p className="text-sm text-muted mb-4">
             {myVote !== null
-              ? "You voted. Waiting for other members."
-              : "Choose your estimate."}
+              ? t("votedWaiting")
+              : t("chooseEstimate")}
           </p>
 
           <div className="grid grid-cols-4 gap-2 mb-4">
@@ -542,7 +540,7 @@ export default function PokerPage() {
           <div className="space-y-2">
             {myVote !== null && (
               <div className="flex justify-between items-center p-3 rounded-lg bg-background border border-border">
-                <span className="text-xs text-muted">Your vote</span>
+                <span className="text-xs text-muted">{t("yourVote")}</span>
                 <span className="text-sm font-bold text-primary">
                   {myVote === -1 ? "?" : myVote}
                 </span>
@@ -550,7 +548,7 @@ export default function PokerPage() {
             )}
 
             <div className="flex justify-between items-center p-3 rounded-lg bg-background border border-border">
-              <span className="text-xs text-muted">Team progress</span>
+              <span className="text-xs text-muted">{t("teamProgress")}</span>
               <span className="text-sm font-semibold text-foreground">
                 {gameState.members.filter((m) => !m.is_absent && m.has_voted).length} /{" "}
                 {gameState.members.filter((m) => !m.is_absent).length}
@@ -558,9 +556,9 @@ export default function PokerPage() {
             </div>
 
             <div className="flex justify-between items-center p-3 rounded-lg bg-background border border-border">
-              <span className="text-xs text-muted">Status</span>
+              <span className="text-xs text-muted">{t("status")}</span>
               <span className="text-sm font-semibold text-foreground">
-                {allVoted ? "All voted" : "Collecting votes"}
+                {allVoted ? t("allVoted") : t("collectingVotes")}
               </span>
             </div>
           </div>
@@ -568,7 +566,7 @@ export default function PokerPage() {
           {canComplete && (
             <div className="mt-4 p-4 rounded-xl border border-primary-border bg-primary-light">
               <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-2">
-                Suggested estimate
+                {t("suggestedEstimate")}
               </p>
               <p className="text-2xl font-bold text-foreground mb-3">
                 {suggestedEstimate}
@@ -581,7 +579,7 @@ export default function PokerPage() {
                       onClick={() => setShowCompleteForm(true)}
                       className="w-full py-2 text-sm font-semibold text-white rounded-lg bg-primary hover:bg-primary-hover transition-colors"
                     >
-                      Complete game →
+                      {t("completeGame")}
                     </button>
                   ) : (
                     <div className="space-y-2">
@@ -599,14 +597,14 @@ export default function PokerPage() {
                           onClick={() => setShowCompleteForm(false)}
                           className="flex-1 py-2 text-sm font-medium rounded-lg bg-background border border-border text-muted hover:bg-border transition-colors"
                         >
-                          Cancel
+                          {t("cancel")}
                         </button>
                         <button
                           onClick={handleComplete}
                           disabled={actionLoading}
                           className="flex-1 py-2 text-sm font-semibold text-white rounded-lg bg-primary hover:bg-primary-hover transition-colors disabled:opacity-50"
                         >
-                          {actionLoading ? "..." : "Confirm"}
+                          {actionLoading ? "..." : t("confirm")}
                         </button>
                       </div>
                     </div>
@@ -619,17 +617,17 @@ export default function PokerPage() {
           {canNextRound && (
             <div className="mt-4 p-4 rounded-xl border border-accent-border bg-accent-light">
               <p className="text-xs font-semibold tracking-widest uppercase text-accent-text mb-2">
-                All voted
+                {t("allVoted")}
               </p>
               <p className="text-sm text-muted mb-3">
-                Estimates differ. Start a new discussion round.
+                {t("estimatesDiffer")}
               </p>
               <button
                 onClick={handleNextRound}
                 disabled={actionLoading}
                 className="w-full py-2 text-sm font-semibold text-white rounded-lg bg-primary hover:bg-primary-hover transition-colors disabled:opacity-50"
               >
-                {actionLoading ? "..." : `Start round ${currentRound + 1} →`}
+                {actionLoading ? "..." : t("startRound", { round: currentRound + 1 })}
               </button>
             </div>
           )}
@@ -656,7 +654,7 @@ export default function PokerPage() {
 
         <div className="rounded-xl border border-border bg-surface p-4">
           <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-3">
-            Story
+            {t("story")}
           </p>
 
           {story ? (
@@ -668,7 +666,7 @@ export default function PokerPage() {
               {story.description && (
                 <div>
                   <p className="text-xs font-semibold text-muted uppercase tracking-widest mb-1">
-                    Description
+                    {t("description")}
                   </p>
                   <p className="text-sm text-foreground">{story.description}</p>
                 </div>
@@ -677,7 +675,7 @@ export default function PokerPage() {
               {story.acceptance_criteria && (
                 <div>
                   <p className="text-xs font-semibold text-muted uppercase tracking-widest mb-1">
-                    Acceptance Criteria
+                    {t("acceptanceCriteria")}
                   </p>
                   <p className="text-sm text-foreground">
                     {story.acceptance_criteria}
@@ -687,14 +685,14 @@ export default function PokerPage() {
 
               <div className="flex gap-2 pt-1">
                 <div className="flex-1 p-2 rounded-lg bg-background border border-border">
-                  <p className="text-xs text-muted mb-0.5">Status</p>
+                  <p className="text-xs text-muted mb-0.5">{t("storyStatus")}</p>
                   <p className="text-sm font-semibold text-foreground capitalize">
                     {story.status}
                   </p>
                 </div>
 
                 <div className="flex-1 p-2 rounded-lg bg-background border border-border">
-                  <p className="text-xs text-muted mb-0.5">Priority</p>
+                  <p className="text-xs text-muted mb-0.5">{t("priority")}</p>
                   <p className="text-sm font-semibold text-foreground capitalize">
                     {story.priority.replace("_", " ")}
                   </p>
@@ -703,7 +701,7 @@ export default function PokerPage() {
 
               {story.story_points !== null && (
                 <div className="p-2 rounded-lg bg-background border border-border">
-                  <p className="text-xs text-muted mb-0.5">Current points</p>
+                  <p className="text-xs text-muted mb-0.5">{t("currentPoints")}</p>
                   <p className="text-sm font-semibold text-foreground">
                     {story.story_points} pts
                   </p>
@@ -711,7 +709,7 @@ export default function PokerPage() {
               )}
             </div>
           ) : (
-            <p className="text-sm text-muted">Loading story...</p>
+            <p className="text-sm text-muted">{t("loadingStory")}</p>
           )}
         </div>
       </div>

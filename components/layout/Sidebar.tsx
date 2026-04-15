@@ -18,6 +18,7 @@ import {
   BookOpen,
   MessageSquare,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 const navigation = [
   {
@@ -90,6 +91,19 @@ export default function Sidebar() {
   const params = useParams();
   const router = useRouter();
   const supabase = createClient();
+  const t = useTranslations("sidebar");
+  const navLabels: Record<string, string> = {
+    "Projects": t("projects"),
+    "Dashboard": t("dashboard"),
+    "Product Backlog": t("productBacklog"),
+    "Sprint Backlog": t("sprintBacklog"),
+    "Sprints": t("sprints"),
+    "Time Tracking": t("timeTracking"),
+    "Documentation": t("documentation"),
+    "Team": t("team"),
+    "Wall": t("wall"),
+    "Settings": t("settings"),
+  };
 
   const currentProjectId = params?.projectId as string | undefined;
 
@@ -178,13 +192,13 @@ export default function Sidebar() {
                 key={item.name}
                 title={
                   !projectHealthy && item.type === "project"
-                    ? "Fix team role issues on the Team page first"
+                    ? t("fixTeamRoles")
                     : undefined
                 }
                 className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-subtle cursor-not-allowed opacity-40"
               >
                 <Icon size={17} />
-                <span>{item.name}</span>
+                <span>{navLabels[item.name] ?? item.name}</span>
               </div>
             );
           }
@@ -210,7 +224,7 @@ export default function Sidebar() {
                     : "text-subtle group-hover:text-muted"
                 }
               />
-              <span>{item.name}</span>
+              <span>{navLabels[item.name] ?? item.name}</span>
             </Link>
           );
         })}
@@ -237,7 +251,7 @@ export default function Sidebar() {
                     : "text-subtle group-hover:text-muted"
                 }
               />
-              <span>Users</span>
+              <span>{t("users")}</span>
             </Link>
           </>
         )}
@@ -249,7 +263,7 @@ export default function Sidebar() {
           className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted transition-all hover:bg-background hover:text-foreground"
         >
           <LogOut size={17} className="text-subtle" />
-          <span>Sign Out</span>
+          <span>{t("signOut")}</span>
         </button>
       </div>
     </aside>

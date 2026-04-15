@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import DocumentationHelpTooltip from "@/components/features/documentation/DocumentationHelpTooltip";
 
 // ─── Markdown → HTML ──────────────────────────────────────────────────────────
@@ -279,6 +280,7 @@ const Divider = () => (
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function DocumentationPage() {
+  const t = useTranslations("documentation");
   const params = useParams();
   const projectId = params.projectId as string;
 
@@ -351,7 +353,7 @@ export default function DocumentationPage() {
           setError(data.error ?? "Failed to save.");
           return;
         }
-        setSuccess("Saved.");
+        setSuccess(t("saved"));
         setTimeout(() => setSuccess(null), 2000);
       } catch {
         setError("Server connection error.");
@@ -465,7 +467,7 @@ export default function DocumentationPage() {
   async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!confirm("This will replace the current documentation. Continue?")) {
+    if (!confirm(t("replaceConfirm"))) {
       e.target.value = "";
       return;
     }
@@ -499,7 +501,7 @@ export default function DocumentationPage() {
       htmlRef.current = html;
       if (editorRef.current) editorRef.current.innerHTML = html;
       await saveDoc(html);
-      setSuccess("Imported successfully.");
+      setSuccess(t("importedSuccess"));
       setTimeout(() => setSuccess(null), 3000);
     } catch {
       setError("Server connection error.");
@@ -527,7 +529,7 @@ export default function DocumentationPage() {
             d="M4 12a8 8 0 018-8v8H4z"
           />
         </svg>
-        <span className="text-sm">Loading documentation...</span>
+        <span className="text-sm">{t("loading")}</span>
       </div>
     );
   }
@@ -538,16 +540,16 @@ export default function DocumentationPage() {
       <div className="flex items-end justify-between mb-4 flex-shrink-0">
         <div>
           <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">
-            Project
+            {t("section")}
           </p>
           <div className="flex items-center gap-2">
             <h1 className="text-3xl font-bold text-foreground leading-tight">
-              Documentation
+              {t("title")}
             </h1>
             <DocumentationHelpTooltip />
           </div>
           <p className="text-sm text-muted mt-1">
-            Shared project wiki — all members can edit
+            {t("subtitle")}
           </p>
         </div>
 
@@ -573,7 +575,7 @@ export default function DocumentationPage() {
               <polyline points="17 8 12 3 7 8" />
               <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
-            {importing ? "Importing..." : "Import"}
+            {importing ? t("importing") : t("import")}
           </button>
           <input
             ref={fileInputRef}
@@ -604,7 +606,7 @@ export default function DocumentationPage() {
                 <polyline points="7 10 12 15 17 10" />
                 <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
-              Export
+              {t("export")}
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="12"
@@ -629,9 +631,9 @@ export default function DocumentationPage() {
                 style={{ background: "var(--color-surface)" }}
               >
                 {[
-                  { label: "Markdown (.md)", action: handleExportMd },
-                  { label: "Plain text (.txt)", action: handleExportTxt },
-                  { label: "PDF (.pdf)", action: handleExportPdf },
+                  { label: t("exportMd"), action: handleExportMd },
+                  { label: t("exportTxt"), action: handleExportTxt },
+                  { label: t("exportPdf"), action: handleExportPdf },
                 ].map((item) => (
                   <button
                     key={item.label}
@@ -650,7 +652,7 @@ export default function DocumentationPage() {
 
       {/* Status bar */}
       <div className="h-5 mb-2 flex-shrink-0">
-        {saving && <p className="text-xs text-muted">Saving...</p>}
+        {saving && <p className="text-xs text-muted">{t("saving")}</p>}
         {success && !saving && (
           <p className="text-xs text-green-600">{success}</p>
         )}
@@ -671,46 +673,46 @@ export default function DocumentationPage() {
           style={{ borderBottom: "1px solid var(--color-border)" }}
         >
           <ToolbarBtn
-            title="Heading 1"
+            title={t("toolbar.h1")}
             onClick={() => exec("formatBlock", "h1")}
           >
             <span className="text-xs font-bold">H1</span>
           </ToolbarBtn>
           <ToolbarBtn
-            title="Heading 2"
+            title={t("toolbar.h2")}
             onClick={() => exec("formatBlock", "h2")}
           >
             <span className="text-xs font-bold">H2</span>
           </ToolbarBtn>
           <ToolbarBtn
-            title="Heading 3"
+            title={t("toolbar.h3")}
             onClick={() => exec("formatBlock", "h3")}
           >
             <span className="text-xs font-bold">H3</span>
           </ToolbarBtn>
           <ToolbarBtn
-            title="Paragraph"
+            title={t("toolbar.paragraph")}
             onClick={() => exec("formatBlock", "p")}
           >
             <span className="text-xs">¶</span>
           </ToolbarBtn>
           <Divider />
           <ToolbarBtn
-            title="Bold"
+            title={t("toolbar.bold")}
             onClick={() => exec("bold")}
             active={activeFormats.has("bold")}
           >
             <span className="font-bold">B</span>
           </ToolbarBtn>
           <ToolbarBtn
-            title="Italic"
+            title={t("toolbar.italic")}
             onClick={() => exec("italic")}
             active={activeFormats.has("italic")}
           >
             <span className="italic">I</span>
           </ToolbarBtn>
           <ToolbarBtn
-            title="Strikethrough"
+            title={t("toolbar.strikethrough")}
             onClick={() => exec("strikeThrough")}
             active={activeFormats.has("strikeThrough")}
           >
@@ -718,7 +720,7 @@ export default function DocumentationPage() {
           </ToolbarBtn>
           <Divider />
           <ToolbarBtn
-            title="Bulleted list"
+            title={t("toolbar.bulletList")}
             onClick={() => exec("insertUnorderedList")}
             active={activeFormats.has("insertUnorderedList")}
           >
@@ -754,7 +756,7 @@ export default function DocumentationPage() {
             </svg>
           </ToolbarBtn>
           <ToolbarBtn
-            title="Numbered list"
+            title={t("toolbar.numberedList")}
             onClick={() => exec("insertOrderedList")}
             active={activeFormats.has("insertOrderedList")}
           >
@@ -779,7 +781,7 @@ export default function DocumentationPage() {
           </ToolbarBtn>
           <Divider />
           <ToolbarBtn
-            title="Blockquote"
+            title={t("toolbar.blockquote")}
             onClick={() => exec("formatBlock", "blockquote")}
           >
             <svg
@@ -798,7 +800,7 @@ export default function DocumentationPage() {
             </svg>
           </ToolbarBtn>
           <ToolbarBtn
-            title="Horizontal rule"
+            title={t("toolbar.horizontalRule")}
             onClick={() => exec("insertHorizontalRule")}
           >
             <svg
@@ -817,7 +819,7 @@ export default function DocumentationPage() {
           </ToolbarBtn>
           <Divider />
           <ToolbarBtn
-            title="Insert link"
+            title={t("toolbar.insertLink")}
             onClick={() => {
               const url = prompt("URL:");
               if (url) exec("createLink", url);
@@ -839,7 +841,7 @@ export default function DocumentationPage() {
             </svg>
           </ToolbarBtn>
           <ToolbarBtn
-            title="Remove formatting"
+            title={t("toolbar.removeFormatting")}
             onClick={() => exec("removeFormat")}
           >
             <svg
@@ -870,7 +872,7 @@ export default function DocumentationPage() {
           onKeyUp={refreshActiveFormats}
           onMouseUp={refreshActiveFormats}
           onSelect={refreshActiveFormats}
-          data-placeholder="Start writing your project documentation here..."
+          data-placeholder={t("placeholder")}
           className="flex-1 p-4 text-sm focus:outline-none doc-editor"
           style={{
             color: "var(--color-foreground)",

@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import SettingsHelpTooltip from "@/components/features/settings/SettingsHelpTooltip";
 
 export default function SettingsPage() {
+  const t = useTranslations("settings");
   const params = useParams();
   const projectId = params.projectId as string;
 
@@ -99,7 +101,7 @@ export default function SettingsPage() {
             d="M4 12a8 8 0 018-8v8H4z"
           />
         </svg>
-        <span className="text-sm">Loading settings...</span>
+        <span className="text-sm">{t("loading")}</span>
       </div>
     );
   }
@@ -108,15 +110,15 @@ export default function SettingsPage() {
     <div className="p-6 text-foreground">
       <div className="mb-6">
         <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">
-          Project
+          {t("section")}
         </p>
         <div className="flex items-center gap-2">
           <h1 className="text-3xl font-bold text-foreground leading-tight">
-            Settings
+            {t("title")}
           </h1>
           <SettingsHelpTooltip />
         </div>
-        <p className="text-sm text-muted mt-1">Manage project settings</p>
+        <p className="text-sm text-muted mt-1">{t("subtitle")}</p>
       </div>
 
       <div
@@ -126,12 +128,12 @@ export default function SettingsPage() {
           border: "1px solid var(--color-border)",
         }}
       >
-        <h2 className="mb-4 font-semibold text-foreground">Project Details</h2>
+        <h2 className="mb-4 font-semibold text-foreground">{t("projectDetails")}</h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-muted mb-1">
-              Name {canManage && <span className="text-error">*</span>}
+              {t("name")} {canManage && <span className="text-error">*</span>}
             </label>
             <input
               type="text"
@@ -150,7 +152,7 @@ export default function SettingsPage() {
 
           <div>
             <label className="block text-sm font-medium text-muted mb-1">
-              Description
+              {t("description")}
             </label>
             <textarea
               value={description}
@@ -177,7 +179,7 @@ export default function SettingsPage() {
             <div className="flex items-start gap-2.5 p-3 rounded-xl border border-green-200 bg-green-50">
               <span className="text-green-600 text-base mt-0.5">✓</span>
               <p className="text-sm text-green-700">
-                Project updated successfully.
+                {t("savedSuccess")}
               </p>
             </div>
           )}
@@ -189,7 +191,7 @@ export default function SettingsPage() {
                 disabled={saving || !name.trim()}
                 className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors shadow-sm bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {saving ? "Saving..." : "Save changes"}
+                {saving ? t("saving") : t("saveChanges")}
               </button>
             </div>
           )}
