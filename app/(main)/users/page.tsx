@@ -1,14 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
 import CreateUserModal from "@/components/features/users/CreateUserModal";
 import EditUserModal from "@/components/features/users/EditUserModal";
 import UsersHelpTooltip from "@/components/features/users/UsersHelpTooltip";
 import type { User } from "@/lib/types";
 
 export default function AdminUsersPage() {
-  const t = useTranslations("users");
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,7 +90,7 @@ export default function AdminUsersPage() {
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
         </svg>
-        <span className="text-sm">{t("loading")}</span>
+        <span className="text-sm">Loading users...</span>
       </div>
     );
   }
@@ -114,13 +112,13 @@ export default function AdminUsersPage() {
     <div className="p-6">
       <div className="flex justify-between items-end mb-8">
         <div>
-          <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">{t("section")}</p>
+          <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Admin</p>
           <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-bold text-foreground leading-tight">{t("title")}</h1>
+            <h1 className="text-3xl font-bold text-foreground leading-tight">Users</h1>
             <UsersHelpTooltip />
           </div>
           <p className="text-sm text-muted mt-1">
-            {users.length > 0 ? t("userCount", { count: users.length }) : t("noUsersYet")}
+            {users.length > 0 ? `${users.length} user${users.length === 1 ? "" : "s"}` : "No users yet"}
           </p>
         </div>
         <button
@@ -128,7 +126,7 @@ export default function AdminUsersPage() {
           className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors shadow-sm bg-primary hover:bg-primary-hover"
         >
           <span className="text-lg leading-none">+</span>
-          {t("addUser")}
+          Add user
         </button>
       </div>
 
@@ -154,7 +152,7 @@ export default function AdminUsersPage() {
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground leading-tight">
                       {user.first_name} {user.last_name}
-                      {isSelf && <span className="ml-2 text-xs font-normal text-muted">{t("you")}</span>}
+                      {isSelf && <span className="ml-2 text-xs font-normal text-muted">(you)</span>}
                     </p>
                     <p className="text-xs text-muted truncate">{user.email}</p>
                     <p className="text-xs text-subtle">@{user.username}</p>
@@ -177,7 +175,7 @@ export default function AdminUsersPage() {
                   <button
                     onClick={() => setEditUser(user)}
                     className="p-1.5 rounded-lg text-muted hover:text-foreground hover:bg-background transition-colors"
-                    title={t("editUser")}
+                    title="Edit user"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
@@ -189,7 +187,7 @@ export default function AdminUsersPage() {
                     onClick={() => { setDeleteError(null); setDeleteUser(user); }}
                     disabled={isSelf}
                     className="p-1.5 rounded-lg text-muted hover:text-error hover:bg-error-light transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                    title={isSelf ? t("cannotDeleteSelf") : t("deleteUser")}
+                    title={isSelf ? "You cannot delete your own account" : "Delete user"}
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
@@ -207,8 +205,8 @@ export default function AdminUsersPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
             </svg>
           </div>
-          <p className="font-semibold text-foreground mb-1">{t("empty.title")}</p>
-          <p className="text-sm text-subtle">{t("empty.addFirst")}</p>
+          <p className="font-semibold text-foreground mb-1">No users yet</p>
+          <p className="text-sm text-subtle">Add the first user to get started.</p>
         </div>
       )}
 
@@ -226,13 +224,14 @@ export default function AdminUsersPage() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-foreground">{t("deleteTitle")}</h3>
-                  <p className="text-sm text-muted">{t("cannotUndo")}</p>
+                  <h3 className="text-base font-bold text-foreground">Delete user</h3>
+                  <p className="text-sm text-muted">This action cannot be undone.</p>
                 </div>
               </div>
 
               <p className="text-sm text-foreground mb-1">
-                {t("deleteConfirm", { name: `${deleteUser.first_name} ${deleteUser.last_name}` })}
+                Are you sure you want to delete{" "}
+                <span className="font-semibold">{deleteUser.first_name} {deleteUser.last_name}</span>?
               </p>
               <p className="text-xs text-subtle mb-5">@{deleteUser.username} · {deleteUser.email}</p>
 
@@ -251,7 +250,7 @@ export default function AdminUsersPage() {
                   disabled={deleteLoading}
                   className="px-4 py-2 text-sm font-medium rounded-lg transition-colors bg-background hover:bg-border text-muted disabled:opacity-50"
                 >
-                  {t("cancel")}
+                  Cancel
                 </button>
                 <button
                   onClick={handleDeleteConfirm}
@@ -264,9 +263,9 @@ export default function AdminUsersPage() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                       </svg>
-                      {t("deleting")}
+                      Deleting...
                     </span>
-                  ) : t("deleteUser")}
+                  ) : "Delete user"}
                 </button>
               </div>
             </div>

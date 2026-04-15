@@ -3,10 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { useTranslations } from "next-intl";
 
 export default function LoginPage() {
-  const t = useTranslations("login");
   const router = useRouter();
   const supabase = createClient();
 
@@ -140,7 +138,7 @@ export default function LoginPage() {
       <div className="fixed top-4 right-4">
         <button
           onClick={toggleTheme}
-          title={isDark ? t("switchThemeLight") : t("switchThemeDark")}
+          title={isDark ? "Switch to light mode" : "Switch to dark mode"}
           className="w-9 h-9 flex items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] hover:bg-[var(--color-primary-light)] hover:border-[var(--color-primary-border)] transition-colors text-[var(--color-muted)] hover:text-[var(--color-primary)]"
         >
           {isDark ? (
@@ -184,15 +182,15 @@ export default function LoginPage() {
         {mfaRequired ? (
           <>
             <h2 className="mb-2 text-center text-lg text-[var(--color-muted)]">
-              {t("twoFactor")}
+              Two-factor authentication
             </h2>
             <p className="mb-6 text-center text-sm text-[var(--color-muted)]">
-              {t("enterCode")}
+              Enter the 6-digit code from your authenticator app.
             </p>
             <form onSubmit={handleMfaVerify} className="space-y-5">
               <div>
                 <label className="mb-2 block text-sm font-medium text-[var(--color-foreground)]">
-                  {t("authCode")}
+                  Authentication code
                 </label>
                 <input
                   type="text"
@@ -217,7 +215,7 @@ export default function LoginPage() {
                 disabled={mfaLoading || mfaCode.length !== 6}
                 className="w-full rounded-lg px-4 py-2 font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]"
               >
-                {mfaLoading ? t("verifying") : t("verify")}
+                {mfaLoading ? "Verifying..." : "Verify"}
               </button>
               <button
                 type="button"
@@ -228,19 +226,19 @@ export default function LoginPage() {
                 }}
                 className="w-full text-sm text-[var(--color-muted)] hover:text-[var(--color-foreground)] transition"
               >
-                {t("backToLogin")}
+                ← Back to login
               </button>
             </form>
           </>
         ) : (
           <>
             <h2 className="mb-6 text-center text-lg text-[var(--color-muted)]">
-              {t("signInTitle")}
+              Sign in to your account
             </h2>
             <form onSubmit={handleLogin} className="space-y-5">
               <div>
                 <label className="mb-2 block text-sm font-medium text-[var(--color-foreground)]">
-                  {t("email")}
+                  Email
                 </label>
                 <input
                   type="email"
@@ -253,7 +251,7 @@ export default function LoginPage() {
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-[var(--color-foreground)]">
-                  {t("password")}
+                  Password
                 </label>
                 <div className="relative">
                   <input
@@ -317,7 +315,7 @@ export default function LoginPage() {
                 disabled={loading}
                 className="w-full rounded-lg px-4 py-2 font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)]"
               >
-                {loading ? t("signingIn") : t("signIn")}
+                {loading ? "Signing in..." : "Sign in"}
               </button>
             </form>
           </>

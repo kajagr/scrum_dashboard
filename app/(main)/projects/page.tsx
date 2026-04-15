@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useTranslations } from "next-intl";
 import CreateProjectModal from "@/components/features/projects/CreateProjectModal";
 import ProjectCard from "@/components/features/projects/ProjectCard";
 import ProjectHelpTooltip from "@/components/features/projects/ProjectHelpTooltip";
@@ -18,7 +17,6 @@ const filterToStatus: Record<FilterStatus, string> = {
 };
 
 export default function ProjectsPage() {
-  const t = useTranslations("projects");
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,13 +59,6 @@ export default function ProjectsPage() {
     );
   };
 
-  const filterLabels: Record<FilterStatus, string> = {
-    "All": t("filters.all"),
-    "Active": t("filters.active"),
-    "On Hold": t("filters.onHold"),
-    "Completed": t("filters.completed"),
-  };
-
   const filteredProjects = useMemo(() => {
     const target = filterToStatus[activeFilter];
     if (!target) return projects;
@@ -81,7 +72,7 @@ export default function ProjectsPage() {
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
         </svg>
-        <span className="text-sm">{t("loading")}</span>
+        <span className="text-sm">Loading projects...</span>
       </div>
     );
   }
@@ -105,16 +96,16 @@ export default function ProjectsPage() {
       <div className="flex justify-between items-end mb-8">
         <div>
           <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">
-            {t("workspace")}
+            Workspace
           </p>
           <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-bold text-foreground leading-tight">{t("title")}</h1>
+            <h1 className="text-3xl font-bold text-foreground leading-tight">Projects</h1>
             <ProjectHelpTooltip />
           </div>
           <p className="text-sm text-muted mt-1">
             {projects.length > 0
-              ? t("projectCount", { count: projects.length })
-              : t("noProjectsYet")}
+              ? `${projects.length} project${projects.length === 1 ? "" : "s"}`
+              : "No projects yet"}
           </p>
         </div>
 
@@ -124,7 +115,7 @@ export default function ProjectsPage() {
             className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors shadow-sm bg-primary hover:bg-primary-hover"
           >
             <span className="text-lg leading-none">+</span>
-            {t("newProject")}
+            New Project
           </button>
         )}
       </div>
@@ -141,7 +132,7 @@ export default function ProjectsPage() {
                 : "bg-surface text-muted border-border hover:border-primary hover:text-foreground"
             }`}
           >
-            {filterLabels[f]}
+            {f}
           </button>
         ))}
       </div>
@@ -164,11 +155,11 @@ export default function ProjectsPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
             </svg>
           </div>
-          <p className="font-semibold text-foreground mb-1">{t("empty.title")}</p>
+          <p className="font-semibold text-foreground mb-1">No projects yet</p>
           <p className="text-sm text-subtle">
             {activeFilter !== "All"
-              ? t("empty.noStatus", { status: filterLabels[activeFilter] })
-              : t("empty.createFirst")}
+              ? `No projects with status "${activeFilter}".`
+              : "Create your first project to get started."}
           </p>
         </div>
       )}

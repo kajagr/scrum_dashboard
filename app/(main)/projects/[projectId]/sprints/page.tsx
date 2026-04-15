@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
 import { useParams } from "next/navigation";
 import CreateSprintModal from "@/components/features/sprints/CreateSprintModal";
 import EditSprintModal from "@/components/features/sprints/EditSprintModal";
@@ -10,7 +9,6 @@ import SprintHelpTooltip from "@/components/features/sprints/SprintHelpTooltip";
 import type { Sprint } from "@/lib/types";
 
 export default function SprintsPage() {
-  const t = useTranslations("sprints");
   const params = useParams();
   const projectId = params.projectId as string;
 
@@ -76,7 +74,7 @@ export default function SprintsPage() {
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
         </svg>
-        <span className="text-sm">{t("loading")}</span>
+        <span className="text-sm">Loading sprints...</span>
       </div>
     );
   }
@@ -86,15 +84,15 @@ export default function SprintsPage() {
       {/* Header */}
       <div className="flex justify-between items-end mb-8">
         <div>
-          <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">{t("section")}</p>
+          <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Project</p>
           <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-bold text-foreground leading-tight">{t("title")}</h1>
+            <h1 className="text-3xl font-bold text-foreground leading-tight">Sprints</h1>
             <SprintHelpTooltip />
           </div>
           <p className="text-sm text-muted mt-1">
             {sprints.length > 0
-              ? t("sprintCount", { count: sprints.length })
-              : t("noSprintsYet")}
+              ? `${sprints.length} sprint${sprints.length === 1 ? "" : "s"}`
+              : "No sprints yet"}
           </p>
         </div>
 
@@ -104,7 +102,7 @@ export default function SprintsPage() {
             className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors shadow-sm bg-primary hover:bg-primary-hover"
           >
             <span className="text-lg leading-none">+</span>
-            {t("newSprint")}
+            New Sprint
           </button>
         )}
       </div>
@@ -129,9 +127,9 @@ export default function SprintsPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 9v7.5" />
             </svg>
           </div>
-          <p className="font-semibold text-foreground mb-1">{t("empty.title")}</p>
+          <p className="font-semibold text-foreground mb-1">No sprints yet</p>
           <p className="text-sm text-subtle">
-            {isScrumMaster ? t("empty.canCreate") : t("empty.cannotCreate")}
+            {isScrumMaster ? "Create your first sprint to get started." : "No sprints have been created yet."}
           </p>
         </div>
       )}
@@ -150,13 +148,14 @@ export default function SprintsPage() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-foreground">{t("deleteTitle")}</h3>
-                  <p className="text-sm text-muted">{t("cannotUndo")}</p>
+                  <h3 className="text-base font-bold text-foreground">Delete sprint</h3>
+                  <p className="text-sm text-muted">This action cannot be undone.</p>
                 </div>
               </div>
 
               <p className="text-sm text-foreground mb-5">
-                {t("deleteConfirm", { name: deleteSprint.name })}
+                Are you sure you want to delete{" "}
+                <span className="font-semibold">{deleteSprint.name}</span>?
               </p>
 
               {deleteError && (
@@ -174,7 +173,7 @@ export default function SprintsPage() {
                   disabled={deleteLoading}
                   className="px-4 py-2 text-sm font-medium rounded-lg transition-colors bg-background hover:bg-border text-muted disabled:opacity-50"
                 >
-                  {t("cancel")}
+                  Cancel
                 </button>
                 <button
                   onClick={handleDeleteConfirm}
@@ -187,9 +186,9 @@ export default function SprintsPage() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                       </svg>
-                      {t("deleting")}
+                      Deleting...
                     </span>
-                  ) : t("deleteSprint")}
+                  ) : "Delete sprint"}
                 </button>
               </div>
             </div>

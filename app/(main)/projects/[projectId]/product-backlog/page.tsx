@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
 import CreateStoryModal from "@/components/features/stories/CreateStoryModal";
 import BacklogHelpTooltip from "@/components/features/stories/BacklogHelpTooltip";
 import type { UserStory } from "@/lib/types";
@@ -70,7 +69,6 @@ function SprintFilterDropdown({
   selected: Set<string>;
   onChange: (s: Set<string>) => void;
 }) {
-  const t = useTranslations("productBacklog");
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -89,7 +87,7 @@ function SprintFilterDropdown({
   };
 
   const label = selected.size === 0
-    ? t("sprint.allSprints")
+    ? "All sprints"
     : selected.size === 1
     ? [...selected][0]
     : `${selected.size} sprints selected`;
@@ -115,9 +113,9 @@ function SprintFilterDropdown({
       {open && (
         <div className="absolute left-0 top-full mt-1.5 z-50 w-52 rounded-xl border border-border bg-surface shadow-lg overflow-hidden">
           <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted uppercase tracking-widest">{t("sprint.filterBySprint")}</span>
+            <span className="text-xs font-semibold text-muted uppercase tracking-widest">Filter by sprint</span>
             {selected.size > 0 && (
-              <button onClick={() => onChange(new Set())} className="text-xs text-primary hover:underline ml-2">{t("sprint.clear")}</button>
+              <button onClick={() => onChange(new Set())} className="text-xs text-primary hover:underline ml-2">Clear</button>
             )}
           </div>
           {sprints.map((name) => (
@@ -183,7 +181,6 @@ function StoryCard({
   activeSessionId?: string | null;
   reviewSprintName?: string;
 }) {
-  const t = useTranslations("productBacklog");
   const [estimating, setEstimating] = useState(false);
   const [estimateVal, setEstimateVal] = useState("");
   const [estimateLoading, setEstimateLoading] = useState(false);
@@ -197,7 +194,7 @@ function StoryCard({
 
   const handleEstimateSubmit = async () => {
     const pts = Number(estimateVal);
-    if (!Number.isFinite(pts) || pts <= 0) { setEstimateError(t("estimate.mustBePositive")); return; }
+    if (!Number.isFinite(pts) || pts <= 0) { setEstimateError("Must be a positive number."); return; }
     setEstimateLoading(true);
     setEstimateError(null);
     const result = await onEstimateSubmit?.(pts);
@@ -355,7 +352,7 @@ function StoryCard({
               className="w-24 px-3 py-1.5 rounded-lg text-sm bg-surface border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
             />
             <button type="button" onClick={handleEstimateSubmit} disabled={estimateLoading || !estimateVal} className="px-3 py-1.5 text-xs font-semibold text-white rounded-lg bg-primary hover:bg-primary-hover disabled:opacity-50 transition-colors">
-              {estimateLoading ? t("estimate.saving") : t("estimate.setEstimate")}
+              {estimateLoading ? "Saving..." : "Set estimate"}
             </button>
             <button type="button" onClick={() => { setEstimating(false); setEstimateVal(""); setEstimateError(null); }} className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-muted hover:text-foreground transition-colors">
               Cancel
@@ -390,7 +387,6 @@ function useSorted(stories: UserStoryWithSprintInfo[], sortBy: SortKey) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function BacklogPage() {
-  const t = useTranslations("productBacklog");
   const params = useParams();
   const router = useRouter();
   const projectId = params.projectId as string;
@@ -678,7 +674,7 @@ export default function BacklogPage() {
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
         </svg>
-        <span className="text-sm">{t("loading")}</span>
+        <span className="text-sm">Loading backlog...</span>
       </div>
     );
   }
@@ -688,13 +684,13 @@ export default function BacklogPage() {
       {/* Header */}
       <div className="flex justify-between items-end mb-6">
         <div>
-          <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">{t("section")}</p>
+          <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Project</p>
           <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-bold text-foreground leading-tight">{t("title")}</h1>
+            <h1 className="text-3xl font-bold text-foreground leading-tight">Product Backlog</h1>
             <BacklogHelpTooltip />
           </div>
           <p className="text-sm text-muted mt-1">
-            {totalStories > 0 ? t("storyCount", { count: totalStories }) : t("noStoriesYet")}
+            {totalStories > 0 ? `${totalStories} stor${totalStories === 1 ? "y" : "ies"}` : "No stories yet"}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -702,7 +698,7 @@ export default function BacklogPage() {
             <button
               onClick={handleAssign}
               disabled={assigning || !activeSprint || exceedsVelocity}
-              title={!activeSprint ? t("sprint.noActiveSprint") : exceedsVelocity ? t("sprint.exceedsVelocity", { current: selectedPoints, max: remainingVelocity }) : undefined}
+              title={!activeSprint ? "No active sprint" : exceedsVelocity ? `Exceeds sprint velocity (${selectedPoints}/${remainingVelocity} pts remaining)` : undefined}
               className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-xl border transition-colors disabled:opacity-50 bg-accent-light border-accent-border text-accent-text hover:bg-accent/20"
             >
               {assigning ? (
@@ -715,7 +711,7 @@ export default function BacklogPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               )}
-              {assigning ? t("sprint.assigning") : t("sprint.assignToSprint")}
+              Add {selectedIds.length} to sprint
             </button>
           )}
           {canCreate && (
@@ -774,26 +770,26 @@ export default function BacklogPage() {
       <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
         <div className="flex items-center gap-1 p-1 rounded-xl bg-surface border border-border flex-wrap">
           <button onClick={() => switchTab("unassigned")} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "unassigned" ? "bg-primary-light text-primary border border-primary-border shadow-sm" : "text-muted hover:text-foreground"}`}>
-            {t("tabs.unassigned")}
+            Unassigned
             <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${activeTab === "unassigned" ? "bg-primary text-white" : "bg-border text-muted"}`}>{unassignedRegular.length}</span>
           </button>
           <button onClick={() => switchTab("assigned")} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "assigned" ? "bg-primary-light text-primary border border-primary-border shadow-sm" : "text-muted hover:text-foreground"}`}>
-            {t("tabs.assigned")}
+            In active sprint
             <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${activeTab === "assigned" ? "bg-primary text-white" : "bg-border text-muted"}`}>{inSprintStories.length}</span>
           </button>
           <button onClick={() => switchTab("ready")} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "ready" ? "bg-primary-light text-primary border border-primary-border shadow-sm" : "text-muted hover:text-foreground"}`}>
-            {t("tabs.ready")}
+            Ready for review
             {readyStories.length > 0 && <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${activeTab === "ready" ? "bg-primary text-white" : "bg-primary text-white"}`}>{readyStories.length}</span>}
             {readyStories.length === 0 && <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${activeTab === "ready" ? "bg-primary text-white" : "bg-border text-muted"}`}>0</span>}
           </button>
           <button onClick={() => switchTab("realized")} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "realized" ? "bg-primary-light text-primary border border-primary-border shadow-sm" : "text-muted hover:text-foreground"}`}>
-            {t("tabs.realized")}
+            Done
             <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${activeTab === "realized" ? "bg-primary text-white" : "bg-border text-muted"}`}>{realized.length}</span>
           </button>
           <div className="flex items-center gap-1">
             <div className="w-px h-4 bg-border mx-1" />
             <button onClick={() => switchTab("future")} className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "future" ? "bg-primary-light text-primary border border-primary-border shadow-sm" : "text-muted hover:text-foreground"}`}>
-              {t("tabs.future")}
+              Future Releases
               <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${activeTab === "future" ? "bg-primary text-white" : "bg-border text-muted"}`}>{unassignedWontHave.length}</span>
             </button>
           </div>
@@ -805,7 +801,7 @@ export default function BacklogPage() {
             <div className="flex items-center gap-1 p-1 rounded-xl bg-surface border border-border">
               {SORT_OPTIONS.map((opt) => (
                 <button key={opt.value} onClick={() => setSortBy(opt.value)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${sortBy === opt.value ? "bg-primary-light text-primary border border-primary-border shadow-sm" : "text-muted hover:text-foreground"}`}>
-                  {opt.value === "created_at" ? t("sort.createdAt") : opt.value === "business_value" ? t("sort.businessValue") : t("sort.priority")}
+                  {opt.label}
                 </button>
               ))}
             </div>
@@ -833,7 +829,7 @@ export default function BacklogPage() {
             }}
             className="text-xs text-primary hover:underline font-medium"
           >
-            {selectedIds.length === unassignedRegular.filter((s) => s.story_points != null).length && selectedIds.length > 0 ? t("deselectAll") : t("selectAll")}
+            {selectedIds.length === unassignedRegular.filter((s) => s.story_points != null).length && selectedIds.length > 0 ? "Deselect all" : "Select all"}
           </button>
           {selectedIds.length > 0 && (
             <span className="text-xs text-muted flex items-center gap-2">
@@ -895,18 +891,18 @@ export default function BacklogPage() {
             </svg>
           </div>
           <p className="font-semibold text-foreground mb-1">
-            {activeTab === "unassigned" ? t("empty.unassigned")
-              : activeTab === "assigned" ? t("empty.assigned")
-              : activeTab === "ready" ? t("empty.ready")
-              : activeTab === "future" ? t("empty.future")
-              : t("empty.realized")}
+            {activeTab === "unassigned" ? "No unassigned stories"
+              : activeTab === "assigned" ? "No stories in active sprint"
+              : activeTab === "ready" ? "No stories ready for review"
+              : activeTab === "future" ? "No future release stories"
+              : "No completed stories yet"}
           </p>
           <p className="text-sm text-subtle">
-            {activeTab === "unassigned" ? t("empty.unassignedSub")
-              : activeTab === "assigned" ? activeSprint ? t("empty.assignedSub") : t("empty.assignedNoSprint")
+            {activeTab === "unassigned" ? "All stories are assigned to a sprint or completed."
+              : activeTab === "assigned" ? activeSprint ? "Add stories from the Unassigned tab." : "Start a sprint first."
               : activeTab === "ready" ? "Stories marked as ready by the team will appear here."
-              : activeTab === "future" ? t("empty.futureSub")
-              : t("empty.realizedSub")}
+              : activeTab === "future" ? 'Stories with "Won\'t Have" priority will appear here.'
+              : "Completed stories will appear here."}
           </p>
         </div>
       )}

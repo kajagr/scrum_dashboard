@@ -4,7 +4,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { useTranslations } from "next-intl";
 import WallCompose from "@/components/features/wall/WallCompose";
 import WallPostCard from "@/components/features/wall/WallPostCard";
 import WallSidebar from "@/components/features/wall/WallSideBar";
@@ -19,7 +18,6 @@ type WallPost = {
 };
 
 export default function WallPage() {
-  const t = useTranslations("wall");
   const params = useParams();
   const projectId = params.projectId as string;
 
@@ -74,13 +72,13 @@ export default function WallPage() {
     <div className="p-6">
       {/* Header */}
       <div className="mb-8">
-        <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">{t("section")}</p>
+        <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Project</p>
         <div className="flex items-center gap-2">
-          <h1 className="text-3xl font-bold text-foreground leading-tight">{t("title")}</h1>
+          <h1 className="text-3xl font-bold text-foreground leading-tight">Project Wall</h1>
           <WallHelpTooltip />
         </div>
         <p className="text-sm text-muted mt-1">
-          {posts.length > 0 ? t("postCount", { count: posts.length }) : t("shareUpdates")}
+          {posts.length > 0 ? `${posts.length} post${posts.length === 1 ? "" : "s"}` : "Share updates with your team"}
         </p>
       </div>
 
@@ -99,7 +97,7 @@ export default function WallPage() {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
               </svg>
-              <span className="text-sm">{t("loading")}</span>
+              <span className="text-sm">Loading posts...</span>
             </div>
           ) : posts.length > 0 ? (
             <div className="relative">
@@ -127,8 +125,8 @@ export default function WallPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
                 </svg>
               </div>
-              <p className="font-semibold text-foreground mb-1">{t("empty.title")}</p>
-              <p className="text-sm text-muted">{t("empty.subtitle")}</p>
+              <p className="font-semibold text-foreground mb-1">No posts yet</p>
+              <p className="text-sm text-muted">Be the first to share an update.</p>
             </div>
           )}
         </div>
