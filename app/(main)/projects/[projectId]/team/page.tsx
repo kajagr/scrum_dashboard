@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import AddMemberModal from "@/components/features/team/AddMemberModal";
 import TeamHelpTooltip from "@/components/features/team/TeamHelpTooltip";
 import { ProjectRole } from "@/lib/types";
@@ -41,28 +42,19 @@ const roleConfig: Record<string, { label: string; className: string }> = {
 
 const roleLabel = (r: string) => roleConfig[r]?.label ?? r;
 
-function getHealthIssues(members: MemberWithUser[]): string[] {
-  const issues: string[] = [];
+function getHealthIssues(members: MemberWithUser[]): { key: string; count?: number }[] {
+  const issues: { key: string; count?: number }[] = [];
   const owners = members.filter((m) => m.role === "product_owner").length;
   const masters = members.filter((m) => m.role === "scrum_master").length;
-
-  if (owners === 0)
-    issues.push("Project has no Product Owner. Please assign one.");
-  if (owners > 1)
-    issues.push(
-      `Project has ${owners} Product Owners. Please demote one to Team Member.`,
-    );
-  if (masters === 0)
-    issues.push("Project has no Scrum Master. Please assign one.");
-  if (masters > 1)
-    issues.push(
-      `Project has ${masters} Scrum Masters. Please demote one to Team Member.`,
-    );
-
+  if (owners === 0) issues.push({ key: "noProductOwner" });
+  if (owners > 1) issues.push({ key: "tooManyProductOwners", count: owners });
+  if (masters === 0) issues.push({ key: "noScrumMaster" });
+  if (masters > 1) issues.push({ key: "tooManyScrumMasters", count: masters });
   return issues;
 }
 
 export default function TeamPage() {
+  const t = useTranslations("team");
   const params = useParams();
   const projectId = params.projectId as string;
 
@@ -70,12 +62,18 @@ export default function TeamPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [healthIssues, setHealthIssues] = useState<string[]>([]);
+  const [healthIssues, setHealthIssues] = useState<{ key: string; count?: number }[]>([]);
   const [editingRoleFor, setEditingRoleFor] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [canManage, setCanManage] = useState(false);
 
   const isHealthy = healthIssues.length === 0;
+
+  const translatedRoleConfig: Record<string, { label: string; className: string }> = {
+    product_owner: { label: t("roles.product_owner"), className: roleConfig.product_owner.className },
+    scrum_master: { label: t("roles.scrum_master"), className: roleConfig.scrum_master.className },
+    developer: { label: t("roles.developer"), className: roleConfig.developer.className },
+  };
 
   useEffect(() => {
     if (!projectId) return;
@@ -206,7 +204,7 @@ export default function TeamPage() {
   }
 
   async function handleRemove(userId: string) {
-    if (!confirm("Are you sure you want to remove this member?")) return;
+    if (!confirm(t("confirmRemove"))) return;
 
     setActionError(null);
 
@@ -247,7 +245,7 @@ export default function TeamPage() {
             d="M4 12a8 8 0 018-8v8H4z"
           />
         </svg>
-        <span className="text-sm">Loading team...</span>
+        <span className="text-sm">{t("loading")}</span>
       </div>
     );
   }
@@ -269,18 +267,18 @@ export default function TeamPage() {
       <div className="flex justify-between items-end mb-8">
         <div>
           <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">
-            Project
+            {t("section")}
           </p>
           <div className="flex items-center gap-2">
             <h1 className="text-3xl font-bold text-foreground leading-tight">
-              Team
+              {t("title")}
             </h1>
             <TeamHelpTooltip />
           </div>
           <p className="text-sm text-muted mt-1">
             {members.length > 0
-              ? `${members.length} member${members.length === 1 ? "" : "s"}`
-              : "No members yet"}
+              ? t("memberCount", { count: members.length })
+              : t("noMembersYet")}
           </p>
         </div>
 
@@ -290,7 +288,7 @@ export default function TeamPage() {
             className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors shadow-sm bg-primary hover:bg-primary-hover"
           >
             <span className="text-lg leading-none">+</span>
-            Add member
+            {t("addMember")}
           </button>
         )}
       </div>
@@ -302,18 +300,17 @@ export default function TeamPage() {
             <span className="text-error text-base mt-0.5">⚠</span>
             <div>
               <p className="text-sm font-semibold text-error mb-2">
-                Project role configuration is incomplete.
+                {t("healthIncomplete")}
               </p>
               <ul className="list-disc list-inside space-y-1">
                 {healthIssues.map((issue, i) => (
                   <li key={i} className="text-sm text-error">
-                    {issue}
+                    {t(`health.${issue.key}`, issue.count !== undefined ? { count: issue.count } : {})}
                   </li>
                 ))}
               </ul>
               <p className="mt-2 text-xs text-error opacity-75">
-                Navigation to other project pages is disabled until this is
-                resolved.
+                {t("healthDisabledNav")}
               </p>
             </div>
           </div>
@@ -329,7 +326,7 @@ export default function TeamPage() {
             onClick={() => setActionError(null)}
             className="ml-auto text-error text-xs underline"
           >
-            Dismiss
+            {t("dismiss")}
           </button>
         </div>
       )}
@@ -338,7 +335,7 @@ export default function TeamPage() {
       {members.length > 0 ? (
         <div className="space-y-3">
           {members.map((member) => {
-            const cfg = roleConfig[member.role] ?? roleConfig.developer;
+            const cfg = translatedRoleConfig[member.role] ?? translatedRoleConfig.developer;
             const initials = `${member.user?.first_name?.[0] ?? ""}${member.user?.last_name?.[0] ?? ""}`;
             const isEditing = editingRoleFor === member.user_id;
 
@@ -394,8 +391,8 @@ export default function TeamPage() {
                                   disabled={disabled}
                                   title={warning ?? undefined}
                                 >
-                                  {roleLabel(r)}
-                                  {disabled ? " — already assigned" : ""}
+                                  {translatedRoleConfig[r]?.label ?? r}
+                                  {disabled ? ` — ${t("alreadyAssigned")}` : ""}
                                 </option>
                               );
                             })}
@@ -405,7 +402,7 @@ export default function TeamPage() {
                             onClick={() => setEditingRoleFor(null)}
                             className="px-3 py-1.5 text-xs font-medium rounded-lg border border-error-border bg-error-light text-error hover:bg-error-light/80 transition-colors"
                           >
-                            Cancel
+                            {t("cancel")}
                           </button>
                         </div>
 
@@ -441,13 +438,13 @@ export default function TeamPage() {
                               }}
                               className="text-xs px-2.5 py-1 rounded-lg border border-border text-muted hover:text-foreground hover:border-primary transition-colors"
                             >
-                              Change role
+                              {t("changeRole")}
                             </button>
                             <button
                               onClick={() => handleRemove(member.user_id)}
                               className="px-3 py-1.5 text-xs font-medium rounded-lg border border-error-border bg-error-light text-error hover:bg-error-light/80 transition-colors"
                             >
-                              Remove
+                              {t("remove")}
                             </button>
                           </>
                         )}
@@ -476,11 +473,11 @@ export default function TeamPage() {
               />
             </svg>
           </div>
-          <p className="font-semibold text-foreground mb-1">No team members yet</p>
+          <p className="font-semibold text-foreground mb-1">{t("empty.title")}</p>
           <p className="text-sm text-subtle">
             {canManage
-              ? "Add your first member to get started."
-              : "No team members have been added yet."}
+              ? t("empty.canManage")
+              : t("empty.cannotManage")}
           </p>
         </div>
       )}

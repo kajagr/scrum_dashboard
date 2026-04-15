@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import ProfileModal from "@/components/features/profile/ProfileModal";
 import { formatDateDot, formatDateTimeDot } from "@/lib/datetime";
+import { useTranslations } from "next-intl";
+import LanguageSwitcher from "@/components/layout/LanguageSwitcher";
 
 interface UserProfile {
   first_name: string | null;
@@ -12,6 +14,7 @@ interface UserProfile {
 }
 
 export default function Navbar() {
+  const t = useTranslations("navbar");
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isDark, setIsDark] = useState(true);
@@ -70,9 +73,11 @@ export default function Navbar() {
 
         <div className="flex items-center gap-3">
           {/* Theme toggle */}
+          <LanguageSwitcher />
+
           <button
             onClick={toggleTheme}
-            title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+            title={isDark ? t("switchThemeLight") : t("switchThemeDark")}
             className="w-9 h-9 flex items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] hover:bg-[var(--color-primary-light)] hover:border-[var(--color-primary-border)] transition-colors text-[var(--color-muted)] hover:text-[var(--color-primary)]"
           >
             {isDark ? (
@@ -115,7 +120,7 @@ export default function Navbar() {
             <div className="w-7 h-7 bg-[var(--color-primary-light)] text-[var(--color-primary)] border border-[var(--color-primary-border)] rounded-full flex items-center justify-center text-xs font-semibold">
               {initials}
             </div>
-            My Profile
+            {t("myProfile")}
           </button>
 
           <div className="text-right">
@@ -127,8 +132,8 @@ export default function Navbar() {
             {user && (
               <div className="text-xs text-[var(--color-subtle)] mt-0.5">
                 {user.last_login_at
-                  ? `Last login: ${formatDateTimeDot(user.last_login_at)}`
-                  : "First login"}
+                  ? t("lastLogin", { date: formatDateTimeDot(user.last_login_at) })
+                  : t("firstLogin")}
               </div>
             )}
           </div>

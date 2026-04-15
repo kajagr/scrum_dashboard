@@ -1,0 +1,359 @@
+{
+  "navbar": {
+    "myProfile": "My Profile",
+    "lastLogin": "Last login: {date}",
+    "firstLogin": "First login",
+    "switchThemeLight": "Switch to light mode",
+    "switchThemeDark": "Switch to dark mode",
+    "switchToSlovenian": "Switch to Slovenian",
+    "switchToEnglish": "Switch to English"
+  },
+  "sidebar": {
+    "projects": "Projects",
+    "dashboard": "Dashboard",
+    "productBacklog": "Product Backlog",
+    "sprintBacklog": "Sprint Backlog",
+    "sprints": "Sprints",
+    "timeTracking": "Time Tracking",
+    "documentation": "Documentation",
+    "team": "Team",
+    "wall": "Wall",
+    "settings": "Settings",
+    "users": "Users",
+    "signOut": "Sign Out",
+    "fixTeamRoles": "Fix team role issues on the Team page first"
+  },
+  "login": {
+    "twoFactor": "Two-factor authentication",
+    "enterCode": "Enter the 6-digit code from your authenticator app.",
+    "authCode": "Authentication code",
+    "verifying": "Verifying...",
+    "verify": "Verify",
+    "backToLogin": "← Back to login",
+    "signInTitle": "Sign in to your account",
+    "email": "Email",
+    "password": "Password",
+    "signingIn": "Signing in...",
+    "signIn": "Sign in",
+    "switchThemeLight": "Switch to light mode",
+    "switchThemeDark": "Switch to dark mode"
+  },
+  "register": {
+    "title": "Registration",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "username": "Username",
+    "email": "Email",
+    "password": "Password",
+    "loading": "Loading...",
+    "register": "Register",
+    "alreadyHaveAccount": "Already have an account?",
+    "signIn": "Sign in"
+  },
+  "projects": {
+    "workspace": "Workspace",
+    "title": "Projects",
+    "projectCount": "{count, plural, one {# project} other {# projects}}",
+    "noProjectsYet": "No projects yet",
+    "newProject": "New Project",
+    "loading": "Loading projects...",
+    "filters": {
+      "all": "All",
+      "active": "Active",
+      "onHold": "On Hold",
+      "completed": "Completed"
+    },
+    "empty": {
+      "title": "No projects yet",
+      "createFirst": "Create your first project to get started.",
+      "noStatus": "No projects with status \"{status}\"."
+    }
+  },
+  "dashboard": {
+    "section": "Project",
+    "noDescription": "No description",
+    "userStories": "User Stories",
+    "completed": "{count} completed",
+    "sprints": "Sprints",
+    "totalSprints": "total sprints",
+    "team": "Team",
+    "members": "members",
+    "progress": "Progress"
+  },
+  "users": {
+    "section": "Admin",
+    "title": "Users",
+    "userCount": "{count, plural, one {# user} other {# users}}",
+    "noUsersYet": "No users yet",
+    "addUser": "Add user",
+    "loading": "Loading users...",
+    "you": "(you)",
+    "editUser": "Edit user",
+    "cannotDeleteSelf": "You cannot delete your own account",
+    "deleteUser": "Delete user",
+    "deleteTitle": "Delete user",
+    "cannotUndo": "This action cannot be undone.",
+    "deleteConfirm": "Are you sure you want to delete {name}?",
+    "cancel": "Cancel",
+    "deleting": "Deleting...",
+    "empty": {
+      "title": "No users yet",
+      "addFirst": "Add the first user to get started."
+    }
+  },
+  "team": {
+    "section": "Project",
+    "title": "Team",
+    "memberCount": "{count, plural, one {# member} other {# members}}",
+    "noMembersYet": "No members yet",
+    "addMember": "Add member",
+    "loading": "Loading team...",
+    "healthIncomplete": "Project role configuration is incomplete.",
+    "healthDisabledNav": "Navigation to other project pages is disabled until this is resolved.",
+    "dismiss": "Dismiss",
+    "changeRole": "Change role",
+    "remove": "Remove",
+    "cancel": "Cancel",
+    "alreadyAssigned": "— already assigned",
+    "confirmRemove": "Are you sure you want to remove this member?",
+    "roles": {
+      "product_owner": "Product Owner",
+      "scrum_master": "Scrum Master",
+      "developer": "Team Member"
+    },
+    "health": {
+      "noProductOwner": "Project has no Product Owner. Please assign one.",
+      "tooManyProductOwners": "Project has {count} Product Owners. Please demote one to Team Member.",
+      "noScrumMaster": "Project has no Scrum Master. Please assign one.",
+      "tooManyScrumMasters": "Project has {count} Scrum Masters. Please demote one to Team Member."
+    },
+    "empty": {
+      "title": "No team members yet",
+      "canManage": "Add your first member to get started.",
+      "cannotManage": "No team members have been added yet."
+    }
+  },
+  "sprints": {
+    "section": "Project",
+    "title": "Sprints",
+    "sprintCount": "{count, plural, one {# sprint} other {# sprints}}",
+    "noSprintsYet": "No sprints yet",
+    "newSprint": "New Sprint",
+    "loading": "Loading sprints...",
+    "deleteTitle": "Delete sprint",
+    "cannotUndo": "This action cannot be undone.",
+    "deleteConfirm": "Are you sure you want to delete {name}?",
+    "cancel": "Cancel",
+    "deleting": "Deleting...",
+    "deleteSprint": "Delete sprint",
+    "empty": {
+      "title": "No sprints yet",
+      "canCreate": "Create your first sprint to get started.",
+      "cannotCreate": "No sprints have been created yet."
+    }
+  },
+  "productBacklog": {
+    "section": "Project",
+    "title": "Product Backlog",
+    "storyCount": "{count, plural, one {# story} other {# stories}}",
+    "noStoriesYet": "No stories yet",
+    "loading": "Loading backlog...",
+    "tabs": {
+      "unassigned": "Unassigned",
+      "assigned": "Active Sprint",
+      "ready": "For Review",
+      "realized": "Completed",
+      "future": "Future"
+    },
+    "sort": {
+      "label": "Sort",
+      "createdAt": "Date",
+      "businessValue": "Business value",
+      "priority": "Priority"
+    },
+    "sprint": {
+      "allSprints": "All sprints",
+      "filterBySprint": "Filter by sprint",
+      "clear": "Clear",
+      "selected": "{count} sprints selected",
+      "noActiveSprint": "No active sprint",
+      "exceedsVelocity": "Exceeds sprint velocity ({current}/{max} pts remaining)",
+      "assignToSprint": "Assign to sprint",
+      "assigning": "Assigning..."
+    },
+    "estimate": {
+      "setEstimate": "Set estimate",
+      "saving": "Saving...",
+      "mustBePositive": "Must be a positive number."
+    },
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "priority": {
+      "must_have": "Must Have",
+      "should_have": "Should Have",
+      "could_have": "Could Have",
+      "wont_have": "Won't Have"
+    },
+    "status": {
+      "backlog": "Backlog",
+      "ready": "Ready",
+      "in_progress": "In Progress",
+      "done": "Done"
+    },
+    "empty": {
+      "unassigned": "No unassigned stories",
+      "assigned": "No stories in active sprint",
+      "ready": "No stories ready for review",
+      "future": "No future release stories",
+      "realized": "No completed stories yet",
+      "unassignedSub": "All stories are assigned to a sprint or completed.",
+      "assignedSub": "Add stories from the Unassigned tab.",
+      "assignedNoSprint": "Start a sprint first.",
+      "readySub": "Stories marked as ready will appear here.",
+      "futureSub": "Stories with \"Won't Have\" priority will appear here.",
+      "realizedSub": "Completed stories will appear here."
+    }
+  },
+  "sprintBacklog": {
+    "section": "Project",
+    "title": "Sprint Backlog",
+    "loading": "Loading sprint backlog...",
+    "noActiveSprint": "No active sprint",
+    "noActiveSprintSub": "Start a sprint from the Sprints page.",
+    "showProgress": "Show % progress",
+    "showHours": "Show hours",
+    "markReady": "Mark as ready",
+    "undoReady": "Undo ready",
+    "saveChanges": "Save changes →",
+    "taskCategory": {
+      "active": "Active",
+      "assigned": "Assigned",
+      "unassigned": "Unassigned",
+      "done": "Done"
+    },
+    "priority": {
+      "must_have": "Must Have",
+      "should_have": "Should Have",
+      "could_have": "Could Have",
+      "wont_have": "Won't Have"
+    },
+    "status": {
+      "backlog": "Backlog",
+      "in_progress": "In Progress",
+      "ready": "Ready",
+      "done": "Done"
+    }
+  },
+  "timeTracking": {
+    "section": "Project",
+    "title": "Time Tracking",
+    "loading": "Loading time logs...",
+    "noLogs": "No time logs this week",
+    "noLogsSub": "Log time from the Sprint Backlog page.",
+    "mustBePositive": "Must be > 0",
+    "noFutureHours": "Can't log future hours",
+    "remaining": "Remaining",
+    "total": "Total",
+    "errorSaving": "Error saving.",
+    "mustBeZeroOrMore": "Must be ≥ 0"
+  },
+  "settings": {
+    "section": "Project",
+    "title": "Settings",
+    "subtitle": "Manage project settings",
+    "projectDetails": "Project Details",
+    "name": "Name",
+    "description": "Description",
+    "loading": "Loading settings...",
+    "saving": "Saving...",
+    "saveChanges": "Save changes",
+    "savedSuccess": "Project updated successfully.",
+    "failedLoad": "Failed to load project.",
+    "failedSave": "Failed to save changes.",
+    "serverError": "Server connection error."
+  },
+  "wall": {
+    "section": "Project",
+    "title": "Project Wall",
+    "postCount": "{count, plural, one {# post} other {# posts}}",
+    "shareUpdates": "Share updates with your team",
+    "loading": "Loading posts...",
+    "empty": {
+      "title": "No posts yet",
+      "subtitle": "Be the first to share an update."
+    }
+  },
+  "documentation": {
+    "section": "Project",
+    "title": "Documentation",
+    "subtitle": "Shared project wiki — all members can edit",
+    "import": "Import",
+    "importing": "Importing...",
+    "export": "Export",
+    "exportMd": "Markdown (.md)",
+    "exportTxt": "Plain text (.txt)",
+    "exportPdf": "PDF (.pdf)",
+    "loading": "Loading documentation...",
+    "saving": "Saving...",
+    "saved": "Saved.",
+    "importedSuccess": "Imported successfully.",
+    "replaceConfirm": "This will replace the current documentation. Continue?",
+    "placeholder": "Start writing your project documentation here...",
+    "toolbar": {
+      "h1": "Heading 1",
+      "h2": "Heading 2",
+      "h3": "Heading 3",
+      "paragraph": "Paragraph",
+      "bold": "Bold",
+      "italic": "Italic",
+      "strikethrough": "Strikethrough",
+      "bulletList": "Bulleted list",
+      "numberedList": "Numbered list",
+      "blockquote": "Blockquote",
+      "horizontalRule": "Horizontal rule",
+      "insertLink": "Insert link",
+      "removeFormatting": "Remove formatting"
+    }
+  },
+  "poker": {
+    "section": "Project",
+    "title": "Planning Poker",
+    "round": "Round {round} / 3",
+    "loading": "Loading Planning Poker...",
+    "noAccess": "Session does not exist or you do not have access.",
+    "participants": "Participants",
+    "you": "You",
+    "scrumMaster": "Scrum Master",
+    "teamMember": "Team member",
+    "absent": "Absent",
+    "voted": "Voted",
+    "waiting": "Waiting",
+    "markPresent": "Mark present",
+    "markAbsent": "Mark absent",
+    "voting": "Voting",
+    "votedWaiting": "You voted. Waiting for other members.",
+    "chooseEstimate": "Choose your estimate.",
+    "yourVote": "Your vote",
+    "teamProgress": "Team progress",
+    "status": "Status",
+    "allVoted": "All voted",
+    "collectingVotes": "Collecting votes",
+    "suggestedEstimate": "Suggested estimate",
+    "completeGame": "Complete game →",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "estimatesDiffer": "Estimates differ. Start a new discussion round.",
+    "startRound": "Start round {round} →",
+    "completedTitle": "Planning Poker Completed",
+    "finalEstimate": "Final Estimate",
+    "completedWith": "This story was completed with a final estimate of {points} pts.",
+    "story": "Story",
+    "backToBacklog": "Back to backlog",
+    "description": "Description",
+    "acceptanceCriteria": "Acceptance Criteria",
+    "storyStatus": "Status",
+    "priority": "Priority",
+    "currentPoints": "Current points",
+    "loadingStory": "Loading story..."
+  }
+}

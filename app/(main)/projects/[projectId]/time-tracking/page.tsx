@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 type SprintRange = {
   id: string;
@@ -74,6 +75,7 @@ function formatWeekLabel(from: string, to: string) {
 export default function TimeTrackingPage() {
   const params = useParams();
   const projectId = params.projectId as string;
+  const t = useTranslations("timeTracking");
 
   const [fromDate, setFromDate] = useState(() => getWeekRange(0).from);
   const [toDate, setToDate] = useState(() => getWeekRange(0).to);
@@ -164,8 +166,8 @@ export default function TimeTrackingPage() {
 
   async function saveCell(taskId: string, date: string, value: string) {
     const hours = Number(value);
-    if (!value || isNaN(hours) || hours <= 0) { setCellError("Must be > 0"); return; }
-    if (date > today) { setCellError("Can't log future hours"); return; }
+    if (!value || isNaN(hours) || hours <= 0) { setCellError(t("mustBePositive")); return; }
+    if (date > today) { setCellError(t("noFutureHours")); return; }
     const task = taskMap.get(taskId);
     const sprint = task?.user_story?.sprint;
     if (sprint && (date < sprint.start_date || date > sprint.end_date)) {
@@ -180,14 +182,14 @@ export default function TimeTrackingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hours_spent: hours }),
       });
-      if (!res.ok) { const b = await res.json(); setCellError(b.error ?? "Error saving."); return; }
+      if (!res.ok) { const b = await res.json(); setCellError(b.error ?? t("errorSaving")); return; }
     } else {
       const res = await fetch(`/api/tasks/${taskId}/timelogs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date, hours_spent: hours }),
       });
-      if (!res.ok) { const b = await res.json(); setCellError(b.error ?? "Error saving."); return; }
+      if (!res.ok) { const b = await res.json(); setCellError(b.error ?? t("errorSaving")); return; }
     }
     setEditingCell(null);
     fetchLogs();
@@ -215,14 +217,14 @@ export default function TimeTrackingPage() {
 
   async function saveRemaining(taskId: string, value: string) {
     const hours = Number(value);
-    if (value === "" || isNaN(hours) || hours < 0) { setRemainingError("Must be ≥ 0"); return; }
+    if (value === "" || isNaN(hours) || hours < 0) { setRemainingError(t("mustBeZeroOrMore")); return; }
     setRemainingError(null);
     const res = await fetch(`/api/tasks/${taskId}/remaining-time`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ remaining_time: hours }),
     });
-    if (!res.ok) { const b = await res.json(); setRemainingError(b.error ?? "Error saving."); return; }
+    if (!res.ok) { const b = await res.json(); setRemainingError(b.error ?? t("errorSaving")); return; }
     setEditingRemaining(null);
     fetchLogs();
   }
@@ -231,8 +233,8 @@ export default function TimeTrackingPage() {
     <div className="p-6">
       {/* Header */}
       <div className="mb-6">
-        <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Project</p>
-        <h1 className="text-3xl font-bold text-foreground leading-tight">Time Tracking</h1>
+        <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">{t("section")}</p>
+        <h1 className="text-3xl font-bold text-foreground leading-tight">{t("title")}</h1>
         <p className="text-sm text-muted mt-1">Log and review your hours per task.</p>
       </div>
 
@@ -328,7 +330,7 @@ export default function TimeTrackingPage() {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
           </svg>
-          <span className="text-sm">Loading...</span>
+          <span className="text-sm">{t("loading")}</span>
         </div>
       ) : taskIds.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 rounded-xl border border-border bg-surface text-center">
@@ -337,8 +339,8 @@ export default function TimeTrackingPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
             </svg>
           </div>
-          <p className="font-semibold text-foreground mb-1">No tasks assigned</p>
-          <p className="text-sm text-subtle">You have no tasks assigned to you in this project.</p>
+          <p className="font-semibold text-foreground mb-1">{t("noLogs")}</p>
+          <p className="text-sm text-subtle">{t("noLogsSub")}</p>
         </div>
       ) : (
         <div className="rounded-xl border border-border overflow-hidden">
@@ -364,10 +366,10 @@ export default function TimeTrackingPage() {
                     </th>
                   ))}
                   <th className="text-center px-3 py-3 font-semibold text-muted text-xs uppercase tracking-wide border-b border-border border-l" style={{ minWidth: 100 }}>
-                    Remaining
+                    {t("remaining")}
                   </th>
                   <th className="text-center px-3 py-3 font-semibold text-muted text-xs uppercase tracking-wide border-b border-border border-l" style={{ minWidth: 70 }}>
-                    Total
+                    {t("total")}
                   </th>
                 </tr>
               </thead>
@@ -505,7 +507,7 @@ export default function TimeTrackingPage() {
               <tfoot>
                 <tr className="bg-surface border-t-2 border-border">
                   <td className="px-4 py-3 text-xs font-bold text-muted uppercase tracking-wide sticky left-0 bg-surface border-r border-border">
-                    Total
+                    {t("total")}
                   </td>
                   {dates.map((d) => {
                     const dayTotal = logs.filter((l) => l.date === d).reduce((s, l) => s + Number(l.hours), 0);

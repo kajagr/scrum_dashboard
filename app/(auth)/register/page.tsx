@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 export default function RegisterPage() {
+  const t = useTranslations("register");
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -55,7 +57,7 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full p-8 bg-white rounded-lg shadow-md">
         <h1 className="text-2xl font-bold text-center mb-6">ScrumBoard</h1>
-        <h2 className="text-xl text-center mb-6">Registracija</h2>
+        <h2 className="text-xl text-center mb-6">{t("title")}</h2>
 
         <form onSubmit={handleRegister} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -64,7 +66,7 @@ export default function RegisterPage() {
                 htmlFor="firstName"
                 className="block text-sm font-medium text-gray-700"
               >
-                Ime
+                {t("firstName")}
               </label>
               <input
                 id="firstName"
@@ -81,7 +83,7 @@ export default function RegisterPage() {
                 htmlFor="lastName"
                 className="block text-sm font-medium text-gray-700"
               >
-                Priimek
+                {t("lastName")}
               </label>
               <input
                 id="lastName"
@@ -99,7 +101,7 @@ export default function RegisterPage() {
               htmlFor="username"
               className="block text-sm font-medium text-gray-700"
             >
-              Uporabniško ime
+              {t("username")}
             </label>
             <input
               id="username"
@@ -116,7 +118,7 @@ export default function RegisterPage() {
               htmlFor="email"
               className="block text-sm font-medium text-gray-700"
             >
-              Email
+              {t("email")}
             </label>
             <input
               id="email"
@@ -133,7 +135,7 @@ export default function RegisterPage() {
               htmlFor="password"
               className="block text-sm font-medium text-gray-700"
             >
-              Geslo
+              {t("password")}
             </label>
             <input
               id="password"
@@ -153,14 +155,14 @@ export default function RegisterPage() {
             disabled={loading}
             className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md disabled:opacity-50"
           >
-            {loading ? "Nalaganje..." : "Registracija"}
+            {loading ? t("loading") : t("register")}
           </button>
         </form>
 
         <p className="mt-4 text-center text-sm text-gray-600">
-          Že imaš račun?{" "}
+          {t("alreadyHaveAccount")}{" "}
           <Link href="/login" className="text-blue-600 hover:underline">
-            Prijava
+            {t("signIn")}
           </Link>
         </p>
       </div>

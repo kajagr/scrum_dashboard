@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import StoryDetailModal from "@/components/features/board/StoryDetailModal";
 import SprintBoardHelpTooltip from "@/components/features/board/SprintBoardHelpTooltip";
 import { formatDateDot } from "@/lib/datetime";
@@ -146,8 +147,16 @@ const CATEGORY_ORDER: TaskCategory[] = [
 ];
 
 export default function SprintBoardPage() {
+  const t = useTranslations("sprintBacklog");
   const params = useParams();
   const projectId = params.projectId as string;
+
+  const taskCategoryLabels: Record<string, string> = {
+    active: t("taskCategory.active"),
+    assigned: t("taskCategory.assigned"),
+    unassigned: t("taskCategory.unassigned"),
+    done: t("taskCategory.done"),
+  };
 
   const [loading, setLoading] = useState(true);
   const [activeSprint, setActiveSprint] = useState<Sprint | null>(null);
@@ -427,7 +436,7 @@ export default function SprintBoardPage() {
             d="M4 12a8 8 0 018-8v8H4z"
           />
         </svg>
-        <span className="text-sm">Loading Sprint Board...</span>
+        <span className="text-sm">{t("loading")}</span>
       </div>
     );
   }
@@ -436,11 +445,11 @@ export default function SprintBoardPage() {
     <div className="p-6">
       <div className="mb-6">
         <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">
-          Project
+          {t("section")}
         </p>
         <div className="flex items-center gap-2">
           <h1 className="text-3xl font-bold text-foreground leading-tight">
-            Sprint Board
+            {t("title")}
           </h1>
           <SprintBoardHelpTooltip />
         </div>
@@ -507,7 +516,7 @@ export default function SprintBoardPage() {
                     onClick={() => setShowHours((v) => !v)}
                     className="px-2 py-0.5 rounded-lg border border-border bg-background text-muted hover:text-foreground hover:border-primary transition-colors text-[10px] font-medium"
                   >
-                    {showHours ? "Show % progress" : "Show hours"}
+                    {showHours ? t("showProgress") : t("showHours")}
                   </button>
                 </div>
                 {showHours ? (
@@ -558,7 +567,7 @@ export default function SprintBoardPage() {
                     className={`w-2 h-2 rounded-full ${TASK_CATEGORY_CONFIG[cat].dot}`}
                   />
                   <span className="text-muted">
-                    {TASK_CATEGORY_CONFIG[cat].label}
+                    {taskCategoryLabels[cat]}
                   </span>
                   <span className="font-semibold text-foreground">
                     {taskStats[cat]}
@@ -686,7 +695,7 @@ export default function SprintBoardPage() {
                               >
                                 {actionLoading === story.id
                                   ? "..."
-                                  : "Mark as ready"}
+                                  : t("markReady")}
                               </button>
                             )}
                             {showUnmarkReady && (
@@ -700,7 +709,7 @@ export default function SprintBoardPage() {
                               >
                                 {actionLoading === story.id
                                   ? "..."
-                                  : "Undo ready"}
+                                  : t("undoReady")}
                               </button>
                             )}
 
@@ -756,7 +765,7 @@ export default function SprintBoardPage() {
                                       className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`}
                                     />
                                     <span className="text-[10px] font-bold tracking-widest uppercase text-muted">
-                                      {cfg.label} ({tasks.length})
+                                      {taskCategoryLabels[category]} ({tasks.length})
                                     </span>
                                   </div>
                                   <div className="space-y-1.5 pl-3">
@@ -946,9 +955,9 @@ export default function SprintBoardPage() {
               />
             </svg>
           </div>
-          <p className="font-semibold text-foreground mb-1">No active sprint</p>
+          <p className="font-semibold text-foreground mb-1">{t("noActiveSprint")}</p>
           <p className="text-sm text-muted">
-            Start a sprint from the Sprints page to see stories here.
+            {t("noActiveSprintSub")}
           </p>
         </div>
       )}
@@ -1084,7 +1093,7 @@ export default function SprintBoardPage() {
                       Saving...
                     </span>
                   ) : (
-                    "Save changes →"
+                    t("saveChanges")
                   )}
                 </button>
               </div>

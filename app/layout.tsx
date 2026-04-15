@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { LocaleProvider } from "@/contexts/LocaleContext";
 
 export const metadata: Metadata = {
   title: "ScrumBoard",
@@ -12,9 +13,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="sl">
+    <html lang="en">
       <body className="min-h-screen bg-gray-50">
-        {children}
+        <LocaleProvider>{children}</LocaleProvider>
       </body>
     </html>
   );
