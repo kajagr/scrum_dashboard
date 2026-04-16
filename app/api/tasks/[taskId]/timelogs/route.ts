@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
+
+const supabaseAdmin = createAdminClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
 
 type RouteContext = {
   params: Promise<{ taskId: string }>;
@@ -37,7 +43,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const supabase = await createClient();
     const { taskId } = await context.params;
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -51,10 +59,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
     if (taskError)
       return NextResponse.json({ error: taskError.message }, { status: 500 });
     if (!task)
-      return NextResponse.json({ error: "Naloga ni bila najdena." }, { status: 404 });
+      return NextResponse.json(
+        { error: "Naloga ni bila najdena." },
+        { status: 404 },
+      );
 
     if (task.assignee_id !== user.id)
-      return NextResponse.json({ error: "Nimate dostopa do tega vnosa." }, { status: 403 });
+      return NextResponse.json(
+        { error: "Nimate dostopa do tega vnosa." },
+        { status: 403 },
+      );
 
     const { data: logs, error: logsError } = await supabase
       .from("time_logs")
@@ -68,7 +82,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json(logs ?? []);
   } catch {
-    return NextResponse.json({ error: "Napaka pri pridobivanju vnosov." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Napaka pri pridobivanju vnosov." },
+      { status: 500 },
+    );
   }
 }
 
@@ -126,7 +143,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const supabase = await createClient();
     const { taskId } = await context.params;
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -135,14 +154,20 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const date: string = body.date;
 
     if (!hoursSpent || isNaN(hoursSpent) || hoursSpent <= 0)
-      return NextResponse.json({ error: "Število ur mora biti večje od 0." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Število ur mora biti večje od 0." },
+        { status: 400 },
+      );
 
     if (!date)
       return NextResponse.json({ error: "Datum je obvezen." }, { status: 400 });
 
     const today = new Date().toISOString().split("T")[0];
     if (date > today)
-      return NextResponse.json({ error: "Datum ne sme biti v prihodnosti." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Datum ne sme biti v prihodnosti." },
+        { status: 400 },
+      );
 
     const { data: task, error: taskError } = await supabase
       .from("tasks")
@@ -154,10 +179,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (taskError)
       return NextResponse.json({ error: taskError.message }, { status: 500 });
     if (!task)
-      return NextResponse.json({ error: "Naloga ni bila najdena." }, { status: 404 });
+      return NextResponse.json(
+        { error: "Naloga ni bila najdena." },
+        { status: 404 },
+      );
 
     if (!task.is_accepted || task.assignee_id !== user.id)
-      return NextResponse.json({ error: "Vnos časa ni dovoljen: naloga ni bila sprejeta." }, { status: 403 });
+      return NextResponse.json(
+        { error: "Vnos časa ni dovoljen: naloga ni bila sprejeta." },
+        { status: 403 },
+      );
 
     const { data: story, error: storyError } = await supabase
       .from("user_stories")
@@ -166,10 +197,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
       .maybeSingle();
 
     if (storyError || !story)
-      return NextResponse.json({ error: "Zgodba ni bila najdena." }, { status: 404 });
+      return NextResponse.json(
+        { error: "Zgodba ni bila najdena." },
+        { status: 404 },
+      );
 
     if (story.status === "done")
-      return NextResponse.json({ error: "Vnos časa ni dovoljen: zgodba je že zaključena." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Vnos časa ni dovoljen: zgodba je že zaključena." },
+        { status: 400 },
+      );
 
     if (story.sprint_id) {
       const { data: sprint } = await supabase
@@ -180,7 +217,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
       if (sprint && (date < sprint.start_date || date > sprint.end_date))
         return NextResponse.json(
-          { error: `Datum mora biti znotraj sprinta (${sprint.start_date} – ${sprint.end_date}).` },
+          {
+            error: `Datum mora biti znotraj sprinta (${sprint.start_date} – ${sprint.end_date}).`,
+          },
           { status: 400 },
         );
     }
@@ -204,7 +243,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
         .single();
 
       if (updateError)
-        return NextResponse.json({ error: updateError.message }, { status: 500 });
+        return NextResponse.json(
+          { error: updateError.message },
+          { status: 500 },
+        );
       resultLog = updated;
     } else {
       const { data: inserted, error: insertError } = await supabase
@@ -220,11 +262,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
         .single();
 
       if (insertError)
-        return NextResponse.json({ error: insertError.message }, { status: 500 });
+        return NextResponse.json(
+          { error: insertError.message },
+          { status: 500 },
+        );
       resultLog = inserted;
     }
 
-    const { data: allLogs } = await supabase
+    const { data: allLogs } = await supabaseAdmin
       .from("time_logs")
       .select("hours")
       .eq("task_id", taskId);
@@ -249,6 +294,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json(resultLog);
   } catch {
-    return NextResponse.json({ error: "Napaka pri vnosu časa." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Napaka pri vnosu časa." },
+      { status: 500 },
+    );
   }
 }
