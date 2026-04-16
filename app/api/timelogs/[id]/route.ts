@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
+
+const supabaseAdmin = createAdminClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -213,7 +219,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
 
     // Recalculate total logged_hours on the task
-    const { data: allLogs } = await supabase
+    const { data: allLogs } = await supabaseAdmin
       .from("time_logs")
       .select("hours")
       .eq("task_id", log.task_id);
