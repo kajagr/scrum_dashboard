@@ -145,11 +145,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
 
+    const taskUpdate: Record<string, unknown> = {
+      remaining_time: remainingTime,
+      updated_at: new Date().toISOString(),
+    };
+    if (remainingTime === 0) {
+      taskUpdate.status = "completed";
+    }
+
     const { data: updated, error: updateError } = await supabase
       .from("tasks")
-      .update({ remaining_time: remainingTime, updated_at: new Date().toISOString() })
+      .update(taskUpdate)
       .eq("id", taskId)
-      .select("id, remaining_time")
+      .select("id, remaining_time, status")
       .single();
 
     if (updateError)
