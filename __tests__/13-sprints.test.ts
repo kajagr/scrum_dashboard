@@ -95,6 +95,12 @@ jest.mock("@/lib/supabase/server", () => ({
   ),
 }));
 
+jest.mock("@supabase/supabase-js", () => ({
+  createClient: jest.fn(() => ({
+    from: jest.fn(() => ({ insert: jest.fn().mockResolvedValue({ error: null }) })),
+  })),
+}));
+
 // ─── Helper funkcije ──────────────────────────────────────────────────────────
 function makeRequest(body: object) {
   return new NextRequest(

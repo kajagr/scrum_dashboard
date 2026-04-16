@@ -186,7 +186,8 @@ function setupDeleteMocks(
 
   mockAdminFrom.mockImplementation(() => ({
     update: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockResolvedValue({ error: null }),
+    eq: jest.fn().mockReturnThis(),
+    is: jest.fn().mockResolvedValue({ error: null }),
   }));
 }
 

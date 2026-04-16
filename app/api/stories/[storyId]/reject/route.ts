@@ -168,6 +168,14 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       { status: 500 },
     );
 
+  // Mark history row as removed
+  await supabaseAdmin
+    .from("story_sprint_history")
+    .update({ removed_at: new Date().toISOString() })
+    .eq("user_story_id", storyId)
+    .eq("sprint_id", story.sprint_id)
+    .is("removed_at", null);
+
   // Insert rejection comment into story_comments if provided
   if (comment) {
     await supabaseAdmin

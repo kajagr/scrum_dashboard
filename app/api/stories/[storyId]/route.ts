@@ -550,6 +550,16 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: deleteError.message }, { status: 500 });
     }
 
+    // Mark history row as removed if story was in a sprint
+    if (story.sprint_id) {
+      await supabaseAdmin
+        .from("story_sprint_history")
+        .update({ removed_at: new Date().toISOString() })
+        .eq("user_story_id", storyId)
+        .eq("sprint_id", story.sprint_id)
+        .is("removed_at", null);
+    }
+
     return NextResponse.json(
       { message: "Story deleted successfully." },
       { status: 200 },

@@ -134,15 +134,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
     if (!sprint)
       return NextResponse.json({ error: "No sprint found." }, { status: 404 });
 
-    // Get all tasks in sprint stories
-    const { data: stories } = await supabase
-      .from("user_stories")
-      .select("id")
-      .eq("project_id", projectId)
-      .eq("sprint_id", sprint.id)
-      .is("deleted_at", null);
+    // Get all stories ever assigned to this sprint (including rejected/deleted ones)
+    const { data: historyRows } = await supabaseAdmin
+      .from("story_sprint_history")
+      .select("user_story_id")
+      .eq("sprint_id", sprint.id);
 
-    const storyIds = (stories ?? []).map((s) => s.id);
+    const storyIds = (historyRows ?? []).map((r) => r.user_story_id);
 
     let tasks: { id: string; estimated_hours: number | null }[] = [];
     if (storyIds.length > 0) {
