@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
+
+const supabaseAdmin = createAdminClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
 
 type RouteContext = {
   params: Promise<{ projectId: string }>;
@@ -278,6 +284,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
+
+    // Record sprint assignment history
+    const historyRows = storyIds.map((id) => ({
+      user_story_id: id,
+      sprint_id: activeSprint.id,
+      assigned_at: new Date().toISOString(),
+    }));
+    await supabaseAdmin.from("story_sprint_history").insert(historyRows);
 
     return NextResponse.json(
       {
