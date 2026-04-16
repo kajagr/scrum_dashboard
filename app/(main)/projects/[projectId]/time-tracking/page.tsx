@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
+import TimeTrackingHelpTooltip from "@/components/features/time-tracking/TimeTrackingHelpTooltip";
 
 type SprintRange = {
   id: string;
@@ -59,16 +60,18 @@ function getDatesInRange(from: string, to: string): string[] {
 }
 
 function formatDateShort(d: string) {
-  return new Date(d + "T12:00:00").toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-  });
+  const date = new Date(d + "T12:00:00");
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${day}.${month}`;
 }
 
 function formatWeekLabel(from: string, to: string) {
   const f = new Date(from + "T12:00:00");
   const t = new Date(to + "T12:00:00");
-  return `${f.toLocaleDateString("en-GB", { month: "short", day: "numeric" })} – ${t.toLocaleDateString("en-GB", { month: "short", day: "numeric", year: "numeric" })}`;
+  const fmt = (d: Date) =>
+    `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+  return `${fmt(f)} – ${fmt(t)}`;
 }
 
 export default function TimeTrackingPage() {
@@ -232,7 +235,10 @@ export default function TimeTrackingPage() {
       {/* Header */}
       <div className="mb-6">
         <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Project</p>
-        <h1 className="text-3xl font-bold text-foreground leading-tight">Time Tracking</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-3xl font-bold text-foreground leading-tight">Time Tracking</h1>
+          <TimeTrackingHelpTooltip />
+        </div>
         <p className="text-sm text-muted mt-1">Log and review your hours per task.</p>
       </div>
 
@@ -246,7 +252,14 @@ export default function TimeTrackingPage() {
         <div className="rounded-xl border border-border bg-surface p-4">
           <p className="text-xs font-semibold tracking-widest uppercase text-muted mb-1">Today</p>
           <p className="text-2xl font-bold text-foreground">{todayHours.toFixed(1)}h</p>
-          <p className="text-xs text-subtle mt-0.5">{new Date().toLocaleDateString("en-GB", { weekday: "long", month: "short", day: "numeric" })}</p>
+          <p className="text-xs text-subtle mt-0.5">{(() => {
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, "0");
+            const month = String(now.getMonth() + 1).padStart(2, "0");
+            const year = now.getFullYear();
+            const weekday = now.toLocaleDateString("en-GB", { weekday: "long" });
+            return `${weekday}, ${day}.${month}.${year}`;
+          })()}</p>
         </div>
         <div className="rounded-xl border border-border bg-surface p-4">
           <p className="text-xs font-semibold tracking-widest uppercase text-muted mb-1">Active tasks</p>

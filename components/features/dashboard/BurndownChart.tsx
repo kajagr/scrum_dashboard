@@ -37,10 +37,10 @@ type Sprint = {
 };
 
 function formatDate(d: string) {
-  return new Date(d + "T12:00:00").toLocaleDateString("en-GB", {
-    month: "short",
-    day: "numeric",
-  });
+  const date = new Date(d + "T12:00:00");
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${day}.${month}`;
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -146,9 +146,15 @@ export default function BurndownChart({ projectId }: { projectId: string }) {
           <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-1">Sprint</p>
           <h2 className="text-xl font-bold text-foreground">{data.sprint.name} — Burn-Down</h2>
           <p className="text-sm text-muted mt-0.5">
-            {new Date(data.sprint.start_date + "T12:00:00").toLocaleDateString("en-GB", { month: "short", day: "numeric" })}
-            {" – "}
-            {new Date(data.sprint.end_date + "T12:00:00").toLocaleDateString("en-GB", { month: "short", day: "numeric", year: "numeric" })}
+          {(() => {
+            const d = new Date(data.sprint.start_date + "T12:00:00");
+            return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+          })()}
+          {" – "}
+          {(() => {
+            const d = new Date(data.sprint.end_date + "T12:00:00");
+            return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+          })()}
           </p>
           {sprints.length > 1 && (
             <select
