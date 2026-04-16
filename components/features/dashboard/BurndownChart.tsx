@@ -127,7 +127,7 @@ export default function BurndownChart({ projectId }: { projectId: string }) {
     date: formatDate(d.date),
     Ideal: d.ideal,
     Remaining: d.remaining,
-    Logged: d.logged,
+    Logged: d.isFuture ? null : d.logged,
     isToday: d.isToday,
     isFuture: d.isFuture,
   }));
@@ -260,7 +260,7 @@ export default function BurndownChart({ projectId }: { projectId: string }) {
             stroke="var(--color-primary)"
             strokeWidth={2}
             dot={false}
-            connectNulls
+            connectNulls={false}
             activeDot={{ r: 4, fill: "var(--color-primary)" }}
           />
         </LineChart>
