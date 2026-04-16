@@ -79,7 +79,7 @@ const completedSprint = {
   end_date: yesterday,
 };
 
-const stories = [{ id: "story-1" }, { id: "story-2" }];
+const storyHistory = [{ user_story_id: "story-1" }, { user_story_id: "story-2" }];
 const tasks = [
   { id: "task-1", estimated_hours: 4 },
   { id: "task-2", estimated_hours: 6 },
@@ -87,27 +87,21 @@ const tasks = [
 // totalEstimated = 10
 
 // ─── Setup helper ─────────────────────────────────────────────────────────────
-// DB calls (supabase) — vary by whether sprintId query param is provided:
-//
-// WITH ?sprintId:
-//   cnt=1: sprints fetch by id  → maybeSingle
-//   cnt=2: user_stories         → thenable
-//   cnt=3: tasks                → thenable  (skip if no stories)
-//
-// WITHOUT ?sprintId:
-//   cnt=1: active sprint        → maybeSingle
-//   cnt=2: (if no active) last sprint → maybeSingle
-//   cnt=?: user_stories, tasks  → thenable
+// DB calls (supabase):
+//   cnt=1: active sprint (or null if noActiveSprint)
+//   cnt=2 (if noActiveSprint): last sprint
+//   then: tasks
 //
 // Admin calls:
-//   cnt=1: time_logs            → thenable  (skip if no tasks)
+//   cnt=1: story_sprint_history
+//   cnt=2: time_logs
 
 function setupGetMocks(
   overrides: {
     sprintById?: any;
     activeSprint?: any;
     lastSprint?: any;
-    stories?: any[];
+    storyHistory?: { user_story_id: string }[];
     tasks?: any[];
     timeLogs?: any[];
   } = {},
@@ -116,7 +110,7 @@ function setupGetMocks(
     sprintById = activeSprint,
     activeSprint: active = activeSprint,
     lastSprint = null,
-    stories: storiesData = stories,
+    storyHistory: historyData = storyHistory,
     tasks: tasksData = tasks,
     timeLogs = [],
   } = overrides;
@@ -125,33 +119,30 @@ function setupGetMocks(
   mockFrom.mockImplementation((table: string) => {
     cnt++;
 
-    // Sprint lookups
     if (table === "sprints") {
-      // Could be sprintById lookup, active sprint, or last sprint
-      if (cnt === 1 && sprintById !== undefined) {
-        // sprintId query param path
+      if (cnt === 1 && sprintById !== undefined)
         return makeChain({ data: sprintById, error: null });
-      }
       if (cnt === 1) return makeChain({ data: active, error: null });
-      if (cnt === 2) return makeChain({ data: lastSprint, error: null });
+      return makeChain({ data: lastSprint, error: null });
     }
 
-    if (table === "user_stories")
-      return makeChain({ data: storiesData, error: null });
     if (table === "tasks") return makeChain({ data: tasksData, error: null });
 
     return makeChain({ data: null, error: null });
   });
 
-  mockAdminFrom.mockImplementation(() =>
-    makeChain({ data: timeLogs, error: null }),
-  );
+  let adminCnt = 0;
+  mockAdminFrom.mockImplementation(() => {
+    adminCnt++;
+    if (adminCnt === 1) return makeChain({ data: historyData, error: null }); // story_sprint_history
+    return makeChain({ data: timeLogs, error: null }); // time_logs
+  });
 }
 
 // Simpler setup used when we don't need to distinguish table names
 function setupMocksByCount(
   sprintData: any,
-  storiesData: any[],
+  historyData: { user_story_id: string }[],
   tasksData: any[],
   timeLogs: any[],
   noActiveSprint = false,
@@ -160,22 +151,19 @@ function setupMocksByCount(
   mockFrom.mockImplementation(() => {
     cnt++;
     if (cnt === 1)
-      return makeChain({
-        data: noActiveSprint ? null : sprintData,
-        error: null,
-      });
+      return makeChain({ data: noActiveSprint ? null : sprintData, error: null });
     if (cnt === 2 && noActiveSprint)
       return makeChain({ data: sprintData, error: null });
-    // user_stories
-    if (cnt === (noActiveSprint ? 3 : 2))
-      return makeChain({ data: storiesData, error: null });
     // tasks
     return makeChain({ data: tasksData, error: null });
   });
 
-  mockAdminFrom.mockImplementation(() =>
-    makeChain({ data: timeLogs, error: null }),
-  );
+  let adminCnt = 0;
+  mockAdminFrom.mockImplementation(() => {
+    adminCnt++;
+    if (adminCnt === 1) return makeChain({ data: historyData, error: null }); // story_sprint_history
+    return makeChain({ data: timeLogs, error: null }); // time_logs
+  });
 }
 
 // ─── GET /api/projects/:projectId/burndown (#29) ──────────────────────────────
@@ -192,7 +180,7 @@ describe("GET /api/projects/:projectId/burndown — Burn-Down diagram (#29)", ()
   // ─── Regularen potek / struktura odgovora ─────────────────────────────────
 
   it("200 — vrne pravilno strukturo odgovora", async () => {
-    setupMocksByCount(activeSprint, stories, tasks, []);
+    setupMocksByCount(activeSprint, storyHistory, tasks, []);
 
     const res = await GET(
       makeGetRequest(`http://localhost/api/projects/${PROJECT_ID}/burndown`),
@@ -208,7 +196,7 @@ describe("GET /api/projects/:projectId/burndown — Burn-Down diagram (#29)", ()
   });
 
   it("200 — vrne podatke za aktiven sprint (brez sprintId parametra)", async () => {
-    setupMocksByCount(activeSprint, stories, tasks, []);
+    setupMocksByCount(activeSprint, storyHistory, tasks, []);
 
     const res = await GET(
       makeGetRequest(`http://localhost/api/projects/${PROJECT_ID}/burndown`),
@@ -221,7 +209,7 @@ describe("GET /api/projects/:projectId/burndown — Burn-Down diagram (#29)", ()
   });
 
   it("200 — vrne podatke za specifičen sprint (?sprintId=...)", async () => {
-    setupMocksByCount(activeSprint, stories, tasks, []);
+    setupMocksByCount(activeSprint, storyHistory, tasks, []);
 
     const res = await GET(
       makeGetRequest(
@@ -235,7 +223,7 @@ describe("GET /api/projects/:projectId/burndown — Burn-Down diagram (#29)", ()
   });
 
   it("200 — fallback na zadnji zaključen sprint ko ni aktivnega", async () => {
-    setupMocksByCount(completedSprint, stories, tasks, [], true);
+    setupMocksByCount(completedSprint, storyHistory, tasks, [], true);
 
     const res = await GET(
       makeGetRequest(`http://localhost/api/projects/${PROJECT_ID}/burndown`),
@@ -249,7 +237,7 @@ describe("GET /api/projects/:projectId/burndown — Burn-Down diagram (#29)", ()
   // ─── Pravilnost izračunov ─────────────────────────────────────────────────
 
   it("pravilno izračuna totalEstimated kot vsoto estimated_hours nalog", async () => {
-    setupMocksByCount(activeSprint, stories, tasks, []);
+    setupMocksByCount(activeSprint, storyHistory, tasks, []);
     // tasks: 4 + 6 = 10
 
     const res = await GET(
@@ -261,7 +249,7 @@ describe("GET /api/projects/:projectId/burndown — Burn-Down diagram (#29)", ()
   });
 
   it("idealna linija začne pri totalEstimated in konča pri 0", async () => {
-    setupMocksByCount(activeSprint, stories, tasks, []);
+    setupMocksByCount(activeSprint, storyHistory, tasks, []);
 
     const res = await GET(
       makeGetRequest(`http://localhost/api/projects/${PROJECT_ID}/burndown`),
@@ -279,7 +267,7 @@ describe("GET /api/projects/:projectId/burndown — Burn-Down diagram (#29)", ()
   it("idealna linija je linearna (vsak dan enakomerno manjša)", async () => {
     // Sprint: yesterday → tomorrow = 2 dni
     // Dan 0: ideal=10, Dan 1: ideal=5, Dan 2: ideal=0
-    setupMocksByCount(activeSprint, stories, tasks, []);
+    setupMocksByCount(activeSprint, storyHistory, tasks, []);
 
     const res = await GET(
       makeGetRequest(`http://localhost/api/projects/${PROJECT_ID}/burndown`),
@@ -299,7 +287,7 @@ describe("GET /api/projects/:projectId/burndown — Burn-Down diagram (#29)", ()
       { date: yesterday, hours: 3 },
       { date: yesterday, hours: 2 }, // skupaj yesterday: 5
     ];
-    setupMocksByCount(activeSprint, stories, tasks, timeLogs);
+    setupMocksByCount(activeSprint, storyHistory, tasks, timeLogs);
 
     const res = await GET(
       makeGetRequest(`http://localhost/api/projects/${PROJECT_ID}/burndown`),
@@ -313,7 +301,7 @@ describe("GET /api/projects/:projectId/burndown — Burn-Down diagram (#29)", ()
 
   it("remaining = totalEstimated - cumulative logged (ne gre pod 0)", async () => {
     const timeLogs = [{ date: yesterday, hours: 4 }];
-    setupMocksByCount(activeSprint, stories, tasks, timeLogs);
+    setupMocksByCount(activeSprint, storyHistory, tasks, timeLogs);
 
     const res = await GET(
       makeGetRequest(`http://localhost/api/projects/${PROJECT_ID}/burndown`),
@@ -327,7 +315,7 @@ describe("GET /api/projects/:projectId/burndown — Burn-Down diagram (#29)", ()
 
   it("remaining ne gre pod 0 tudi če so ure večje od estimated", async () => {
     const timeLogs = [{ date: yesterday, hours: 999 }];
-    setupMocksByCount(activeSprint, stories, tasks, timeLogs);
+    setupMocksByCount(activeSprint, storyHistory, tasks, timeLogs);
 
     const res = await GET(
       makeGetRequest(`http://localhost/api/projects/${PROJECT_ID}/burndown`),
@@ -339,7 +327,7 @@ describe("GET /api/projects/:projectId/burndown — Burn-Down diagram (#29)", ()
   });
 
   it("prihodnji dnevi imajo remaining = null in isFuture = true", async () => {
-    setupMocksByCount(activeSprint, stories, tasks, []);
+    setupMocksByCount(activeSprint, storyHistory, tasks, []);
 
     const res = await GET(
       makeGetRequest(`http://localhost/api/projects/${PROJECT_ID}/burndown`),
@@ -355,7 +343,7 @@ describe("GET /api/projects/:projectId/burndown — Burn-Down diagram (#29)", ()
   });
 
   it("označuje današnji dan z isToday = true", async () => {
-    setupMocksByCount(activeSprint, stories, tasks, []);
+    setupMocksByCount(activeSprint, storyHistory, tasks, []);
 
     const res = await GET(
       makeGetRequest(`http://localhost/api/projects/${PROJECT_ID}/burndown`),
@@ -383,7 +371,7 @@ describe("GET /api/projects/:projectId/burndown — Burn-Down diagram (#29)", ()
   });
 
   it("200 — dni so urejeni od start_date do end_date sprinta", async () => {
-    setupMocksByCount(activeSprint, stories, tasks, []);
+    setupMocksByCount(activeSprint, storyHistory, tasks, []);
 
     const res = await GET(
       makeGetRequest(`http://localhost/api/projects/${PROJECT_ID}/burndown`),
@@ -427,5 +415,62 @@ describe("GET /api/projects/:projectId/burndown — Burn-Down diagram (#29)", ()
       makeContext({ projectId: PROJECT_ID }),
     );
     expect(res.status).toBe(401);
+  });
+
+  // ─── Zavrnjena / izbrisana zgodba ohrani ure ──────────────────────────────
+
+  it("includes hours from rejected stories (not in sprint anymore but in history)", async () => {
+    const historyRows = [{ user_story_id: "story-rejected" }];
+    const rejectedTasks = [{ id: "task-r", estimated_hours: 8 }];
+    const timeLogs = [{ date: yesterday, hours: 8 }];
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "sprints") return makeChain({ data: activeSprint, error: null });
+      if (table === "tasks")   return makeChain({ data: rejectedTasks, error: null });
+      return makeChain({ data: null, error: null });
+    });
+
+    let adminCnt = 0;
+    mockAdminFrom.mockImplementation(() => {
+      adminCnt++;
+      if (adminCnt === 1) return makeChain({ data: historyRows, error: null }); // story_sprint_history
+      return makeChain({ data: timeLogs, error: null }); // time_logs
+    });
+
+    const res = await GET(
+      makeGetRequest(`http://localhost/api/projects/${PROJECT_ID}/burndown`),
+      makeContext({ projectId: PROJECT_ID }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.totalEstimated).toBe(8);
+    const yesterdayEntry = body.days.find((d: any) => d.date === yesterday);
+    expect(yesterdayEntry.logged).toBe(8);
+  });
+
+  it("includes hours from soft-deleted stories (deleted_at set but in history)", async () => {
+    const historyRows = [{ user_story_id: "story-deleted" }];
+    const deletedTasks = [{ id: "task-d", estimated_hours: 5 }];
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "sprints") return makeChain({ data: activeSprint, error: null });
+      if (table === "tasks")   return makeChain({ data: deletedTasks, error: null });
+      return makeChain({ data: null, error: null });
+    });
+
+    let adminCnt = 0;
+    mockAdminFrom.mockImplementation(() => {
+      adminCnt++;
+      if (adminCnt === 1) return makeChain({ data: historyRows, error: null });
+      return makeChain({ data: [], error: null });
+    });
+
+    const res = await GET(
+      makeGetRequest(`http://localhost/api/projects/${PROJECT_ID}/burndown`),
+      makeContext({ projectId: PROJECT_ID }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.totalEstimated).toBe(5);
   });
 });
