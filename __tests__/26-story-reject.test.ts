@@ -83,10 +83,11 @@ function setupMocks(
     return makeReadChain({ data: membership, error: null }); // membership
   });
 
-  // reject uses supabaseAdmin for update + insert
+  // reject uses supabaseAdmin for update user_stories + update story_sprint_history + insert
   mockAdminFrom.mockImplementation(() => ({
     update: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
+    is: jest.fn().mockResolvedValue({ error: null }),
     select: jest.fn().mockReturnThis(),
     insert: jest.fn().mockResolvedValue({ error: null }),
     maybeSingle: jest.fn().mockResolvedValue({
@@ -167,5 +168,48 @@ describe("POST /api/stories/:storyId/reject — zavračanje zgodbe (#26)", () =>
     mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
     const res = await REJECT(makeRejectRequest(), makeContext());
     expect(res.status).toBe(401);
+  });
+
+  it("sets removed_at on the story_sprint_history row when story is rejected", async () => {
+    const updateHistoryMock = jest.fn().mockReturnThis();
+    const eqHistoryMock = jest.fn().mockReturnThis();
+    const isHistoryMock = jest.fn().mockResolvedValue({ error: null });
+
+    let adminCallCount = 0;
+    mockAdminFrom.mockImplementation(() => {
+      adminCallCount++;
+      if (adminCallCount === 1) {
+        // First admin call: update user_stories
+        return {
+          update: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          select: jest.fn().mockReturnThis(),
+          insert: jest.fn().mockResolvedValue({ error: null }),
+          maybeSingle: jest.fn().mockResolvedValue({
+            data: { ...readyStory, status: "backlog", sprint_id: null },
+            error: null,
+          }),
+        };
+      }
+      // Second admin call: update story_sprint_history
+      return {
+        update: updateHistoryMock,
+        eq: eqHistoryMock,
+        is: isHistoryMock,
+      };
+    });
+
+    let cnt = 0;
+    mockFrom.mockImplementation(() => {
+      cnt++;
+      if (cnt === 1) return makeReadChain({ data: readyStory, error: null });
+      return makeReadChain({ data: { role: "product_owner" }, error: null });
+    });
+
+    const res = await REJECT(makeRejectRequest(), makeContext());
+    expect(res.status).toBe(200);
+    expect(updateHistoryMock).toHaveBeenCalledWith(
+      expect.objectContaining({ removed_at: expect.any(String) }),
+    );
   });
 });
