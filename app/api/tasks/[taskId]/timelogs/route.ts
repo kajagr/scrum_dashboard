@@ -72,7 +72,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const { data: logs, error: logsError } = await supabase
       .from("time_logs")
-      .select("id, task_id, user_id, hours, date, logged_at")
+      .select("id, task_id, user_id, hours, date, logged_at, remaining_time")
       .eq("task_id", taskId)
       .eq("user_id", user.id)
       .order("date", { ascending: false });
@@ -178,7 +178,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const { data: task, error: taskError } = await supabase
       .from("tasks")
-      .select("id, user_story_id, assignee_id, is_accepted, remaining_time")
+      .select("id, user_story_id, assignee_id, is_accepted, remaining_time, status")
       .eq("id", taskId)
       .is("deleted_at", null)
       .maybeSingle();
@@ -293,6 +293,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     };
     if (remainingTime === 0) {
       taskUpdate.status = "completed";
+      taskUpdate.is_active = false;
+      taskUpdate.active_since = null;
+    } else if (task.status === "completed") {
+      taskUpdate.status = "in_progress";
     }
 
     await supabase

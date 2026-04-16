@@ -177,7 +177,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     // Verify the task is accepted by current user
     const { data: task, error: taskError } = await supabase
       .from("tasks")
-      .select("id, user_story_id, assignee_id, is_accepted, remaining_time")
+      .select("id, user_story_id, assignee_id, is_accepted, remaining_time, status")
       .eq("id", log.task_id)
       .is("deleted_at", null)
       .maybeSingle();
@@ -243,6 +243,10 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     };
     if (remainingTime === 0) {
       taskUpdate.status = "completed";
+      taskUpdate.is_active = false;
+      taskUpdate.active_since = null;
+    } else if (task.status === "completed") {
+      taskUpdate.status = "in_progress";
     }
 
     await supabase
