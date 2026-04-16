@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import DashboardHelpTooltip from "@/components/features/dashboard/DashboardHelpTooltip";
-import BurndownChart from "@/components/features/dashboard/BurndownChart";
+import ChartSwitcher from "@/components/features/dashboard/ChartSwitcher";
 
 interface Props {
   params: Promise<{ projectId: string }>;
@@ -111,8 +111,7 @@ export default async function ProjectDashboardPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Burndown chart */}
-      <BurndownChart projectId={projectId} />
+      <ChartSwitcher projectId={projectId} />
     </div>
   );
 }
