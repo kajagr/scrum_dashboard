@@ -136,10 +136,18 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 
     const body = await request.json();
     const hoursSpent = Number(body.hours_spent);
+    const remainingTime = body.remaining_time !== undefined ? Number(body.remaining_time) : undefined;
 
     if (!body.hours_spent || isNaN(hoursSpent) || hoursSpent <= 0) {
       return NextResponse.json(
         { error: "Število ur mora biti večje od 0." },
+        { status: 400 },
+      );
+    }
+
+    if (remainingTime === undefined || isNaN(remainingTime) || remainingTime < 0) {
+      return NextResponse.json(
+        { error: "Preostali čas je obvezen in mora biti 0 ali več." },
         { status: 400 },
       );
     }
@@ -210,9 +218,9 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     // Update the log
     const { data: updated, error: updateError } = await supabase
       .from("time_logs")
-      .update({ hours: hoursSpent })
+      .update({ hours: hoursSpent, remaining_time: remainingTime })
       .eq("id", id)
-      .select("id, task_id, user_id, hours, date, logged_at")
+      .select("id, task_id, user_id, hours, date, logged_at, remaining_time")
       .single();
 
     if (updateError)
@@ -228,21 +236,18 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       ? allLogs.reduce((sum, l) => sum + Number(l.hours), 0)
       : 0;
 
-    // Adjust remaining_time by delta (new hours - old hours), floor at 0
-    const oldHours = Number(log.hours);
-    const delta = hoursSpent - oldHours;
-    const newRemaining =
-      task.remaining_time != null
-        ? Math.max(0, Number(task.remaining_time) - delta)
-        : null;
+    const taskUpdate: Record<string, unknown> = {
+      logged_hours: totalLoggedHours,
+      remaining_time: remainingTime,
+      updated_at: new Date().toISOString(),
+    };
+    if (remainingTime === 0) {
+      taskUpdate.status = "completed";
+    }
 
     await supabase
       .from("tasks")
-      .update({
-        logged_hours: totalLoggedHours,
-        remaining_time: newRemaining,
-        updated_at: new Date().toISOString(),
-      })
+      .update(taskUpdate)
       .eq("id", log.task_id);
 
     return NextResponse.json(updated);
