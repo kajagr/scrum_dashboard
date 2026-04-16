@@ -100,7 +100,11 @@ const activeTask = {
   remaining_time: 4,
 };
 
-const activeStory = { id: STORY_ID, status: "in_progress" };
+const activeStory = {
+  id: STORY_ID,
+  status: "in_progress",
+  sprint_id: "sprint-1",
+};
 const doneStory = { id: STORY_ID, status: "done" };
 
 const existingLog = {
@@ -354,13 +358,21 @@ describe("POST /api/tasks/:taskId/timelogs — dodajanje ur (#19)", () => {
     let cnt = 0;
     mockFrom.mockImplementation(() => {
       cnt++;
-      if (cnt === 1) return makeChain({ data: task, error: null });
-      if (cnt === 2) return makeChain({ data: story, error: null });
-      if (cnt === 3) return makeChain({ data: existing, error: null });
-      if (cnt === 4) return makeChain({ data: resultLog, error: null });
-      if (cnt === 5) return makeChain({ data: [{ hours: 2 }], error: null });
+      if (cnt === 1) return makeChain({ data: task, error: null }); // tasks
+      if (cnt === 2) return makeChain({ data: story, error: null }); // user_stories
+      if (cnt === 3)
+        return makeChain({
+          data: { start_date: "2026-01-01", end_date: "2099-12-31" },
+          error: null,
+        }); // sprints
+      if (cnt === 4) return makeChain({ data: existing, error: null }); // existing log check
+      if (cnt === 5) return makeChain({ data: resultLog, error: null }); // insert/update log
       return makeChain({ data: null, error: null }); // task update
     });
+    // allLogs gre zdaj skozi supabaseAdmin
+    mockAdminFrom.mockImplementation(() =>
+      makeChain({ data: [{ hours: 2 }], error: null }),
+    );
   }
 
   it("200 — uspešno doda nov vnos ur", async () => {
@@ -546,13 +558,16 @@ describe("PUT /api/timelogs/:id — urejanje ur (#19)", () => {
     let cnt = 0;
     mockFrom.mockImplementation(() => {
       cnt++;
-      if (cnt === 1) return makeChain({ data: log, error: null });
-      if (cnt === 2) return makeChain({ data: task, error: null });
-      if (cnt === 3) return makeChain({ data: story, error: null });
-      if (cnt === 4) return makeChain({ data: updatedLog, error: updateError });
-      if (cnt === 5) return makeChain({ data: [{ hours: 3 }], error: null });
+      if (cnt === 1) return makeChain({ data: log, error: null }); // time_logs fetch
+      if (cnt === 2) return makeChain({ data: task, error: null }); // tasks fetch
+      if (cnt === 3) return makeChain({ data: story, error: null }); // user_stories fetch
+      if (cnt === 4) return makeChain({ data: updatedLog, error: updateError }); // time_logs update
       return makeChain({ data: null, error: null }); // task update
     });
+    // allLogs gre zdaj skozi supabaseAdmin
+    mockAdminFrom.mockImplementation(() =>
+      makeChain({ data: [{ hours: 3 }], error: null }),
+    );
   }
 
   it("200 — lastnik uspešno posodobi ure (AC1)", async () => {
