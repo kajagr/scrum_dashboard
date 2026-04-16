@@ -161,6 +161,7 @@ function StoryCard({
   onJoinPoker,
   activeSessionId,
   reviewSprintName,
+  canJoinPoker,
 }: {
   story: UserStoryWithSprintInfo;
   selectable?: boolean;
@@ -180,6 +181,7 @@ function StoryCard({
   onJoinPoker?: () => void;
   activeSessionId?: string | null;
   reviewSprintName?: string;
+  canJoinPoker?: boolean;
 }) {
   const [estimating, setEstimating] = useState(false);
   const [estimateVal, setEstimateVal] = useState("");
@@ -291,7 +293,7 @@ function StoryCard({
                   🃏 Planning Poker
                 </button>
               )}
-              {activeSessionId && !canEstimate && (
+              {activeSessionId && !canEstimate && canJoinPoker && (
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onJoinPoker?.(); }}
@@ -880,6 +882,7 @@ export default function BacklogPage() {
               onJoinPoker={() => handleJoinPoker(activePokerSessions[story.id])}
               activeSessionId={activePokerSessions[story.id] ?? null}
               reviewSprintName={activeTab === "ready" ? (story.unfinished_sprint_info?.sprint_name ?? activeSprint?.name) : undefined}
+              canJoinPoker={projectRole !== "product_owner"}
             />
           ))}
         </div>
