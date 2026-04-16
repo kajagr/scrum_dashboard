@@ -5,108 +5,59 @@ import { useEffect, useRef, useState } from "react";
 const helpItems = [
   {
     icon: (
-      <svg
-        className="w-4 h-4 text-primary flex-shrink-0 mt-0.5"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M3 13.5l6.75-6.75 4.5 4.5L21 4.5"
-        />
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M17.25 4.5H21v3.75"
-        />
+      <svg className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.5l6.75-6.75 4.5 4.5L21 4.5" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 4.5H21v3.75" />
       </svg>
     ),
     title: "What is the dashboard?",
-    desc: "The dashboard gives a quick overview of the project and its current statistics.",
+    desc: "The dashboard gives a quick overview of the project — including sprint progress, story statistics, and team activity.",
   },
   {
     icon: (
-      <svg
-        className="w-4 h-4 text-primary flex-shrink-0 mt-0.5"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-        />
+      <svg className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v18h18M7 16l4-4 4 4 4-8" />
       </svg>
     ),
-    title: "User Stories",
-    desc: "This number shows how many user stories currently belong to the project.",
+    title: "Burn-Down chart",
+    desc: "Shows sprint progress over time. Tracks three lines: Ideal (expected progress), Remaining (estimated hours left), and Logged (cumulative hours spent). Use the dropdown to switch between sprints.",
   },
   {
     icon: (
-      <svg
-        className="w-4 h-4 text-primary flex-shrink-0 mt-0.5"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M8 7V3m8 4V3m-9 8h10m-13 9h16a2 2 0 002-2V7a2 2 0 00-2-2h-16a2 2 0 00-2 2v11a2 2 0 002 2z"
-        />
+      <svg className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
       </svg>
     ),
-    title: "Sprints",
-    desc: "This number shows how many sprints have been created for the project.",
+    title: "Statistics — Story status",
+    desc: "A donut chart showing how stories are distributed across statuses: In active sprint, Ready for review, Done, Unassigned, and Future releases.",
   },
   {
     icon: (
-      <svg
-        className="w-4 h-4 text-primary flex-shrink-0 mt-0.5"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M17 20h5V4H2v16h5m10 0v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5m10 0H7"
-        />
+      <svg className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5V4H2v16h5m10 0v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5m10 0H7" />
       </svg>
     ),
-    title: "Project summary",
-    desc: "The top section shows the project name and description so users can quickly identify the current project.",
+    title: "Statistics — Hours per member",
+    desc: "A bar chart showing logged hours per team member. Switch between 'This sprint' and 'All time' to compare workload distribution.",
   },
   {
     icon: (
-      <svg
-        className="w-4 h-4 text-primary flex-shrink-0 mt-0.5"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M11.25 6.75v4.5m0 3h.008v.008h-.008v-.008z"
-        />
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M4.26 18.75h15.48c1.397 0 2.27-1.518 1.56-2.73L13.56 4.98c-.699-1.197-2.421-1.197-3.12 0L2.7 16.02c-.71 1.212.163 2.73 1.56 2.73z"
-        />
+      <svg className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
       </svg>
     ),
-    title: "Empty values",
-    desc: "Some cards may show '-' for now because those statistics have not been implemented yet.",
+    title: "Statistics — Sprint velocity",
+    desc: "Compares estimated vs. logged hours across all sprints. The active sprint is highlighted in green.",
+  },
+  {
+    icon: (
+      <svg className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+    title: "User Stories & Sprints",
+    desc: "The summary cards at the top show total user stories, number of sprints, and team members in the project.",
   },
 ];
 
