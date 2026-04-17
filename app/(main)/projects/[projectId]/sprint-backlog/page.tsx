@@ -181,6 +181,7 @@ export default function SprintBoardPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionError, setActionError] = useState<Record<string, string>>({});
 
+
   const fetchTasks = async (storyIds: string[]) => {
     const tasksMap: Record<string, TaskWithAssignee[]> = {};
     await Promise.all(

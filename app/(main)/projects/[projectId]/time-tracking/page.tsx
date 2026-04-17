@@ -22,6 +22,7 @@ type TaskInfo = {
   title: string;
   description: string | null;
   remaining_time: number | null;
+  status: string;
   user_story: Story | null;
 };
 
@@ -229,6 +230,7 @@ export default function TimeTrackingPage() {
               (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
             );
             const isStoryDone = task.user_story?.status === "done";
+            const isTaskDone = task.status === "completed";
             const isExpanded = expandedTasks.has(taskId);
             const isShowingForm = logForm?.taskId === taskId;
             const latestRemaining = taskLogs[0]?.remaining_time;
@@ -240,7 +242,7 @@ export default function TimeTrackingPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-medium text-foreground text-sm truncate">{task.title}</p>
-                      {isStoryDone && (
+                      {(isStoryDone || isTaskDone) && (
                         <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[rgba(52,211,153,0.12)] text-[#34D399] border border-[rgba(52,211,153,0.25)] shrink-0">
                           done
                         </span>
