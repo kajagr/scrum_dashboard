@@ -37,6 +37,7 @@ type TaskWithAssignee = {
   is_active: boolean;
   estimated_hours: number | null;
   logged_hours: number | null;
+  remaining_time: number | null;
   assignee?: { id: string; first_name: string; last_name: string } | null;
 };
 
@@ -179,6 +180,7 @@ export default function SprintBoardPage() {
 
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionError, setActionError] = useState<Record<string, string>>({});
+
 
   const fetchTasks = async (storyIds: string[]) => {
     const tasksMap: Record<string, TaskWithAssignee[]> = {};
@@ -808,6 +810,11 @@ export default function SprintBoardPage() {
                                                 </svg>
                                                 {task.logged_hours ?? 0}h /{" "}
                                                 {task.estimated_hours}h
+                                              </span>
+                                            )}
+                                            {task.remaining_time != null && (
+                                              <span className={`text-xs font-medium ${task.remaining_time === 0 ? "text-[#34D399]" : "text-muted"}`}>
+                                                · {Number(task.remaining_time).toFixed(1)}h remaining
                                               </span>
                                             )}
                                             {task.assignee ? (

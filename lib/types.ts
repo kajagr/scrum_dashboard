@@ -98,6 +98,7 @@ export interface TimeLog {
   hours: number;
   date: string;
   description: string | null;
+  remaining_time: number | null;
   logged_at: string;
 }
 

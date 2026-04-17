@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import TimeTrackingHelpTooltip from "@/components/features/time-tracking/TimeTrackingHelpTooltip";
 
@@ -22,6 +22,7 @@ type TaskInfo = {
   title: string;
   description: string | null;
   remaining_time: number | null;
+  status: string;
   user_story: Story | null;
 };
 
@@ -31,33 +32,19 @@ type TimeLogEntry = {
   hours: number;
   date: string;
   logged_at: string;
+  remaining_time: number | null;
   task: TaskInfo | null;
 };
 
-function getWeekRange(offset = 0) {
-  const now = new Date();
-  const day = now.getDay();
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - ((day + 6) % 7) + offset * 7);
-  monday.setHours(0, 0, 0, 0);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  return {
-    from: monday.toISOString().split("T")[0],
-    to: sunday.toISOString().split("T")[0],
-  };
-}
-
-function getDatesInRange(from: string, to: string): string[] {
-  const dates: string[] = [];
-  const cur = new Date(from);
-  const end = new Date(to);
-  while (cur <= end) {
-    dates.push(cur.toISOString().split("T")[0]);
-    cur.setDate(cur.getDate() + 1);
-  }
-  return dates;
-}
+type LogFormState = {
+  taskId: string;
+  existingLogId: string | null;
+  date: string;
+  hours: string;
+  remaining: string;
+  error: string | null;
+  saving: boolean;
+};
 
 function formatDateShort(d: string) {
   const date = new Date(d + "T12:00:00");
@@ -66,42 +53,25 @@ function formatDateShort(d: string) {
   return `${day}.${month}`;
 }
 
-function formatWeekLabel(from: string, to: string) {
-  const f = new Date(from + "T12:00:00");
-  const t = new Date(to + "T12:00:00");
-  const fmt = (d: Date) =>
-    `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
-  return `${fmt(f)} – ${fmt(t)}`;
-}
-
 export default function TimeTrackingPage() {
   const params = useParams();
   const projectId = params.projectId as string;
 
-  const [fromDate, setFromDate] = useState(() => getWeekRange(0).from);
-  const [toDate, setToDate] = useState(() => getWeekRange(0).to);
   const [logs, setLogs] = useState<TimeLogEntry[]>([]);
   const [assignedTasks, setAssignedTasks] = useState<TaskInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [weekOffset, setWeekOffsetState] = useState(0);
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [logForm, setLogForm] = useState<LogFormState | null>(null);
 
-  const [editingCell, setEditingCell] = useState<string | null>(null);
-  const [cellValue, setCellValue] = useState("");
-  const [cellError, setCellError] = useState<string | null>(null);
-
-  const [editingRemaining, setEditingRemaining] = useState<string | null>(null);
-  const [remainingValue, setRemainingValue] = useState("");
-  const [remainingError, setRemainingError] = useState<string | null>(null);
-
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const today = new Date().toISOString().split("T")[0];
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const [logsRes, tasksRes] = await Promise.all([
-        fetch(`/api/users/me/timelogs?from_date=${fromDate}&to_date=${toDate}&project_id=${projectId}`),
+        fetch(`/api/users/me/timelogs?project_id=${projectId}`),
         fetch(`/api/projects/${projectId}/my-tasks`),
       ]);
       if (!logsRes.ok) {
@@ -121,114 +91,78 @@ export default function TimeTrackingPage() {
     } finally {
       setLoading(false);
     }
-  }, [fromDate, toDate, projectId]);
+  }, [projectId]);
 
-  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+  useEffect(() => {
+    fetchLogs();
+  }, [fetchLogs]);
 
-  const dates = getDatesInRange(fromDate, toDate);
-  const today = new Date().toISOString().split("T")[0];
-
-  const logMap = new Map<string, Map<string, TimeLogEntry>>();
   const taskMap = new Map<string, TaskInfo>();
+  const logsByTask = new Map<string, TimeLogEntry[]>();
 
-  // Seed taskMap with all assigned tasks so they always show
   for (const t of assignedTasks) {
     taskMap.set(t.id, t);
   }
 
-  // Layer in log data — only for tasks already in taskMap (current project, not completed)
   for (const log of logs) {
-    if (!log.task || !taskMap.has(log.task_id)) continue;
-    taskMap.set(log.task_id, log.task);
-    if (!logMap.has(log.task_id)) logMap.set(log.task_id, new Map());
-    logMap.get(log.task_id)!.set(log.date, log);
+    if (!log.task) continue;
+    if (!taskMap.has(log.task_id)) taskMap.set(log.task_id, log.task);
+    if (!logsByTask.has(log.task_id)) logsByTask.set(log.task_id, []);
+    logsByTask.get(log.task_id)!.push(log);
   }
+
   const taskIds = Array.from(taskMap.keys());
 
-  // Summary stats
-  const totalHoursThisWeek = logs.reduce((s, l) => s + Number(l.hours), 0);
-  const todayHours = logs.filter((l) => l.date === today).reduce((s, l) => s + Number(l.hours), 0);
-  const activeTasks = taskIds.filter((id) => taskMap.get(id)?.user_story?.status !== "done").length;
-  const isCurrentWeek = weekOffset === 0;
-
-  function applyWeekOffset(offset: number) {
-    setWeekOffsetState(offset);
-    const range = getWeekRange(offset);
-    setFromDate(range.from);
-    setToDate(range.to);
+  function openLogForm(taskId: string, existingLog?: TimeLogEntry) {
+    setLogForm({
+      taskId,
+      existingLogId: existingLog?.id ?? null,
+      date: existingLog?.date ?? today,
+      hours: existingLog ? String(existingLog.hours) : "",
+      remaining: existingLog?.remaining_time != null ? String(existingLog.remaining_time) : "",
+      error: null,
+      saving: false,
+    });
   }
 
-  function startEditCell(taskId: string, date: string) {
-    const existing = logMap.get(taskId)?.get(date);
-    setEditingCell(`${taskId}|${date}`);
-    setCellValue(existing ? String(existing.hours) : "");
-    setCellError(null);
-  }
-
-  async function saveCell(taskId: string, date: string, value: string) {
-    const hours = Number(value);
-    if (!value || isNaN(hours) || hours <= 0) { setCellError("Must be > 0"); return; }
-    if (date > today) { setCellError("Can't log future hours"); return; }
-    const task = taskMap.get(taskId);
-    const sprint = task?.user_story?.sprint;
-    if (sprint && (date < sprint.start_date || date > sprint.end_date)) {
-      setCellError(`Only dates within sprint (${sprint.start_date} – ${sprint.end_date})`);
+  async function saveLogForm() {
+    if (!logForm) return;
+    const hours = Number(logForm.hours);
+    const remaining = Number(logForm.remaining);
+    if (!logForm.hours || isNaN(hours) || hours <= 0) {
+      setLogForm((f) => f && { ...f, error: "Hours must be > 0" });
       return;
     }
-    setCellError(null);
-    const existing = logMap.get(taskId)?.get(date);
-    if (existing) {
-      const res = await fetch(`/api/timelogs/${existing.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hours_spent: hours }),
-      });
-      if (!res.ok) { const b = await res.json(); setCellError(b.error ?? "Error saving."); return; }
-    } else {
-      const res = await fetch(`/api/tasks/${taskId}/timelogs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, hours_spent: hours }),
-      });
-      if (!res.ok) { const b = await res.json(); setCellError(b.error ?? "Error saving."); return; }
+    if (logForm.remaining === "" || isNaN(remaining) || remaining < 0) {
+      setLogForm((f) => f && { ...f, error: "Remaining must be ≥ 0" });
+      return;
     }
-    setEditingCell(null);
-    fetchLogs();
-  }
-
-  function handleCellKeyDown(e: React.KeyboardEvent, taskId: string, date: string) {
-    if (e.key === "Enter") { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); saveCell(taskId, date, cellValue); }
-    else if (e.key === "Escape") { setEditingCell(null); setCellError(null); }
-  }
-
-  function handleCellBlur(taskId: string, date: string) {
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      if (cellValue) saveCell(taskId, date, cellValue);
-      else setEditingCell(null);
-    }, 300);
-  }
-
-  function startEditRemaining(taskId: string) {
-    const task = taskMap.get(taskId);
-    setEditingRemaining(taskId);
-    setRemainingValue(task?.remaining_time != null ? String(task.remaining_time) : "");
-    setRemainingError(null);
-  }
-
-  async function saveRemaining(taskId: string, value: string) {
-    const hours = Number(value);
-    if (value === "" || isNaN(hours) || hours < 0) { setRemainingError("Must be ≥ 0"); return; }
-    setRemainingError(null);
-    const res = await fetch(`/api/tasks/${taskId}/remaining-time`, {
-      method: "PATCH",
+    if (logForm.date > today) {
+      setLogForm((f) => f && { ...f, error: "Can't log future hours" });
+      return;
+    }
+    setLogForm((f) => f && { ...f, saving: true, error: null });
+    const url = logForm.existingLogId
+      ? `/api/timelogs/${logForm.existingLogId}`
+      : `/api/tasks/${logForm.taskId}/timelogs`;
+    const method = logForm.existingLogId ? "PUT" : "POST";
+    const res = await fetch(url, {
+      method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ remaining_time: hours }),
+      body: JSON.stringify({ date: logForm.date, hours_spent: hours, remaining_time: remaining }),
     });
-    if (!res.ok) { const b = await res.json(); setRemainingError(b.error ?? "Error saving."); return; }
-    setEditingRemaining(null);
+    if (!res.ok) {
+      const b = await res.json();
+      setLogForm((f) => f && { ...f, saving: false, error: b.error ?? "Error saving." });
+      return;
+    }
+    setLogForm(null);
     fetchLogs();
   }
+
+  const todayHours = logs.filter((l) => l.date === today).reduce((s, l) => s + Number(l.hours), 0);
+  const totalHours = logs.reduce((s, l) => s + Number(l.hours), 0);
+  const activeTasks = assignedTasks.filter((t) => t.user_story?.status !== "done").length;
 
   return (
     <div className="p-6">
@@ -239,90 +173,25 @@ export default function TimeTrackingPage() {
           <h1 className="text-3xl font-bold text-foreground leading-tight">Time Tracking</h1>
           <TimeTrackingHelpTooltip />
         </div>
-        <p className="text-sm text-muted mt-1">Log and review your hours per task.</p>
+        <p className="text-sm text-muted mt-1">Log your daily hours and remaining estimate per task.</p>
       </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="rounded-xl border border-border bg-surface p-4">
-          <p className="text-xs font-semibold tracking-widest uppercase text-muted mb-1">This week</p>
-          <p className="text-2xl font-bold text-foreground">{totalHoursThisWeek.toFixed(1)}h</p>
-          <p className="text-xs text-subtle mt-0.5">total logged</p>
-        </div>
-        <div className="rounded-xl border border-border bg-surface p-4">
           <p className="text-xs font-semibold tracking-widest uppercase text-muted mb-1">Today</p>
           <p className="text-2xl font-bold text-foreground">{todayHours.toFixed(1)}h</p>
-          <p className="text-xs text-subtle mt-0.5">{(() => {
-            const now = new Date();
-            const day = String(now.getDate()).padStart(2, "0");
-            const month = String(now.getMonth() + 1).padStart(2, "0");
-            const year = now.getFullYear();
-            const weekday = now.toLocaleDateString("en-GB", { weekday: "long" });
-            return `${weekday}, ${day}.${month}.${year}`;
-          })()}</p>
+          <p className="text-xs text-subtle mt-0.5">logged today</p>
+        </div>
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <p className="text-xs font-semibold tracking-widest uppercase text-muted mb-1">Total logged</p>
+          <p className="text-2xl font-bold text-foreground">{totalHours.toFixed(1)}h</p>
+          <p className="text-xs text-subtle mt-0.5">all time</p>
         </div>
         <div className="rounded-xl border border-border bg-surface p-4">
           <p className="text-xs font-semibold tracking-widest uppercase text-muted mb-1">Active tasks</p>
           <p className="text-2xl font-bold text-foreground">{activeTasks}</p>
-          <p className="text-xs text-subtle mt-0.5">in this period</p>
-        </div>
-      </div>
-
-      {/* Week navigation */}
-      <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => applyWeekOffset(weekOffset - 1)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border bg-surface text-muted hover:text-foreground hover:border-primary transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-            Prev
-          </button>
-          <button
-            onClick={() => applyWeekOffset(0)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-              isCurrentWeek
-                ? "bg-primary-light text-primary border-primary-border"
-                : "border-border bg-surface text-muted hover:text-foreground hover:border-primary"
-            }`}
-          >
-            This week
-          </button>
-          <button
-            onClick={() => applyWeekOffset(weekOffset + 1)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border bg-surface text-muted hover:text-foreground hover:border-primary transition-colors"
-          >
-            Next
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          <span className="text-sm font-medium text-foreground">{formatWeekLabel(fromDate, toDate)}</span>
-        </div>
-
-        {/* Custom range */}
-        <div className="flex items-center gap-2">
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => { setFromDate(e.target.value); setWeekOffsetState(99); }}
-            className="text-xs px-2.5 py-1.5 rounded-lg border border-border bg-surface text-foreground focus:outline-none focus:border-primary"
-          />
-          <span className="text-xs text-muted">to</span>
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => { setToDate(e.target.value); setWeekOffsetState(99); }}
-            className="text-xs px-2.5 py-1.5 rounded-lg border border-border bg-surface text-foreground focus:outline-none focus:border-primary"
-          />
+          <p className="text-xs text-subtle mt-0.5">assigned to you</p>
         </div>
       </div>
 
@@ -354,200 +223,215 @@ export default function TimeTrackingPage() {
           <p className="text-sm text-subtle">You have no tasks assigned to you in this project.</p>
         </div>
       ) : (
-        <div className="rounded-xl border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="bg-surface">
-                  <th className="text-left px-4 py-3 font-semibold text-muted text-xs uppercase tracking-wide border-b border-border sticky left-0 bg-surface z-10" style={{ minWidth: 240 }}>
-                    Task
-                  </th>
-                  {dates.map((d) => (
-                    <th
-                      key={d}
-                      className="text-center px-3 py-3 text-xs border-b border-border border-l border-border"
-                      style={{
-                        minWidth: 80,
-                        color: d === today ? "var(--color-primary)" : "var(--color-muted)",
-                        fontWeight: d === today ? 700 : 500,
-                        background: d === today ? "var(--color-primary-light)" : undefined,
-                      }}
-                    >
-                      {formatDateShort(d)}
-                    </th>
-                  ))}
-                  <th className="text-center px-3 py-3 font-semibold text-muted text-xs uppercase tracking-wide border-b border-border border-l" style={{ minWidth: 100 }}>
-                    Remaining
-                  </th>
-                  <th className="text-center px-3 py-3 font-semibold text-muted text-xs uppercase tracking-wide border-b border-border border-l" style={{ minWidth: 70 }}>
-                    Total
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {taskIds.map((taskId, i) => {
-                  const task = taskMap.get(taskId)!;
-                  const taskLogs = logMap.get(taskId) ?? new Map<string, TimeLogEntry>();
-                  const rowTotal = Array.from(taskLogs.values()).reduce((s, l) => s + Number(l.hours), 0);
-                  const isStoryDone = task.user_story?.status === "done";
-                  const isEditingRem = editingRemaining === taskId;
+        <div className="flex flex-col gap-3">
+          {taskIds.map((taskId) => {
+            const task = taskMap.get(taskId)!;
+            const taskLogs = (logsByTask.get(taskId) ?? []).sort(
+              (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+            );
+            const isStoryDone = task.user_story?.status === "done";
+            const isTaskDone = task.status === "completed";
+            const isExpanded = expandedTasks.has(taskId);
+            const isShowingForm = logForm?.taskId === taskId;
+            const latestRemaining = taskLogs[0]?.remaining_time;
 
-                  return (
-                    <tr
-                      key={taskId}
-                      className="group"
-                      style={{
-                        background: i % 2 === 0 ? "var(--color-background)" : "var(--color-surface)",
-                        borderBottom: "1px solid var(--color-border)",
-                      }}
-                    >
-                      {/* Task cell */}
-                      <td
-                        className="px-4 py-3 border-r border-border sticky left-0 z-10"
-                        style={{ background: i % 2 === 0 ? "var(--color-background)" : "var(--color-surface)" }}
-                      >
-                        <div className="font-medium text-foreground leading-snug text-sm">{task.title}</div>
-                        {task.user_story && (
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <p className="text-xs text-muted truncate max-w-[180px]">{task.user_story.title}</p>
-                            {isStoryDone && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[rgba(52,211,153,0.12)] text-[#34D399] border border-[rgba(52,211,153,0.25)]">
-                                done
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Day cells */}
-                      {dates.map((d) => {
-                        const log = taskLogs.get(d);
-                        const key = `${taskId}|${d}`;
-                        const isEditing = editingCell === key;
-                        const isFuture = d > today;
-                        const sprint = task.user_story?.sprint;
-                        const isOutsideSprint = sprint != null && (d < sprint.start_date || d > sprint.end_date);
-                        const isBlocked = isStoryDone || isFuture || isOutsideSprint;
-
-                        return (
-                          <td
-                            key={d}
-                            className="text-center px-2 py-2 border-l border-border"
-                            style={{
-                              cursor: isBlocked ? "default" : "pointer",
-                              background: d === today ? "var(--color-primary-light)" : isOutsideSprint ? "var(--color-surface)" : undefined,
-                              opacity: isOutsideSprint ? 0.35 : undefined,
-                            }}
-                            onClick={() => { if (!isBlocked) startEditCell(taskId, d); }}
-                          >
-                            {isEditing ? (
-                              <div>
-                                <input
-                                  autoFocus
-                                  type="number"
-                                  min="0.01"
-                                  step="0.25"
-                                  value={cellValue}
-                                  onChange={(e) => setCellValue(e.target.value)}
-                                  onKeyDown={(e) => handleCellKeyDown(e, taskId, d)}
-                                  onBlur={() => handleCellBlur(taskId, d)}
-                                  className="w-14 text-center text-xs px-1.5 py-1 rounded-lg bg-background border border-primary text-foreground focus:outline-none"
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                                {cellError && <div className="text-[10px] text-error mt-0.5">{cellError}</div>}
-                              </div>
-                            ) : log ? (
-                              <span className="text-xs font-semibold text-foreground px-2 py-0.5 rounded-lg bg-primary-light text-primary border border-primary-border">
-                                {Number(log.hours).toFixed(1)}h
-              				        </span>
-                            ) : (
-                              <span className="text-xs text-subtle opacity-0 group-hover:opacity-100 transition-opacity">
-                                {isFuture || isOutsideSprint ? "—" : "+"}
-                              </span>
-                            )}
-                          </td>
-                        );
-                      })}
-
-                      {/* Remaining */}
-                      <td
-                        className="text-center px-2 py-2 border-l border-border"
-                        style={{ cursor: isStoryDone ? "default" : "pointer" }}
-                        onClick={() => { if (!isStoryDone) startEditRemaining(taskId); }}
-                      >
-                        {isEditingRem ? (
-                          <div>
-                            <input
-                              autoFocus
-                              type="number"
-                              min="0"
-                              step="0.25"
-                              value={remainingValue}
-                              onChange={(e) => setRemainingValue(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") saveRemaining(taskId, remainingValue);
-                                else if (e.key === "Escape") setEditingRemaining(null);
-                              }}
-                              onBlur={() => { if (remainingValue !== "") saveRemaining(taskId, remainingValue); else setEditingRemaining(null); }}
-                              className="w-14 text-center text-xs px-1.5 py-1 rounded-lg bg-background border border-primary text-foreground focus:outline-none"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            {remainingError && <div className="text-[10px] text-error mt-0.5">{remainingError}</div>}
-                          </div>
-                        ) : task.remaining_time != null ? (
-                          <span className={`text-xs font-semibold ${task.remaining_time === 0 ? "text-[#34D399]" : "text-foreground"}`}>
-                            {Number(task.remaining_time).toFixed(1)}h
-                          </span>
-                        ) : (
-                          <span className="text-xs text-subtle">—</span>
-                        )}
-                      </td>
-
-                      {/* Row total */}
-                      <td className="text-center px-3 py-2 border-l border-border">
-                        <span className="text-xs font-bold text-foreground">
-                          {rowTotal > 0 ? `${rowTotal.toFixed(1)}h` : "—"}
+            return (
+              <div key={taskId} className="rounded-xl border border-border bg-surface overflow-hidden">
+                {/* Task header row */}
+                <div className="flex items-center justify-between px-4 py-3 gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-foreground text-sm truncate">{task.title}</p>
+                      {(isStoryDone || isTaskDone) && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[rgba(52,211,153,0.12)] text-[#34D399] border border-[rgba(52,211,153,0.25)] shrink-0">
+                          done
                         </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-
-              {/* Footer totals */}
-              <tfoot>
-                <tr className="bg-surface border-t-2 border-border">
-                  <td className="px-4 py-3 text-xs font-bold text-muted uppercase tracking-wide sticky left-0 bg-surface border-r border-border">
-                    Total
-                  </td>
-                  {dates.map((d) => {
-                    const dayTotal = logs.filter((l) => l.date === d).reduce((s, l) => s + Number(l.hours), 0);
-                    return (
-                      <td
-                        key={d}
-                        className="text-center px-3 py-3 border-l border-border text-xs font-bold"
-                        style={{
-                          color: d === today ? "var(--color-primary)" : "var(--color-foreground)",
-                          background: d === today ? "var(--color-primary-light)" : undefined,
+                      )}
+                    </div>
+                    {task.user_story && (
+                      <p className="text-xs text-muted truncate mt-0.5">{task.user_story.title}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {latestRemaining != null && (
+                      <span className={`text-xs font-semibold ${latestRemaining === 0 ? "text-[#34D399]" : "text-muted"}`}>
+                        {Number(latestRemaining).toFixed(1)}h remaining
+                      </span>
+                    )}
+                    {!isStoryDone && (
+                      <button
+                        onClick={() => {
+                          openLogForm(taskId);
+                          setExpandedTasks((p) => {
+                            const n = new Set(p);
+                            n.add(taskId);
+                            return n;
+                          });
                         }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary text-white hover:bg-primary/90 transition-colors"
                       >
-                        {dayTotal > 0 ? `${dayTotal.toFixed(1)}h` : "—"}
-                      </td>
-                    );
-                  })}
-                  <td className="border-l border-border" />
-                  <td className="text-center px-3 py-3 border-l border-border text-xs font-bold text-foreground">
-                    {totalHoursThisWeek.toFixed(1)}h
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+                        + Log time
+                      </button>
+                    )}
+                    <button
+                      onClick={() =>
+                        setExpandedTasks((p) => {
+                          const n = new Set(p);
+                          n.has(taskId) ? n.delete(taskId) : n.add(taskId);
+                          return n;
+                        })
+                      }
+                      className="p-1.5 rounded-lg border border-border bg-background text-muted hover:text-foreground transition-colors"
+                    >
+                      <svg
+                        className={`w-3.5 h-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Log form */}
+                {isShowingForm && logForm && (
+                  <div className="border-t border-border px-4 py-3 bg-background flex flex-wrap items-end gap-3">
+                    <div>
+                      <label className="text-[10px] font-semibold uppercase tracking-wide text-muted block mb-1">
+                        Date
+                      </label>
+                      <input
+                        type="date"
+                        value={logForm.date}
+                        max={today}
+                        onChange={(e) => setLogForm((f) => f && { ...f, date: e.target.value })}
+                        className="text-xs px-2.5 py-1.5 rounded-lg border border-border bg-surface text-foreground focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold uppercase tracking-wide text-muted block mb-1">
+                        Hours logged
+                      </label>
+                      <input
+                        type="number"
+                        min="0.25"
+                        step="0.25"
+                        placeholder="e.g. 3"
+                        value={logForm.hours}
+                        onChange={(e) => setLogForm((f) => f && { ...f, hours: e.target.value })}
+                        className="w-24 text-xs px-2.5 py-1.5 rounded-lg border border-border bg-surface text-foreground focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold uppercase tracking-wide text-muted block mb-1">
+                        Remaining estimate
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.25"
+                        placeholder="e.g. 4"
+                        value={logForm.remaining}
+                        onChange={(e) => setLogForm((f) => f && { ...f, remaining: e.target.value })}
+                        className="w-24 text-xs px-2.5 py-1.5 rounded-lg border border-border bg-surface text-foreground focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={saveLogForm}
+                        disabled={logForm.saving}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary text-white hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                      >
+                        {logForm.saving ? "Saving…" : "Save"}
+                      </button>
+                      <button
+                        onClick={() => setLogForm(null)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border bg-surface text-muted hover:text-foreground transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    {logForm.error && <p className="text-xs text-error w-full">{logForm.error}</p>}
+                  </div>
+                )}
+
+                {/* History table */}
+                {isExpanded && (
+                  <div className="border-t border-border">
+                    {taskLogs.length === 0 ? (
+                      <p className="text-xs text-muted px-4 py-3">No time logged yet.</p>
+                    ) : (
+                      <table className="w-full text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-background border-b border-border">
+                            <th
+                              className="text-left px-4 py-2 font-semibold text-muted uppercase tracking-wide"
+                              style={{ width: 100 }}
+                            >
+                              Date
+                            </th>
+                            <th
+                              className="text-right px-4 py-2 font-semibold text-muted uppercase tracking-wide"
+                              style={{ width: 100 }}
+                            >
+                              Time
+                            </th>
+                            <th
+                              className="text-right px-4 py-2 font-semibold text-muted uppercase tracking-wide"
+                              style={{ width: 120 }}
+                            >
+                              Remaining
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {taskLogs.map((log, i) => (
+                            <tr
+                              key={log.id}
+                              className="border-b border-border last:border-0 hover:bg-background/60 cursor-pointer transition-colors"
+                              style={{
+                                background:
+                                  i % 2 === 0 ? undefined : "var(--color-background)",
+                              }}
+                              onClick={() => !isStoryDone && openLogForm(taskId, log)}
+                            >
+                              <td className="px-4 py-2.5 text-foreground">{formatDateShort(log.date)}</td>
+                              <td className="px-4 py-2.5 text-right">
+                                <span className="font-semibold text-primary">
+                                  {Number(log.hours).toFixed(1)}h
+                                </span>
+                              </td>
+                              <td className="px-4 py-2.5 text-right">
+                                {log.remaining_time != null ? (
+                                  <span
+                                    className={`font-semibold ${
+                                      log.remaining_time === 0 ? "text-[#34D399]" : "text-foreground"
+                                    }`}
+                                  >
+                                    {Number(log.remaining_time).toFixed(1)}h
+                                  </span>
+                                ) : (
+                                  <span className="text-subtle">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
       <p className="text-xs text-muted mt-3">
-        Click any cell to edit hours · Enter to save · Escape to cancel
+        Click &quot;+ Log time&quot; to add an entry · Click a row to edit · Remaining = 0 auto-completes the task
       </p>
     </div>
   );

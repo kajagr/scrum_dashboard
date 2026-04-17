@@ -72,7 +72,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const { data: logs, error: logsError } = await supabase
       .from("time_logs")
-      .select("id, task_id, user_id, hours, date, logged_at")
+      .select("id, task_id, user_id, hours, date, logged_at, remaining_time")
       .eq("task_id", taskId)
       .eq("user_id", user.id)
       .order("date", { ascending: false });
@@ -152,6 +152,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const body = await request.json();
     const hoursSpent = Number(body.hours_spent);
     const date: string = body.date;
+    const remainingTime = body.remaining_time !== undefined ? Number(body.remaining_time) : undefined;
 
     if (!hoursSpent || isNaN(hoursSpent) || hoursSpent <= 0)
       return NextResponse.json(
@@ -162,6 +163,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (!date)
       return NextResponse.json({ error: "Datum je obvezen." }, { status: 400 });
 
+    if (remainingTime === undefined || isNaN(remainingTime) || remainingTime < 0)
+      return NextResponse.json(
+        { error: "Preostali čas je obvezen in mora biti 0 ali več." },
+        { status: 400 },
+      );
+
     const today = new Date().toISOString().split("T")[0];
     if (date > today)
       return NextResponse.json(
@@ -171,7 +178,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const { data: task, error: taskError } = await supabase
       .from("tasks")
-      .select("id, user_story_id, assignee_id, is_accepted, remaining_time")
+      .select("id, user_story_id, assignee_id, is_accepted, remaining_time, status")
       .eq("id", taskId)
       .is("deleted_at", null)
       .maybeSingle();
@@ -237,9 +244,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (existingLog) {
       const { data: updated, error: updateError } = await supabase
         .from("time_logs")
-        .update({ hours: Number(existingLog.hours) + hoursSpent })
+        .update({ hours: Number(existingLog.hours) + hoursSpent, remaining_time: remainingTime })
         .eq("id", existingLog.id)
-        .select("id, task_id, user_id, hours, date, logged_at")
+        .select("id, task_id, user_id, hours, date, logged_at, remaining_time")
         .single();
 
       if (updateError)
@@ -257,8 +264,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
           hours: hoursSpent,
           date,
           logged_at: new Date().toISOString(),
+          remaining_time: remainingTime,
         })
-        .select("id, task_id, user_id, hours, date, logged_at")
+        .select("id, task_id, user_id, hours, date, logged_at, remaining_time")
         .single();
 
       if (insertError)
@@ -278,18 +286,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
       ? allLogs.reduce((sum, l) => sum + Number(l.hours), 0)
       : 0;
 
-    const newRemaining =
-      task.remaining_time != null
-        ? Math.max(0, Number(task.remaining_time) - hoursSpent)
-        : null;
+    const taskUpdate: Record<string, unknown> = {
+      logged_hours: totalLoggedHours,
+      remaining_time: remainingTime,
+      updated_at: new Date().toISOString(),
+    };
+    if (remainingTime === 0) {
+      taskUpdate.status = "completed";
+      taskUpdate.is_active = false;
+      taskUpdate.active_since = null;
+    } else if (task.status === "completed") {
+      taskUpdate.status = "in_progress";
+    }
 
     await supabase
       .from("tasks")
-      .update({
-        logged_hours: totalLoggedHours,
-        remaining_time: newRemaining,
-        updated_at: new Date().toISOString(),
-      })
+      .update(taskUpdate)
       .eq("id", taskId);
 
     return NextResponse.json(resultLog);

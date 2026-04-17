@@ -381,6 +381,7 @@ describe("POST /api/tasks/:taskId/timelogs — dodajanje ur (#19)", () => {
       makePostRequest(`http://localhost/api/tasks/${TASK_ID}/timelogs`, {
         date: yesterday,
         hours_spent: 2,
+        remaining_time: 4,
       }),
       makeContext({ taskId: TASK_ID }),
     );
@@ -399,6 +400,7 @@ describe("POST /api/tasks/:taskId/timelogs — dodajanje ur (#19)", () => {
       makePostRequest(`http://localhost/api/tasks/${TASK_ID}/timelogs`, {
         date: yesterday,
         hours_spent: 2,
+        remaining_time: 4,
       }),
       makeContext({ taskId: TASK_ID }),
     );
@@ -414,6 +416,7 @@ describe("POST /api/tasks/:taskId/timelogs — dodajanje ur (#19)", () => {
       makePostRequest(`http://localhost/api/tasks/${TASK_ID}/timelogs`, {
         date: yesterday,
         hours_spent: 0,
+        remaining_time: 4,
       }),
       makeContext({ taskId: TASK_ID }),
     );
@@ -427,6 +430,7 @@ describe("POST /api/tasks/:taskId/timelogs — dodajanje ur (#19)", () => {
       makePostRequest(`http://localhost/api/tasks/${TASK_ID}/timelogs`, {
         date: yesterday,
         hours_spent: -1,
+        remaining_time: 4,
       }),
       makeContext({ taskId: TASK_ID }),
     );
@@ -439,6 +443,7 @@ describe("POST /api/tasks/:taskId/timelogs — dodajanje ur (#19)", () => {
       makePostRequest(`http://localhost/api/tasks/${TASK_ID}/timelogs`, {
         date: tomorrow,
         hours_spent: 2,
+        remaining_time: 4,
       }),
       makeContext({ taskId: TASK_ID }),
     );
@@ -451,6 +456,7 @@ describe("POST /api/tasks/:taskId/timelogs — dodajanje ur (#19)", () => {
     const res = await POST(
       makePostRequest(`http://localhost/api/tasks/${TASK_ID}/timelogs`, {
         hours_spent: 2,
+        remaining_time: 4,
       }),
       makeContext({ taskId: TASK_ID }),
     );
@@ -464,6 +470,7 @@ describe("POST /api/tasks/:taskId/timelogs — dodajanje ur (#19)", () => {
       makePostRequest(`http://localhost/api/tasks/${TASK_ID}/timelogs`, {
         date: yesterday,
         hours_spent: 2,
+        remaining_time: 4,
       }),
       makeContext({ taskId: TASK_ID }),
     );
@@ -477,6 +484,7 @@ describe("POST /api/tasks/:taskId/timelogs — dodajanje ur (#19)", () => {
       makePostRequest(`http://localhost/api/tasks/${TASK_ID}/timelogs`, {
         date: yesterday,
         hours_spent: 2,
+        remaining_time: 4,
       }),
       makeContext({ taskId: TASK_ID }),
     );
@@ -489,6 +497,7 @@ describe("POST /api/tasks/:taskId/timelogs — dodajanje ur (#19)", () => {
       makePostRequest(`http://localhost/api/tasks/${TASK_ID}/timelogs`, {
         date: yesterday,
         hours_spent: 2,
+        remaining_time: 4,
       }),
       makeContext({ taskId: TASK_ID }),
     );
@@ -502,6 +511,7 @@ describe("POST /api/tasks/:taskId/timelogs — dodajanje ur (#19)", () => {
       makePostRequest(`http://localhost/api/tasks/nonexistent/timelogs`, {
         date: yesterday,
         hours_spent: 2,
+        remaining_time: 4,
       }),
       makeContext({ taskId: "nonexistent" }),
     );
@@ -515,6 +525,7 @@ describe("POST /api/tasks/:taskId/timelogs — dodajanje ur (#19)", () => {
       makePostRequest(`http://localhost/api/tasks/${TASK_ID}/timelogs`, {
         date: yesterday,
         hours_spent: 2,
+        remaining_time: 4,
       }),
       makeContext({ taskId: TASK_ID }),
     );
@@ -575,6 +586,7 @@ describe("PUT /api/timelogs/:id — urejanje ur (#19)", () => {
     const res = await PUT(
       makePutRequest(`http://localhost/api/timelogs/${TIMELOG_ID}`, {
         hours_spent: 3,
+        remaining_time: 4,
       }),
       makeContext({ id: TIMELOG_ID }),
     );
@@ -587,6 +599,7 @@ describe("PUT /api/timelogs/:id — urejanje ur (#19)", () => {
     const res = await PUT(
       makePutRequest(`http://localhost/api/timelogs/${TIMELOG_ID}`, {
         hours_spent: 0,
+        remaining_time: 4,
       }),
       makeContext({ id: TIMELOG_ID }),
     );
@@ -599,6 +612,7 @@ describe("PUT /api/timelogs/:id — urejanje ur (#19)", () => {
     const res = await PUT(
       makePutRequest(`http://localhost/api/timelogs/${TIMELOG_ID}`, {
         hours_spent: -2,
+        remaining_time: 4,
       }),
       makeContext({ id: TIMELOG_ID }),
     );
@@ -619,6 +633,7 @@ describe("PUT /api/timelogs/:id — urejanje ur (#19)", () => {
     const res = await PUT(
       makePutRequest(`http://localhost/api/timelogs/${TIMELOG_ID}`, {
         hours_spent: 3,
+        remaining_time: 4,
       }),
       makeContext({ id: TIMELOG_ID }),
     );
@@ -631,6 +646,7 @@ describe("PUT /api/timelogs/:id — urejanje ur (#19)", () => {
     const res = await PUT(
       makePutRequest(`http://localhost/api/timelogs/${TIMELOG_ID}`, {
         hours_spent: 3,
+        remaining_time: 4,
       }),
       makeContext({ id: TIMELOG_ID }),
     );
@@ -643,6 +659,7 @@ describe("PUT /api/timelogs/:id — urejanje ur (#19)", () => {
     const res = await PUT(
       makePutRequest(`http://localhost/api/timelogs/${TIMELOG_ID}`, {
         hours_spent: 3,
+        remaining_time: 4,
       }),
       makeContext({ id: TIMELOG_ID }),
     );
@@ -655,6 +672,7 @@ describe("PUT /api/timelogs/:id — urejanje ur (#19)", () => {
     const res = await PUT(
       makePutRequest(`http://localhost/api/timelogs/nonexistent`, {
         hours_spent: 3,
+        remaining_time: 4,
       }),
       makeContext({ id: "nonexistent" }),
     );
@@ -667,6 +685,7 @@ describe("PUT /api/timelogs/:id — urejanje ur (#19)", () => {
     const res = await PUT(
       makePutRequest(`http://localhost/api/timelogs/${TIMELOG_ID}`, {
         hours_spent: 3,
+        remaining_time: 4,
       }),
       makeContext({ id: TIMELOG_ID }),
     );
@@ -678,6 +697,7 @@ describe("PUT /api/timelogs/:id — urejanje ur (#19)", () => {
     const res = await PUT(
       makePutRequest(`http://localhost/api/timelogs/${TIMELOG_ID}`, {
         hours_spent: 3,
+        remaining_time: 4,
       }),
       makeContext({ id: TIMELOG_ID }),
     );
@@ -689,6 +709,7 @@ describe("PUT /api/timelogs/:id — urejanje ur (#19)", () => {
     const res = await PUT(
       makePutRequest(`http://localhost/api/timelogs/${TIMELOG_ID}`, {
         hours_spent: 3,
+        remaining_time: 4,
       }),
       makeContext({ id: TIMELOG_ID }),
     );

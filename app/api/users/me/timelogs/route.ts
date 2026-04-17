@@ -117,10 +117,9 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from("time_logs")
       .select(
-        "id, task_id, hours, date, logged_at, task:tasks!inner(id, title, description, remaining_time, status, user_story:user_stories!inner(id, title, status, project_id))",
+        "id, task_id, hours, date, logged_at, remaining_time, task:tasks!inner(id, title, description, remaining_time, status, user_story:user_stories!inner(id, title, status, project_id, sprint:sprints(id, start_date, end_date)))",
       )
       .eq("user_id", user.id)
-      .neq("task.status", "completed")
       .order("date", { ascending: false })
       .order("logged_at", { ascending: false });
 

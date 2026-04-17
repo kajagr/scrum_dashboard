@@ -125,7 +125,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const { data: task, error: taskError } = await supabase
       .from("tasks")
-      .select("id, assignee_id, is_accepted")
+      .select("id, user_story_id, assignee_id, is_accepted, status")
       .eq("id", taskId)
       .is("deleted_at", null)
       .maybeSingle();
@@ -145,11 +145,36 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
 
+    const { data: story } = await supabase
+      .from("user_stories")
+      .select("id, status")
+      .eq("id", task.user_story_id)
+      .maybeSingle();
+
+    if (story?.status === "done") {
+      return NextResponse.json(
+        { error: "Zgodba je že zaključena." },
+        { status: 400 },
+      );
+    }
+
+    const taskUpdate: Record<string, unknown> = {
+      remaining_time: remainingTime,
+      updated_at: new Date().toISOString(),
+    };
+    if (remainingTime === 0) {
+      taskUpdate.status = "completed";
+      taskUpdate.is_active = false;
+      taskUpdate.active_since = null;
+    } else if (task.status === "completed") {
+      taskUpdate.status = "in_progress";
+    }
+
     const { data: updated, error: updateError } = await supabase
       .from("tasks")
-      .update({ remaining_time: remainingTime, updated_at: new Date().toISOString() })
+      .update(taskUpdate)
       .eq("id", taskId)
-      .select("id, remaining_time")
+      .select("id, remaining_time, status")
       .single();
 
     if (updateError)
